@@ -34,7 +34,7 @@ from moviepy.audio.tools.cuts import find_audio_period
 
 from PIL import Image, ImageDraw
 
-MANDL_VER "0.1"
+MANDL_VER = "0.1"
 
 class MandlContext:
     """
