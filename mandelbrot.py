@@ -140,7 +140,7 @@ class MandlContext:
         self.precision = 17 # int decimal precision for calculations
 
         self.duration  = 0  # int  duration of clip in seconds
-e       self.fps = 0 # int  number of frames per second
+        self.fps = 0 # int  number of frames per second
 
         self.palette = None
 
@@ -193,6 +193,11 @@ e       self.fps = 0 # int  number of frames per second
 
         im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
         im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
+
+        if self.verbose > 0:
+            print("MandlContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
+                  (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
+                  end = " ")
 
         # Used to create a histogram of the frequency of iteration
         # deppths retured by the mandelbrot calculation. Helpful for 
@@ -253,6 +258,9 @@ e       self.fps = 0 # int  number of frames per second
 
         # Zoom in by scaling factor
         self.zoom_in()
+
+        if self.verbose > 0:
+            print("Done]")
         
         return np.array(im)
         
@@ -299,9 +307,8 @@ class MediaView:
 
     def __repr__(self):
         return """\
-[MediaView duration {d:d} FPS:{f:d} Output:{vf:s}]\
-""".format(
-        d=self.duration,d=self.fps,vf=self.vfilename)
+[MediaView duration {du:d} FPS:{f:d} Output:{vf:s}]\
+""".format(du=self.duration,f=self.fps,vf=self.vfilename)
 
 # For now, use global context for a single dive per run
 
@@ -416,6 +423,7 @@ def parse_options():
             view_ctx.vfilename = arg
 
     print(mandl_ctx)
+    print(view_ctx)
 
 if __name__ == "__main__":
 
