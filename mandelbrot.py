@@ -41,16 +41,19 @@ class MandlPalette:
     Color gradient
     """
 
+    # XXX Idea : recursively define color palette so the black portion
+    # (the deepest) has far more fidelity. Can really do arbitrarily ...
+
     # Color in RGB 
-    def __init__(self, color_list = [(0,0,0),(255,0,0),(0,0,255),(255,255,0),(255,255,255)]):
-        self.gradient_size = 256
+    def __init__(self, color_list = [(0,0,0),(255,255,255),(0,0,0),(255,255,0),(255,204,204),(204,204,255),(255,255,204),(255,255,255)]):
+        self.gradient_size = 1024
         self.color_list = color_list
         self.palette = []
 
     def linear_interpolate(color1, color2, fraction):
-        new_r = int((color2[0] - color1[0])*fraction + color1[0])
-        new_g = int((color2[1] - color1[2])*fraction + color1[1])
-        new_b = int((color2[2] - color1[2])*fraction + color1[2])
+        new_r = int(math.ceil((color2[0] - color1[0])*fraction) + color1[0])
+        new_g = int(math.ceil((color2[1] - color1[1])*fraction) + color1[1])
+        new_b = int(math.ceil((color2[2] - color1[2])*fraction) + color1[2])
         return (new_r, new_g, new_b)
 
 
@@ -64,24 +67,27 @@ class MandlPalette:
         
         section_size = int(float(self.gradient_size)/float(len(self.color_list)-1))
         for c in range(0, len(self.color_list) - 1): 
-            for i in range(0, section_size): 
+            for i in range(0, section_size+1): 
                 fraction = float(i)/float(section_size)
                 new_color = MandlPalette.linear_interpolate(self.color_list[c], self.color_list[c+1], fraction)
                 self.palette.append(new_color)
         while len(self.palette) < self.gradient_size:
             c = self.palette[-1]
             self.palette.append(c)
-        assert len(self.palette) == self.gradient_size    
+        #assert len(self.palette) == self.gradient_size    
 
     def make_frame(self, t):    
+
+        IMG_WIDTH=255
+        IMG_HEIGHT=100
         
-        im = Image.new('RGB', (200, 100), (0, 0, 0))
+        im = Image.new('RGB', (IMG_WIDTH, IMG_HEIGHT), (0, 0, 0))
         draw = ImageDraw.Draw(im)
 
         color_iter = 0
-        for x in range(0,255):
+        for x in range(0,IMG_WIDTH):
             color = self.palette[color_iter]
-            for y in range(0,100):
+            for y in range(0,IMG_HEIGHT):
                 draw.point([x, y], color) 
             color_iter += 1 
         
@@ -239,7 +245,7 @@ class MandlContext:
                     c = 255 - int(255 * hues[math.floor(m)]) 
                     color=(c, c, c)
                 else:
-                    color = self.palette[255 - int(255 * hues[math.floor(m)])]
+                    color = self.palette[1024 - int(1024 * hues[math.floor(m)])]
 
                 # Plot the point
                 draw.point([x, y], color) 
@@ -307,8 +313,8 @@ view_ctx  = MediaView(16, 16, mandl_ctx)
 def set_default_params():
     global mandl_ctx
 
-    mandl_ctx.img_width  = 600
-    mandl_ctx.img_height = 400
+    mandl_ctx.img_width  = 1024
+    mandl_ctx.img_height = 768 
 
     mandl_ctx.cmplx_width  = mandl_ctx.ctxf(3.)
     mandl_ctx.cmplx_height = mandl_ctx.ctxf(2.5)
@@ -337,8 +343,8 @@ def set_preview_mode():
     mandl_ctx.img_width  = 300
     mandl_ctx.img_height = 200
 
-    mandl_ctx.cmplx_width  = 11.
-    mandl_ctx.cmplx_height = 7.5 
+    mandl_ctx.cmplx_width  = 3.
+    mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .75
 
@@ -361,7 +367,7 @@ def parse_options():
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
-                                "palette-test=",
+                                "palette-test",
                                 "color",
                                 "smooth="])
 
