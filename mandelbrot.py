@@ -41,9 +41,6 @@ class MandlPalette:
     Color gradient
     """
 
-    # XXX Idea : recursively define color palette so the black portion
-    # (the deepest) has far more fidelity. Can really do arbitrarily ...
-
     # Color in RGB 
     def __init__(self, color_list = [(0,0,0),(255,255,255),(0,0,0),(255,255,0),(255,204,204),(204,204,255),(255,255,204),(255,255,255)]):
         self.gradient_size = 1024
@@ -143,7 +140,7 @@ class MandlContext:
         self.precision = 17 # int decimal precision for calculations
 
         self.duration  = 0  # int  duration of clip in seconds
-        self.fps = 0 # int  number of frames per second
+e       self.fps = 0 # int  number of frames per second
 
         self.palette = None
 
@@ -263,10 +260,10 @@ class MandlContext:
     def __repr__(self):
         return """\
 [MandlContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
-Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Epochs:{e:d}]\
+Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=self.cmplx_width,ch=self.cmplx_height,
-        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs); 
+        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
 
 class MediaView: 
     """
@@ -299,6 +296,12 @@ class MediaView:
             print("Error: file extension not supported, must be gif or mp4")
             sys.exit(0)
             
+
+    def __repr__(self):
+        return """\
+[MediaView duration {d:d} FPS:{f:d} Output:{vf:s}]\
+""".format(
+        d=self.duration,d=self.fps,vf=self.vfilename)
 
 # For now, use global context for a single dive per run
 
