@@ -36,12 +36,75 @@ from PIL import Image, ImageDraw
 
 MANDL_VER = "0.1"
 
+class MandlPalette:
+    """
+    Color gradient
+    """
+
+    # Color in RGB 
+    def __init__(self, color_list = [(0,0,0),(255,0,0),(0,0,255),(255,255,0),(255,255,255)]):
+        self.gradient_size = 256
+        self.color_list = color_list
+        self.palette = []
+
+    def linear_interpolate(color1, color2, fraction):
+        new_r = int((color2[0] - color1[0])*fraction + color1[0])
+        new_g = int((color2[1] - color1[2])*fraction + color1[1])
+        new_b = int((color2[2] - color1[2])*fraction + color1[2])
+        return (new_r, new_g, new_b)
+
+
+    # Create 255 value gradient
+    # Use the following trivial linear interpolation algorithm
+    # (color2 - color1) * fraction + color1
+    def create_gradient(self):
+        if len(self.palette) != 0:
+            print("Error creating gradient, palette already exists")
+            sys.exit(0)
+        
+        section_size = int(float(self.gradient_size)/float(len(self.color_list)-1))
+        for c in range(0, len(self.color_list) - 1): 
+            for i in range(0, section_size): 
+                fraction = float(i)/float(section_size)
+                new_color = MandlPalette.linear_interpolate(self.color_list[c], self.color_list[c+1], fraction)
+                self.palette.append(new_color)
+        while len(self.palette) < self.gradient_size:
+            c = self.palette[-1]
+            self.palette.append(c)
+        assert len(self.palette) == self.gradient_size    
+
+    def make_frame(self, t):    
+        
+        im = Image.new('RGB', (200, 100), (0, 0, 0))
+        draw = ImageDraw.Draw(im)
+
+        color_iter = 0
+        for x in range(0,255):
+            color = self.palette[color_iter]
+            for y in range(0,100):
+                draw.point([x, y], color) 
+            color_iter += 1 
+        
+
+        return np.array(im)
+
+    def __iter__(self):
+        return self.palette
+
+    def __getitem__(self, index):
+             return self.palette[index]
+
+    def display(self):
+        clip = mpy.VideoClip(self.make_frame, duration=64)
+        clip.preview(fps=1) #fps 1 is really all that works
+        
+
 class MandlContext:
     """
     The context for a single dive
     """
 
-    def __init__(self, ctxf = None, ctxc = None):
+    def __init__(self, ctxf = None, ctxc = None, mp = None):
 
         if not ctxf:
             self.ctxf = float
@@ -51,6 +114,8 @@ class MandlContext:
             self.ctxc = complex
         else:    
             self.ctxc = ctxc 
+        if not mp:
+            self.mp = math
 
         self.img_width  = 0 # int : Wide of Image in pixels
         self.img_height = 0 # int
@@ -67,10 +132,14 @@ class MandlContext:
         self.scaling_factor = 0.0 #  float amount to zoom each epoch
         self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
+        self.smoothing      = False # bool turn on color smoothing
+
         self.precision = 17 # int decimal precision for calculations
 
         self.duration  = 0  # int  duration of clip in seconds
         self.fps = 0 # int  number of frames per second
+
+        self.palette = None
 
         self.verbose = 0 # how much to print about progress
 
@@ -96,15 +165,19 @@ class MandlContext:
         while ((z.real*z.real)+(z.imag*z.imag)) <= squared_escape  and n < self.max_iter:
             z = z*z + c
             n += 1
+
+        if n== self.max_iter:
+            return self.max_iter
         
         # The following code smooths out the colors so there aren't bands
         # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        # z = z*z + c; n+=1 # a couple extra iterations helps
-        # z = z*z + c; n+=1 # decrease the size of the error
-        # mu = n + 1 - mp.log(mp.log(fabs(z), b=2))
-        #return n + 1 - math.log(math.log2(abs(z)))
-
-        return n 
+        if self.smoothing:
+            z = z*z + c; n+=1 # a couple extra iterations helps
+            z = z*z + c; n+=1 # decrease the size of the error
+            mu = n + 1 - math.log(self.mp.log2(abs(z)))
+            return mu 
+        else:    
+            return n 
 
     def next_epoch(self, t):
         """Called for each frame of the animation. Will calculate
@@ -161,9 +234,15 @@ class MandlContext:
 
                 # The color depends on the number of iterations    
                 #hue = 255 - int(255 * linear_interpolation(hues[floor(m)], hues[ceil(m)], m % 1))
-                color = 255 - int(255 * hues[m]) 
+
+                if not self.palette:
+                    c = 255 - int(255 * hues[math.floor(m)]) 
+                    color=(c, c, c)
+                else:
+                    color = self.palette[255 - int(255 * hues[math.floor(m)])]
+
                 # Plot the point
-                draw.point([x, y], (color, color, color))
+                draw.point([x, y], color) 
 
 
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
@@ -235,7 +314,8 @@ def set_default_params():
     mandl_ctx.cmplx_height = mandl_ctx.ctxf(2.5)
 
     # This is close t Misiurewicz point M32,2
-    mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
+    # mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
+    mandl_ctx.cmplx_center = mandl_ctx.ctxc(-1.769383179195515018213,0.00423684791873677221)
 
     mandl_ctx.scaling_factor = .97
     mandl_ctx.num_epochs     = 0
@@ -257,8 +337,8 @@ def set_preview_mode():
     mandl_ctx.img_width  = 300
     mandl_ctx.img_height = 200
 
-    mandl_ctx.cmplx_width  = 3.
-    mandl_ctx.cmplx_height = 2.5 
+    mandl_ctx.cmplx_width  = 11.
+    mandl_ctx.cmplx_height = 7.5 
 
     mandl_ctx.scaling_factor = .75
 
@@ -280,7 +360,10 @@ def parse_options():
                                 "fps=",
                                 "gif=",
                                 "mpeg=",
-                                "verbose="])
+                                "verbose=",
+                                "palette-test=",
+                                "color",
+                                "smooth="])
 
     for opt,arg in opts:
         if opt in ['-p', '--preview']:
@@ -295,6 +378,17 @@ def parse_options():
             mandl_ctx.scale_factor = float(arg)
         elif opt in ['-f', '--fps']:
             view_ctx.sfps = float(arg)
+        elif opt in ['--smooth']:
+            mandl_ctx.smoothing = bool(arg)
+        elif opt in ['--palette-test']:
+            m = MandlPalette()
+            m.create_gradient()
+            m.display()
+            sys.exit(0)
+        elif opt in ['--color']:
+            m = MandlPalette()
+            m.create_gradient()
+            mandl_ctx.palette = m
         elif opt in ['--verbose']:
             verbosity = int(arg)
             if verbosity not in [0,1,2,3]:
