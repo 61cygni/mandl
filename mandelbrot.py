@@ -135,7 +135,10 @@ class MandlContext:
         self.scaling_factor = 0.0 #  float amount to zoom each epoch
         self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
+        self.set_zoom_level = 0   # Zoom in prior to the dive
+
         self.smoothing      = False # bool turn on color smoothing
+        self.snapshot       = False # Generate a single, high res shotb
 
         self.precision = 17 # int decimal precision for calculations
 
@@ -183,7 +186,7 @@ class MandlContext:
         else:    
             return n 
 
-    def next_epoch(self, t):
+    def next_epoch(self, t, snapshot_filename = None):
         """Called for each frame of the animation. Will calculate
         current view, and then zoom in"""
     
@@ -207,6 +210,9 @@ class MandlContext:
         hist = defaultdict(int) 
         values = {}
 
+        if snapshot_filename:
+            print("Generating image [", end="")
+
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
                 # map from pixels to complex coordinates
@@ -223,6 +229,13 @@ class MandlContext:
                 if m < self.max_iter:
                     hist[math.floor(m)] += 1
 
+            if snapshot_filename:
+                print(".",end="")
+                sys.stdout.flush()
+
+        if snapshot_filename:
+            print("]")
+
         total = sum(hist.values())
         hues = []
         h = 0
@@ -234,7 +247,7 @@ class MandlContext:
             hues.append(h)
         hues.append(h)
 
-        im = Image.new('RGB', (self.img_height, self.img_height), (0, 0, 0))
+        im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
         
         for x in range(0, self.img_width):
@@ -274,7 +287,10 @@ class MandlContext:
         if self.verbose > 0:
             print("Done]")
         
-        return np.array(im)
+        if snapshot_filename:
+            return im.save(snapshot_filename,"gif")
+        else:    
+            return np.array(im)
         
 
     def __repr__(self):
@@ -300,35 +316,58 @@ class MediaView:
         self.banner    = False 
         self.vfilename = None 
 
+
+    def intro_banner(self):
+        # Generate a text clip
+        w,h = self.ctx.img_width, self.ctx.img_height
+        banner_text = u"%dx%d center %s duration=%d fps=%d" %\
+                       (w, h, str(self.ctx.cmplx_center), self.duration, self.fps)
+
+
+        txt = mpy.TextClip(banner_text, font='Amiri-regular',
+                           color='white',fontsize=12)
+
+        txt_col = txt.on_color(size=(w + txt.w,txt.h+6),
+                          color=(0,0,0), pos=(1,'center'), col_opacity=0.6)
+
+        txt_mov = txt_col.set_position((0,h-txt_col.h)).set_duration(4)
+
+        return mpy.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
+
+    def create_snapshot(self):    
+    
+        if not self.vfilename:
+            self.vfilename = "snapshot.gif"
+        
+        self.ctx.next_epoch(-1,self.vfilename)
+
+
     def run(self):
+
+        # Check whether we need to zoom in prior to calculation
+
+        if self.ctx.set_zoom_level > 0:
+            print("Zooming in by %d epochs" % (self.ctx.set_zoom_level))
+            while self.ctx.set_zoom_level > 0:
+                self.ctx.zoom_in()
+                self.ctx.set_zoom_level -= 1
+            
+
+        if self.ctx.snapshot == True:
+            self.create_snapshot()
+            return
 
         self.clip = mpy.VideoClip(self.make_frame, duration=self.duration)
 
-        final = self.clip
-
         if self.banner:
-            # Generate a text clip
-            w,h = self.ctx.img_width, self.ctx.img_height
-            banner_text = u"%dx%d center %s duration=%d fps=%d" %\
-                           (w, h, str(self.ctx.cmplx_center), self.duration, self.fps)
-
-
-            txt = mpy.TextClip(banner_text, font='Amiri-regular',
-                               color='white',fontsize=12)
-
-            txt_col = txt.on_color(size=(w + txt.w,txt.h+6),
-                              color=(0,0,0), pos=(1,'center'), col_opacity=0.6)
-
-            txt_mov = txt_col.set_position((0,h-txt_col.h)).set_duration(4)
-
-            final = mpy.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
+            self.clip = self.intro_banner()
 
         if not self.vfilename:
-            final.preview(fps=1) #fps 1 is really all that works
+            self.clip.preview(fps=1) #fps 1 is really all that works
         elif self.vfilename.endswith(".gif"):
-            final.write_gif(self.vfilename, fps=self.fps)
+            self.clip.write_gif(self.vfilename, fps=self.fps)
         elif self.vfilename.endswith(".mp4"):
-            final.write_videofile(self.vfilename,
+            self.clip.write_videofile(self.vfilename,
                                   fps=self.fps, 
                                   audio=False, 
                                   codec="mpeg4")
@@ -393,6 +432,26 @@ def set_preview_mode():
     view_ctx.duration       = 4
     view_ctx.fps            = 4
 
+def set_snapshot_mode():
+    global mandl_ctx
+
+    print("+ Running in snapshot mode ")
+
+    mandl_ctx.snapshot = True
+
+    mandl_ctx.img_width  = 3000
+    mandl_ctx.img_height = 2000 
+
+    mandl_ctx.max_iter   = 2000
+
+    mandl_ctx.cmplx_width  = 3.
+    mandl_ctx.cmplx_height = 2.5 
+
+    mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
+
+    view_ctx.duration       = 0
+    view_ctx.fps            = 0
+
 
 def parse_options():
     global mandl_ctx
@@ -400,11 +459,15 @@ def parse_options():
     argv = sys.argv[1:]
 
     
-    opts, args = getopt.getopt(argv, "pd:m:s:f:",
+    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:c:",
                                ["preview",
                                 "duration=",
-                                "max_iter=",
-                                "scale_factor=",
+                                "max-iter=",
+                                "img-w=",
+                                "center=",
+                                "scale-factor=",
+                                "snapshot=",
+                                "zoom=",
                                 "fps=",
                                 "gif=",
                                 "mpeg=",
@@ -413,23 +476,33 @@ def parse_options():
                                 "color",
                                 "burn",
                                 "banner",
-                                "smooth="])
+                                "smooth"])
 
     for opt,arg in opts:
         if opt in ['-p', '--preview']:
             set_preview_mode()
+        if opt in ['-s', '--snapshot']:
+            set_snapshot_mode()
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
             view_ctx.duration = float(arg) 
-        elif opt in ['-m', '--max_iter']:
+        elif opt in ['-m', '--max-iter']:
             mandl_ctx.max_iter = int(arg)
-        elif opt in ['-s', '--scale_factor']:
+        elif opt in ['-w', '--img-w']:
+            mandl_ctx.img_width = int(arg)
+        elif opt in ['-c', '--center']:
+            mandl_ctx.cmplx_center= complex(arg)
+        elif opt in ['-h', '--img-h']:
+            mandl_ctx.img_height = int(arg)
+        elif opt in ['--scale-factor']:
             mandl_ctx.scale_factor = float(arg)
         elif opt in ['-f', '--fps']:
             view_ctx.sfps = float(arg)
+        elif opt in ['-z', '--zoom']:
+            view_ctx.set_zoom_level = int(arg)
         elif opt in ['--smooth']:
-            mandl_ctx.smoothing = bool(arg)
+            mandl_ctx.smoothing = True 
         elif opt in ['--palette-test']:
             m = MandlPalette()
             m.create_gradient()

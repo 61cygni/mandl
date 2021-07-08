@@ -3,6 +3,8 @@ Minor:
 
 Major:
 
+- Add simple testing framework.
+
 - Color palette 
   
    Coloring is still pretty shoddy. The blacks tend to wash out fidelity
@@ -11,8 +13,8 @@ Major:
 
 - Snapshot
 
+  Take a single, high-res, snaphot and save as an image
     
-
 - Caching raw calculations
 
 - Distribution
@@ -20,3 +22,7 @@ Major:
 Research:
 
 - Music
+
+Completed:
+
+- Burn in Framework
