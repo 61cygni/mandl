@@ -497,10 +497,10 @@ def parse_options():
             mandl_ctx.img_height = int(arg)
         elif opt in ['--scale-factor']:
             mandl_ctx.scale_factor = float(arg)
+        elif opt in ['-z', '--zoom']:
+            mandl_ctx.set_zoom_level = int(arg)
         elif opt in ['-f', '--fps']:
             view_ctx.sfps = float(arg)
-        elif opt in ['-z', '--zoom']:
-            view_ctx.set_zoom_level = int(arg)
         elif opt in ['--smooth']:
             mandl_ctx.smoothing = True 
         elif opt in ['--palette-test']:
