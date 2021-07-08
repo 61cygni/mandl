@@ -1,0 +1,22 @@
+Minor:
+- Add debug printing levels (verbosity 0,1,2,3)
+
+Major:
+
+- Color palette 
+  
+   Coloring is still pretty shoddy. The blacks tend to wash out fidelity
+   at mid-altitude. The best deep dives use a color other than black to
+   articulate the swirls ... we should probably do same
+
+- Snapshot
+
+    
+
+- Caching raw calculations
+
+- Distribution
+
+Research:
+
+- Music
