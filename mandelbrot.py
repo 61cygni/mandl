@@ -297,18 +297,38 @@ class MediaView:
         self.duration  = duration
         self.fps       = fps
         self.ctx       = ctx
+        self.banner    = False 
         self.vfilename = None 
 
     def run(self):
 
         self.clip = mpy.VideoClip(self.make_frame, duration=self.duration)
 
+        final = self.clip
+
+        if self.banner:
+            # Generate a text clip
+            w,h = self.ctx.img_width, self.ctx.img_height
+            banner_text = u"%dx%d center %s duration=%d fps=%d" %\
+                           (w, h, str(self.ctx.cmplx_center), self.duration, self.fps)
+
+
+            txt = mpy.TextClip(banner_text, font='Amiri-regular',
+                               color='white',fontsize=12)
+
+            txt_col = txt.on_color(size=(w + txt.w,txt.h+6),
+                              color=(0,0,0), pos=(1,'center'), col_opacity=0.6)
+
+            txt_mov = txt_col.set_position((0,h-txt_col.h)).set_duration(4)
+
+            final = mpy.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
+
         if not self.vfilename:
-            self.clip.preview(fps=1) #fps 1 is really all that works
+            final.preview(fps=1) #fps 1 is really all that works
         elif self.vfilename.endswith(".gif"):
-            self.clip.write_gif(self.vfilename, fps=self.fps)
+            final.write_gif(self.vfilename, fps=self.fps)
         elif self.vfilename.endswith(".mp4"):
-            self.clip.write_videofile(self.vfilename,
+            final.write_videofile(self.vfilename,
                                   fps=self.fps, 
                                   audio=False, 
                                   codec="mpeg4")
@@ -320,7 +340,7 @@ class MediaView:
     def __repr__(self):
         return """\
 [MediaView duration {du:f} FPS:{f:d} Output:{vf:s}]\
-""".format(du=self.duration,f=self.fps,vf=self.vfilename)
+""".format(du=self.duration,f=self.fps,vf=str(self.vfilename))
 
 # For now, use global context for a single dive per run
 
@@ -392,6 +412,7 @@ def parse_options():
                                 "palette-test",
                                 "color",
                                 "burn",
+                                "banner",
                                 "smooth="])
 
     for opt,arg in opts:
@@ -420,6 +441,8 @@ def parse_options():
             mandl_ctx.palette = m
         elif opt in ['--burn']:
             mandl_ctx.burn_in = True
+        elif opt in ['--banner']:
+            view_ctx.banner = True
         elif opt in ['--verbose']:
             verbosity = int(arg)
             if verbosity not in [0,1,2,3]:
