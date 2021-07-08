@@ -32,7 +32,7 @@ import moviepy.editor as mpy
 
 from moviepy.audio.tools.cuts import find_audio_period
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 MANDL_VER = "0.1"
 
@@ -143,6 +143,7 @@ class MandlContext:
         self.fps = 0 # int  number of frames per second
 
         self.palette = None
+        self.burn_in = False
 
         self.verbose = 0 # how much to print about progress
 
@@ -256,6 +257,17 @@ class MandlContext:
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
 
+        if self.burn_in == True:
+            burn_in_text = u"%d re range %f %f im range %f %f center %f + %f i" %\
+                (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag)
+
+            burn_in_location = (10,10)
+            burn_in_margin = 5 
+            burn_in_font = ImageFont.truetype('fonts/cour.ttf', 12)
+            burn_in_size = burn_in_font.getsize(burn_in_text)
+            draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
+            draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
+
         # Zoom in by scaling factor
         self.zoom_in()
 
@@ -307,7 +319,7 @@ class MediaView:
 
     def __repr__(self):
         return """\
-[MediaView duration {du:d} FPS:{f:d} Output:{vf:s}]\
+[MediaView duration {du:f} FPS:{f:d} Output:{vf:s}]\
 """.format(du=self.duration,f=self.fps,vf=self.vfilename)
 
 # For now, use global context for a single dive per run
@@ -379,6 +391,7 @@ def parse_options():
                                 "verbose=",
                                 "palette-test",
                                 "color",
+                                "burn",
                                 "smooth="])
 
     for opt,arg in opts:
@@ -387,7 +400,7 @@ def parse_options():
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
-            view_ctx.duration = int(arg) 
+            view_ctx.duration = float(arg) 
         elif opt in ['-m', '--max_iter']:
             mandl_ctx.max_iter = int(arg)
         elif opt in ['-s', '--scale_factor']:
@@ -405,6 +418,8 @@ def parse_options():
             m = MandlPalette()
             m.create_gradient()
             mandl_ctx.palette = m
+        elif opt in ['--burn']:
+            mandl_ctx.burn_in = True
         elif opt in ['--verbose']:
             verbosity = int(arg)
             if verbosity not in [0,1,2,3]:
