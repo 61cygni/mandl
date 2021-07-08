@@ -42,7 +42,7 @@ class MandlPalette:
     """
 
     # Color in RGB 
-    def __init__(self, color_list = [(0,0,0),(255,255,255),(0,0,0),(255,255,0),(255,204,204),(204,204,255),(255,255,204),(255,255,255)]):
+    def __init__(self, color_list = [(255,255,255),(0,0,0),(255,255,255),(0,0,0),(255,255,255),(0,0,0),(255,255,0),(255,204,204),(204,204,255),(255,255,204),(255,255,255)]):
         self.gradient_size = 1024
         self.color_list = color_list
         self.palette = []
@@ -62,7 +62,18 @@ class MandlPalette:
             print("Error creating gradient, palette already exists")
             sys.exit(0)
         
-        section_size = int(float(self.gradient_size)/float(len(self.color_list)-1))
+        #the first few colors are critical, so just fill by hand.
+        self.palette.append((0,0,0))
+        self.palette.append((0,0,0))
+        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.2))
+        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.4))
+        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.6))
+        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.8))
+
+        # The magic number 6 here just denotes the previous colors we
+        # filled by hand
+        section_size = int(float(self.gradient_size-6)/float(len(self.color_list)-1))
+
         for c in range(0, len(self.color_list) - 1): 
             for i in range(0, section_size+1): 
                 fraction = float(i)/float(section_size)
@@ -397,8 +408,8 @@ def set_default_params():
     mandl_ctx.img_width  = 1024
     mandl_ctx.img_height = 768 
 
-    mandl_ctx.cmplx_width  = mandl_ctx.ctxf(3.)
-    mandl_ctx.cmplx_height = mandl_ctx.ctxf(2.5)
+    mandl_ctx.cmplx_width  = mandl_ctx.ctxf(5.0)
+    mandl_ctx.cmplx_height = mandl_ctx.ctxf(3.5)
 
     # This is close t Misiurewicz point M32,2
     # mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
@@ -459,11 +470,12 @@ def parse_options():
     argv = sys.argv[1:]
 
     
-    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:c:",
+    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:h:c:",
                                ["preview",
                                 "duration=",
                                 "max-iter=",
                                 "img-w=",
+                                "img-h=",
                                 "center=",
                                 "scale-factor=",
                                 "snapshot=",
@@ -491,6 +503,8 @@ def parse_options():
             mandl_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:
             mandl_ctx.img_width = int(arg)
+        elif opt in ['-h', '--img-h']:
+            mandl_ctx.img_height = int(arg)
         elif opt in ['-c', '--center']:
             mandl_ctx.cmplx_center= complex(arg)
         elif opt in ['-h', '--img-h']:
