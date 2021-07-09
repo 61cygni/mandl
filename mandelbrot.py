@@ -30,11 +30,17 @@ import numpy as  np
 import mpmath as mp
 import moviepy.editor as mpy
 
+from scipy.stats import norm
+
 from moviepy.audio.tools.cuts import find_audio_period
 
 from PIL import Image, ImageDraw, ImageFont
 
 MANDL_VER = "0.1"
+
+def gaussian(x, mu, sig):
+    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
+
 
 class MandlPalette:
     """
@@ -42,10 +48,10 @@ class MandlPalette:
     """
 
     # Color in RGB 
-    def __init__(self, color_list = [(255,255,255),(0,0,0),(255,255,255),(0,0,0),(255,255,255),(0,0,0),(255,255,0),(255,204,204),(204,204,255),(255,255,204),(255,255,255)]):
+    def __init__(self):
         self.gradient_size = 1024
-        self.color_list = color_list
         self.palette = []
+
 
     def linear_interpolate(color1, color2, fraction):
         new_r = int(math.ceil((color2[0] - color1[0])*fraction) + color1[0])
@@ -54,12 +60,65 @@ class MandlPalette:
         return (new_r, new_g, new_b)
 
 
+    def create_gauss_gradient(self, c1, c2, mu=0.0, sigma=1.0): 
+        
+        print("+ Creating color gradient with gaussian decay")
+        
+        if len(self.palette) != 0:
+            print("Error palette already created")
+            sys.exit(0)
+
+        self.palette.append(c2)
+
+        x = 0.0
+        while len(self.palette) <= self.gradient_size:
+            g = gaussian(x,0,.10)
+            c = MandlPalette.linear_interpolate(c1, c2, g) 
+            #print(c,end=" ")
+            #print(g)
+            self.palette.append(c)
+            x = x + (1./(self.gradient_size+1))
+
+    def create_exp_gradient(self, c1, c2, decay_const = 1.05):    
+
+        print("+ Creating color gradient with exponential decay")
+        
+        if len(self.palette) != 0:
+            print("Error palette already created")
+            sys.exit(0)
+
+        self.palette.append(c2)
+
+        fraction = 1.
+        while len(self.palette) <= self.gradient_size:
+            c = MandlPalette.linear_interpolate(c1, c2, fraction)
+            self.palette.append(c)
+            fraction = fraction / decay_const
+
+    def create_normal_gradient(self, c1, c2, decay_const = 1.05):    
+        
+        if len(self.palette) != 0:
+            print("Error palette already created")
+            sys.exit(0)
+
+        self.palette.append(c2)
+
+        fraction = 1.
+        while len(self.palette) <= self.gradient_size:
+            c = MandlPalette.linear_interpolate(c1, c2, fraction)
+            self.palette.append(c)
+            fraction = fraction / decay_const
+            
+
     # Create 255 value gradient
     # Use the following trivial linear interpolation algorithm
     # (color2 - color1) * fraction + color1
-    def create_gradient(self):
+    def create_gradient_from_list(self, color_list = [(255,255,255),(0,0,0),(255,255,255),(0,0,0),(255,255,255),(0,0,0),(241, 247, 215),(255,204,204),(204,204,255),(255,255,204),(255,255,255)]):
+
+        print("+ Creating color gradient from color list")
+
         if len(self.palette) != 0:
-            print("Error creating gradient, palette already exists")
+            print("Error palette already created")
             sys.exit(0)
         
         #the first few colors are critical, so just fill by hand.
@@ -72,12 +131,12 @@ class MandlPalette:
 
         # The magic number 6 here just denotes the previous colors we
         # filled by hand
-        section_size = int(float(self.gradient_size-6)/float(len(self.color_list)-1))
+        section_size = int(float(self.gradient_size-6)/float(len(color_list)-1))
 
-        for c in range(0, len(self.color_list) - 1): 
+        for c in range(0, len(color_list) - 1): 
             for i in range(0, section_size+1): 
                 fraction = float(i)/float(section_size)
-                new_color = MandlPalette.linear_interpolate(self.color_list[c], self.color_list[c+1], fraction)
+                new_color = MandlPalette.linear_interpolate(color_list[c], color_list[c+1], fraction)
                 self.palette.append(new_color)
         while len(self.palette) < self.gradient_size:
             c = self.palette[-1]
@@ -86,7 +145,7 @@ class MandlPalette:
 
     def make_frame(self, t):    
 
-        IMG_WIDTH=255
+        IMG_WIDTH=1024
         IMG_HEIGHT=100
         
         im = Image.new('RGB', (IMG_WIDTH, IMG_HEIGHT), (0, 0, 0))
@@ -192,7 +251,7 @@ class MandlContext:
         if self.smoothing:
             z = z*z + c; n+=1 # a couple extra iterations helps
             z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(self.mp.log2(abs(z)))
+            mu = n + 1 - math.log(math.log2(abs(z)))
             return mu 
         else:    
             return n 
@@ -265,12 +324,14 @@ class MandlContext:
             for y in range(0, self.img_height):
                 m = values[(x,y)] 
 
-                # The color depends on the number of iterations    
-                #hue = 255 - int(255 * linear_interpolation(hues[floor(m)], hues[ceil(m)], m % 1))
 
                 if not self.palette:
                     c = 255 - int(255 * hues[math.floor(m)]) 
                     color=(c, c, c)
+                elif self.smoothing:
+                    c1 = self.palette[1024 - int(1024 * hues[math.floor(m)])]
+                    c2 = self.palette[1024 - int(1024 * hues[math.ceil(m)])]
+                    color = MandlPalette.linear_interpolate(c1,c2,.5) 
                 else:
                     color = self.palette[1024 - int(1024 * hues[math.floor(m)])]
 
@@ -484,8 +545,8 @@ def parse_options():
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
-                                "palette-test",
-                                "color",
+                                "palette-test=",
+                                "color=",
                                 "burn",
                                 "banner",
                                 "smooth"])
@@ -519,12 +580,28 @@ def parse_options():
             mandl_ctx.smoothing = True 
         elif opt in ['--palette-test']:
             m = MandlPalette()
-            m.create_gradient()
+            if str(arg) == "gauss":
+                m.create_gauss_gradient((255,255,255),(0,0,0))
+            elif str(arg) == "exp":    
+                m.create_exp_gradient((255,255,255),(0,0,0))
+            elif str(arg) == "list":    
+                m.create_gradient_from_list()
+            else:
+                print("Error: --palette-test arg must be one of gauss|exp|list")
+                sys.exit(0)
             m.display()
             sys.exit(0)
         elif opt in ['--color']:
             m = MandlPalette()
-            m.create_gradient()
+            if str(arg) == "gauss":
+                m.create_gauss_gradient((255,255,255),(0,0,0))
+            elif str(arg) == "exp":    
+                m.create_exp_gradient((255,255,255),(0,0,0))
+            elif str(arg) == "list":    
+                m.create_gradient_from_list()
+            else:
+                print("Error: --palette-test arg must be one of gauss|exp|list")
+                sys.exit(0)
             mandl_ctx.palette = m
         elif opt in ['--burn']:
             mandl_ctx.burn_in = True
