@@ -523,7 +523,7 @@ def set_default_params():
     mandl_ctx.num_epochs     = 0
 
     mandl_ctx.max_iter       = 255
-    mandl_ctx.escape_rad     = 20.
+    mandl_ctx.escape_rad     = 4.
 
     mandl_ctx.precision      = 100
 
@@ -543,7 +543,7 @@ def set_preview_mode():
     mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .75
-    mandl_ctx.escape_rad     = 20.
+    mandl_ctx.escape_rad     = 4.
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
@@ -564,7 +564,7 @@ def set_snapshot_mode():
     mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
-    mandl_ctx.escape_rad     = 20.
+    mandl_ctx.escape_rad     = 4.
 
     view_ctx.duration       = 0
     view_ctx.fps            = 0
