@@ -74,12 +74,10 @@ class MandlPalette:
         while len(self.palette) <= self.gradient_size:
             g = gaussian(x,0,.10)
             c = MandlPalette.linear_interpolate(c1, c2, g) 
-            #print(c,end=" ")
-            #print(g)
             self.palette.append(c)
             x = x + (1./(self.gradient_size+1))
 
-    def create_exp_gradient(self, c1, c2, decay_const = 1.05):    
+    def create_exp_gradient(self, c1, c2, decay_const = 1.01):    
 
         print("+ Creating color gradient with exponential decay")
         
@@ -87,21 +85,67 @@ class MandlPalette:
             print("Error palette already created")
             sys.exit(0)
 
-        self.palette.append(c2)
 
-        fraction = 1.
+        x = 0.0
+
         while len(self.palette) <= self.gradient_size:
+            fraction = math.pow(math.e,-15.*x)
             c = MandlPalette.linear_interpolate(c1, c2, fraction)
             self.palette.append(c)
-            fraction = fraction / decay_const
+            x = x + (1. / 1025) 
+
+
+    def create_exp2_gradient(self, c1, c2, decay_const = 1.01):    
+
+        print("+ Creating color gradient with varying exponential decay")
+        
+        if len(self.palette) != 0:
+            print("Error palette already created")
+            sys.exit(0)
+
+
+        x = 0.0
+        c = c1
+        # Do a very quick decent for the first 1/16 
+        while len(self.palette) <= float(self.gradient_size)/32.:
+            fraction = math.pow(math.e,-30.*x)
+            c = MandlPalette.linear_interpolate((255,255,255), c1, fraction)
+            self.palette.append(c)
+            x = x + (1. / float(self.gradient_size)) 
+
+        last_c = c
+        x = 0.0
+        # Do another quick decent back to first color for the next 1/16 
+        while len(self.palette) <= 2.*(float(self.gradient_size) / 16.):
+            fraction = math.pow(math.e,-15.*x)
+            c = MandlPalette.linear_interpolate((255,255,255), last_c, fraction)
+            self.palette.append(c)
+            x = x + (1. / float(self.gradient_size)) 
+
+        last_c = c
+        x = 0.0
+        # Do another quick decent back to first color for the next 1/16 
+        while len(self.palette) <= 2.*(float(self.gradient_size) / 16.):
+            fraction = math.pow(math.e,-5.*x)
+            c = MandlPalette.linear_interpolate((255,255,255), last_c, fraction)
+            self.palette.append(c)
+            x = x + (1. / float(self.gradient_size)) 
+
+        last_c = c
+        # For the remaining go back to white 
+        x = 0.0
+        while len(self.palette) <= self.gradient_size :
+            fraction = math.pow(math.e,-2.*x)
+            c = MandlPalette.linear_interpolate((255,255,255),last_c, fraction)
+            self.palette.append(c)
+            x = x + (1. / float(self.gradient_size)) 
+
 
     def create_normal_gradient(self, c1, c2, decay_const = 1.05):    
         
         if len(self.palette) != 0:
             print("Error palette already created")
             sys.exit(0)
-
-        self.palette.append(c2)
 
         fraction = 1.
         while len(self.palette) <= self.gradient_size:
@@ -324,7 +368,6 @@ class MandlContext:
             for y in range(0, self.img_height):
                 m = values[(x,y)] 
 
-
                 if not self.palette:
                     c = 255 - int(255 * hues[math.floor(m)]) 
                     color=(c, c, c)
@@ -480,7 +523,7 @@ def set_default_params():
     mandl_ctx.num_epochs     = 0
 
     mandl_ctx.max_iter       = 255
-    mandl_ctx.escape_rad     = 20
+    mandl_ctx.escape_rad     = 20.
 
     mandl_ctx.precision      = 100
 
@@ -500,6 +543,7 @@ def set_preview_mode():
     mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .75
+    mandl_ctx.escape_rad     = 20.
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
@@ -520,6 +564,7 @@ def set_snapshot_mode():
     mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
+    mandl_ctx.escape_rad     = 20.
 
     view_ctx.duration       = 0
     view_ctx.fps            = 0
@@ -538,7 +583,7 @@ def parse_options():
                                 "img-w=",
                                 "img-h=",
                                 "center=",
-                                "scale-factor=",
+                                "scaling-factor=",
                                 "snapshot=",
                                 "zoom=",
                                 "fps=",
@@ -570,12 +615,12 @@ def parse_options():
             mandl_ctx.cmplx_center= complex(arg)
         elif opt in ['-h', '--img-h']:
             mandl_ctx.img_height = int(arg)
-        elif opt in ['--scale-factor']:
-            mandl_ctx.scale_factor = float(arg)
+        elif opt in ['--scaling-factor']:
+            mandl_ctx.scaling_factor = float(arg)
         elif opt in ['-z', '--zoom']:
             mandl_ctx.set_zoom_level = int(arg)
         elif opt in ['-f', '--fps']:
-            view_ctx.sfps = float(arg)
+            view_ctx.fps = int(arg)
         elif opt in ['--smooth']:
             mandl_ctx.smoothing = True 
         elif opt in ['--palette-test']:
@@ -584,6 +629,8 @@ def parse_options():
                 m.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
                 m.create_exp_gradient((255,255,255),(0,0,0))
+            elif str(arg) == "exp2":    
+                m.create_exp2_gradient((0,0,0),(128,128,128))
             elif str(arg) == "list":    
                 m.create_gradient_from_list()
             else:
@@ -597,6 +644,8 @@ def parse_options():
                 m.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
                 m.create_exp_gradient((255,255,255),(0,0,0))
+            elif str(arg) == "exp2":    
+                m.create_exp2_gradient((0,0,0),(128,128,128))
             elif str(arg) == "list":    
                 m.create_gradient_from_list()
             else:
