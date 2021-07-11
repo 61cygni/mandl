@@ -259,6 +259,7 @@ class MandlContext:
         self.duration  = 0  # int  duration of clip in seconds
         self.fps = 0 # int  number of frames per second
 
+        self.julia_c  = None
         self.palette = None
         self.burn_in = False
 
@@ -271,6 +272,17 @@ class MandlContext:
             self.num_epochs += 1
             iterations -= 1
 
+    def julia(self, c, z0):
+        z = z0
+        n = 0
+        while abs(z) <= 2 and n < self.max_iter:
+            z = z*z + c
+            n += 1
+
+        if n == self.max_iter:
+            return self.max_iter
+
+        return n + 1 - math.log(math.log2(abs(z)))
 
     def mandelbrot(self, c):
         z = self.ctxc(0)
@@ -287,7 +299,7 @@ class MandlContext:
             z = z*z + c
             n += 1
 
-        if n== self.max_iter:
+        if n >= self.max_iter:
             return self.max_iter
         
         # The following code smooths out the colors so there aren't bands
@@ -337,7 +349,12 @@ class MandlContext:
 
                 c = self.ctxc(Re_x, Im_y)
 
-                m = self.mandelbrot(c)
+
+                if not self.julia:
+                    m = self.mandelbrot(c)
+                else:        
+                    z0 = c
+                    m = self.julia(self.julia_c, z0) 
 
                 values[(x,y)] = m 
                 if m < self.max_iter:
@@ -411,10 +428,10 @@ class MandlContext:
     def __repr__(self):
         return """\
 [MandlContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
-Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
+Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Epochs:{e:d} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=self.cmplx_width,ch=self.cmplx_height,
-        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
+        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter,sm=self.smoothing); 
 
 class MediaView: 
     """
@@ -523,7 +540,7 @@ def set_default_params():
     mandl_ctx.num_epochs     = 0
 
     mandl_ctx.max_iter       = 255
-    mandl_ctx.escape_rad     = 4.
+    mandl_ctx.escape_rad     = 32768. 
 
     mandl_ctx.precision      = 100
 
@@ -543,7 +560,7 @@ def set_preview_mode():
     mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .75
-    mandl_ctx.escape_rad     = 4.
+    mandl_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
@@ -564,7 +581,7 @@ def set_snapshot_mode():
     mandl_ctx.cmplx_height = 2.5 
 
     mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
-    mandl_ctx.escape_rad     = 4.
+    mandl_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 0
     view_ctx.fps            = 0
@@ -590,6 +607,8 @@ def parse_options():
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
+                                "julia=",
+                                "center=",
                                 "palette-test=",
                                 "color=",
                                 "burn",
@@ -623,6 +642,10 @@ def parse_options():
             view_ctx.fps = int(arg)
         elif opt in ['--smooth']:
             mandl_ctx.smoothing = True 
+        elif opt in ['--julia']:
+            mandl_ctx.julia_c = complex(arg) 
+        elif opt in ['--center']:
+            mandl_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
             m = MandlPalette()
             if str(arg) == "gauss":
