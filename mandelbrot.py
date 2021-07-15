@@ -259,7 +259,10 @@ class MandlContext:
         self.duration  = 0  # int  duration of clip in seconds
         self.fps = 0 # int  number of frames per second
 
-        self.julia_c  = None
+        self.julia_c      = None
+        self.julia_orig   = None
+        self.julia_walk_c = None
+
         self.palette = None
         self.burn_in = False
 
@@ -271,6 +274,31 @@ class MandlContext:
             self.cmplx_height *= self.scaling_factor
             self.num_epochs += 1
             iterations -= 1
+
+    # Use Bresenham's line drawing algo for a simple walk between two
+    # complex points
+    def julia_walk(self, c,  t):
+
+        fraction = float(t) / float(self.duration)
+
+        if not self.julia_orig:
+            self.julia_orig = self.julia_c
+
+        x0 = self.julia_orig.real
+        x1 = c.real 
+        y0 = self.julia_orig.imag 
+        y1 = c.imag 
+
+        new_x = ((x1 - x0)*fraction) + x0
+        new_y = ((y1 - y0)*fraction) + y0 
+        self.julia_c = complex(new_x, new_y)
+
+
+    # Some interesting c values
+    # c = complex(285, .01)
+    # c = complex(-0.8, 0.156)
+    # c = complex(-0.4, 0.6)
+    # c = complex(-0.7269, 0.1889)
 
     def julia(self, c, z0):
         z = z0
@@ -413,8 +441,12 @@ class MandlContext:
             draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
             draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
-        # Zoom in by scaling factor
-        self.zoom_in()
+
+        if self.julia_walk_c:
+            self.julia_walk(self.julia_walk_c, t)
+            #self.julia_walk(complex(-0.6734375,0.296484375), t)
+        else:    
+            self.zoom_in()
 
         if self.verbose > 0:
             print("Done]")
@@ -447,6 +479,9 @@ class MediaView:
         self.ctx       = ctx
         self.banner    = False 
         self.vfilename = None 
+
+        self.ctx.duration = duration
+        self.ctx.fps      = fps
 
 
     def intro_banner(self):
@@ -599,6 +634,8 @@ def parse_options():
                                 "max-iter=",
                                 "img-w=",
                                 "img-h=",
+                                "cmplx-w=",
+                                "cmplx-h=",
                                 "center=",
                                 "scaling-factor=",
                                 "snapshot=",
@@ -608,6 +645,7 @@ def parse_options():
                                 "mpeg=",
                                 "verbose=",
                                 "julia=",
+                                "julia-walk=",
                                 "center=",
                                 "palette-test=",
                                 "color=",
@@ -623,13 +661,18 @@ def parse_options():
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
-            view_ctx.duration = float(arg) 
+            view_ctx.duration  = float(arg) 
+            mandl_ctx.duration = float(arg) 
         elif opt in ['-m', '--max-iter']:
             mandl_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:
             mandl_ctx.img_width = int(arg)
         elif opt in ['-h', '--img-h']:
             mandl_ctx.img_height = int(arg)
+        elif opt in ['--cmplx-w']:
+            mandl_ctx.cmplx_width = float(arg)
+        elif opt in ['--cmplx-h']:
+            mandl_ctx.cmplx_height = float(arg)
         elif opt in ['-c', '--center']:
             mandl_ctx.cmplx_center= complex(arg)
         elif opt in ['-h', '--img-h']:
@@ -639,11 +682,14 @@ def parse_options():
         elif opt in ['-z', '--zoom']:
             mandl_ctx.set_zoom_level = int(arg)
         elif opt in ['-f', '--fps']:
-            view_ctx.fps = int(arg)
+            view_ctx.fps  = int(arg)
+            mandl_ctx.fps = int(arg)
         elif opt in ['--smooth']:
             mandl_ctx.smoothing = True 
         elif opt in ['--julia']:
             mandl_ctx.julia_c = complex(arg) 
+        elif opt in ['--julia-walk']:
+            mandl_ctx.julia_walk_c = complex(arg) 
         elif opt in ['--center']:
             mandl_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
