@@ -263,6 +263,8 @@ class MandlContext:
         self.julia_orig   = None
         self.julia_walk_c = None
 
+        self.julia_list   = None 
+
         self.palette = None
         self.burn_in = False
 
@@ -277,17 +279,29 @@ class MandlContext:
 
     # Use Bresenham's line drawing algo for a simple walk between two
     # complex points
-    def julia_walk(self, c,  t):
+    def julia_walk(self, t):
 
-        fraction = float(t) / float(self.duration)
+        # duration of a leg
+        leg_d      = float(self.duration) / float(len(self.julia_list) - 1)
+        # which leg are we walking?
+        leg        = math.floor(float(t) / leg_d)
+        # how far along are we on that leg?
+        timeslice  = float(self.duration) / (float(self.duration) * float(self.fps))
+        fraction   = (float(t) - (float(leg) * leg_d)) / (leg_d - timeslice)
 
-        if not self.julia_orig:
-            self.julia_orig = self.julia_c
+        #print("T %f Leg %d leg_d %d Fraction %f"%(t,leg,leg_d,fraction))
+
+        cp1 = self.julia_list[leg]
+        cp2 = self.julia_list[leg + 1]
+
+
+        if self.julia_orig != cp1:
+            self.julia_orig = cp1
 
         x0 = self.julia_orig.real
-        x1 = c.real 
+        x1 = cp2.real 
         y0 = self.julia_orig.imag 
-        y1 = c.imag 
+        y1 = cp2.imag 
 
         new_x = ((x1 - x0)*fraction) + x0
         new_y = ((y1 - y0)*fraction) + y0 
@@ -295,7 +309,6 @@ class MandlContext:
 
 
     # Some interesting c values
-    # c = complex(285, .01)
     # c = complex(-0.8, 0.156)
     # c = complex(-0.4, 0.6)
     # c = complex(-0.7269, 0.1889)
@@ -442,9 +455,8 @@ class MandlContext:
             draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
 
-        if self.julia_walk_c:
-            self.julia_walk(self.julia_walk_c, t)
-            #self.julia_walk(complex(-0.6734375,0.296484375), t)
+        if self.julia_list:
+            self.julia_walk(t)
         else:    
             self.zoom_in()
 
@@ -689,7 +701,8 @@ def parse_options():
         elif opt in ['--julia']:
             mandl_ctx.julia_c = complex(arg) 
         elif opt in ['--julia-walk']:
-            mandl_ctx.julia_walk_c = complex(arg) 
+            mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
+            mandl_ctx.julia_c    = mandl_ctx.julia_list[0]
         elif opt in ['--center']:
             mandl_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
