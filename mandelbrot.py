@@ -353,12 +353,12 @@ class MandlContext:
         else:    
             return n 
 
-    def next_epoch(self, t, snapshot_filename = None):
-        """Called for each frame of the animation. Will calculate
-        current view, and then zoom in"""
-    
-        # Use center point to determines the box in the complex plane
-        # we need to calculatee
+    def calc_cur_frame(self, snapshot_filename = None):        
+
+        # --
+        # Calculate box in complex plane from center point
+        # --
+
         re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
         re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
 
@@ -370,15 +370,23 @@ class MandlContext:
                   (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
                   end = " ")
 
+
         # Used to create a histogram of the frequency of iteration
-        # deppths retured by the mandelbrot calculation. Helpful for 
+        # depths retured by the mandelbrot calculation. Helpful for 
         # color selection since many iterations never come up so you
         # loose fidelity by not focusing on those heavily used
+
         hist = defaultdict(int) 
         values = {}
 
         if snapshot_filename:
             print("Generating image [", end="")
+
+        # --
+        # Iterate over every point in the complex plane (1:1 mapping per
+        # pixel) and run the fractacl calculation. We save the output in
+        # a 2x2 array, and also create the histogram of values
+        # --
 
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
@@ -408,16 +416,9 @@ class MandlContext:
         if snapshot_filename:
             print("]")
 
-        total = sum(hist.values())
-        hues = []
-        h = 0
+        return values, hist    
 
-        # calculate percent of total for each iteration
-        for i in range(self.max_iter):
-            if total :
-                h += hist[i] / total
-            hues.append(h)
-        hues.append(h)
+    def draw_image_PIL(self, values, hues):    
 
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
@@ -454,6 +455,44 @@ class MandlContext:
             draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
             draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
+        return im    
+
+    def next_epoch(self, t, snapshot_filename = None):
+        """Called for each frame of the animation. Will calculate
+        current view, and then zoom in"""
+    
+    
+        # call primary calculation function
+        values, hist = self.calc_cur_frame(snapshot_filename)
+
+
+        #- 
+        # From histogram normalize to percent-of-total. This is
+        # effectively a probability distribution of escape values 
+        #
+        # Note that this is not effecitly a probability distribution for
+        # a given escape value. We can use this to calculate the Shannon 
+
+        total = sum(hist.values())
+        hues = []
+        h = 0
+
+        for i in range(self.max_iter):
+            if total :
+                h += hist[i] / total
+            hues.append(h)
+        hues.append(h)
+
+
+        # -- 
+        # Create image for this frame
+        # --
+        
+        im = self.draw_image_PIL(values, hues)
+
+        # -- 
+        # Do next step in animation
+        # -- 
 
         if self.julia_list:
             self.julia_walk(t)
