@@ -12,15 +12,17 @@ import struct
 import pickle
 
 
+CACHE_VER = 0.11
 FRACTL_CACHE_DIR = "./.fractal_cache/"
 
 class Frame:
 
-    def __init__(self, ver, cw, ch, center, escape_r, m_iter, values, histogram):
+    def __init__(self, ver, cw, ch, center, julia_c, escape_r, m_iter, values, histogram):
         self.ver = ver
         self.cw  = cw
         self.ch  = ch
         self.center    = center
+        self.julia_c   = julia_c
         self.escape_r  = escape_r
         self.m_iter    = m_iter
         self.values    = values
@@ -36,19 +38,39 @@ class FractalCache:
         self.subdir = None
 
     def create_subdir_name(self):
-        return self.root_dir + "/" + str(self.ctx.img_width)+"x"+str(self.ctx.img_height)
+        filename = self.root_dir + "/"
+        if not self.ctx.julia_c:
+            filename = filename + "mandelbrot/"
+        else:    
+            filename = filename + "juliaset/"
+
+        return filename + "/" + str(self.ctx.img_width)+"x"+str(self.ctx.img_height)
 
     def create_file_name(self):
-        # create filename from a deterministic hash of the important
-        # context
-        ba = struct.pack("ffffffi",
-                              float(self.ctx.ver),
-                              self.ctx.cmplx_width,
-                              self.ctx.cmplx_height,
-                              self.ctx.cmplx_center.real,
-                              self.ctx.cmplx_center.imag,
-                              self.ctx.escape_rad,
-                              self.ctx.max_iter)
+        ba = None
+
+        if not self.ctx.julia_c:
+            # create filename from a deterministic hash of the important
+            # context
+            ba = struct.pack("ffffffi",
+                                  CACHE_VER, 
+                                  self.ctx.cmplx_width,
+                                  self.ctx.cmplx_height,
+                                  self.ctx.cmplx_center.real,
+                                  self.ctx.cmplx_center.imag,
+                                  self.ctx.escape_rad,
+                                  self.ctx.max_iter)
+        else:                            
+            ba = struct.pack("ffffffffi",
+                                  CACHE_VER, 
+                                  self.ctx.cmplx_width,
+                                  self.ctx.cmplx_height,
+                                  self.ctx.cmplx_center.real,
+                                  self.ctx.cmplx_center.imag,
+                                  self.ctx.julia_c.real,
+                                  self.ctx.julia_c.imag,
+                                  self.ctx.escape_rad,
+                                  self.ctx.max_iter)
 
         h = hmac.new(ba, digestmod=hashlib.sha1)
         return h.hexdigest()
@@ -58,12 +80,12 @@ class FractalCache:
 
         if not os.path.isdir(self.root_dir):
             print("  -> directory not found ...  creating ")
-            os.mkdir(self.root_dir)
+            os.makedirs(self.root_dir,exist_ok=True)
 
         self.subdir = self.create_subdir_name() 
         if not os.path.isdir(self.subdir):
             print("  ->  subdir %s not found ...  creating "%(self.subdir))
-            os.mkdir(self.subdir)
+            os.makedirs(self.subdir,exist_ok=True)
 
     def check_cache(self):
 
@@ -77,10 +99,11 @@ class FractalCache:
         
         filename = self.subdir + "/" + self.create_file_name()
         print("+  writing frame to cache file %s ...  "%(filename))
-        frame = Frame(float(self.ctx.ver),
+        frame = Frame(CACHE_VER,
                       self.ctx.cmplx_width,
                       self.ctx.cmplx_height,
                       self.ctx.cmplx_center,
+                      self.ctx.julia_c,
                       self.ctx.escape_rad,
                       self.ctx.max_iter,
                       values,
@@ -102,10 +125,11 @@ class FractalCache:
         with open(filename, 'rb') as fd:
             frame = pickle.load(fd)
 
-        assert frame.ver == float(self.ctx.ver)
+        assert frame.ver == CACHE_VER 
         assert frame.cw  == self.ctx.cmplx_width 
         assert frame.ch  == self.ctx.cmplx_height 
         assert frame.center   == self.ctx.cmplx_center 
+        assert frame.julia_c  == self.ctx.julia_c 
         assert frame.escape_r == self.ctx.escape_rad 
         assert frame.m_iter   == self.ctx.max_iter 
 

@@ -273,7 +273,7 @@ class MandlContext:
         self.palette = None
         self.burn_in = False
 
-        self.cache_dir = None
+        self.cache   = None
 
         self.verbose = 0 # how much to print about progress
 
@@ -585,11 +585,7 @@ class MediaView:
         print(self.ctx)
 
         if self.ctx.cache:
-            if self.ctx.julia_c or self.ctx.julia_list:
-                print("** Caching doesn't currently support Julia sets")
-                self.ctx.cache = None
-            else:    
-                self.ctx.cache.setup()
+            self.ctx.cache.setup()
 
 
 
