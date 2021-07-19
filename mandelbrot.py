@@ -226,6 +226,8 @@ class MandlContext:
 
     def __init__(self, ctxf = None, ctxc = None, mp = None):
 
+        self.ver = MANDL_VER # used to version cash
+
         if not ctxf:
             self.ctxf = float
         else:
@@ -404,7 +406,7 @@ class MandlContext:
                 c = self.ctxc(Re_x, Im_y)
 
 
-                if not self.julia:
+                if not self.julia_c:
                     m = self.mandelbrot(c)
                 else:        
                     z0 = c
@@ -466,9 +468,17 @@ class MandlContext:
         """Called for each frame of the animation. Will calculate
         current view, and then zoom in"""
     
-    
-        # call primary calculation function
-        values, hist = self.calc_cur_frame(snapshot_filename)
+
+        values, hist = None, None
+        if self.cache: 
+            values, hist = self.cache.read_cache()
+
+        if not values or not hist:    
+            # call primary calculation function
+            values, hist = self.calc_cur_frame(snapshot_filename)
+
+            if self.cache:
+                self.cache.write_cache(values, hist)
 
 
         #- 
@@ -575,7 +585,11 @@ class MediaView:
         print(self.ctx)
 
         if self.ctx.cache:
-            self.ctx.cache.setup()
+            if self.ctx.julia_c or self.ctx.julia_list:
+                print("** Caching doesn't currently support Julia sets")
+                self.ctx.cache = None
+            else:    
+                self.ctx.cache.setup()
 
 
 
@@ -760,7 +774,7 @@ def parse_options():
         elif opt in ['--julia']:
             mandl_ctx.julia_c = complex(arg) 
         elif opt in ['--cache']:
-            mandl_ctx.cache = fc.FractalCache() 
+            mandl_ctx.cache = fc.FractalCache(mandl_ctx) 
         elif opt in ['--julia-walk']:
             mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
             if len(mandl_ctx.julia_list) <= 1:
