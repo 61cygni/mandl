@@ -36,6 +36,9 @@ from moviepy.audio.tools.cuts import find_audio_period
 
 from PIL import Image, ImageDraw, ImageFont
 
+# -- our files
+import fractalcache as fc
+
 MANDL_VER = "0.1"
 
 def gaussian(x, mu, sig):
@@ -267,6 +270,8 @@ class MandlContext:
 
         self.palette = None
         self.burn_in = False
+
+        self.cache_dir = None
 
         self.verbose = 0 # how much to print about progress
 
@@ -560,6 +565,20 @@ class MediaView:
         self.ctx.next_epoch(-1,self.vfilename)
 
 
+    # --
+    # Do any setup needed prior to running the calculatiion loop 
+    # --
+
+    def setup(self):
+
+        print(self)
+        print(self.ctx)
+
+        if self.ctx.cache:
+            self.ctx.cache.setup()
+
+
+
     def run(self):
 
         # Check whether we need to zoom in prior to calculation
@@ -702,6 +721,7 @@ def parse_options():
                                 "color=",
                                 "burn",
                                 "banner",
+                                "cache",
                                 "smooth"])
 
     for opt,arg in opts:
@@ -739,8 +759,13 @@ def parse_options():
             mandl_ctx.smoothing = True 
         elif opt in ['--julia']:
             mandl_ctx.julia_c = complex(arg) 
+        elif opt in ['--cache']:
+            mandl_ctx.cache = fc.FractalCache() 
         elif opt in ['--julia-walk']:
             mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
+            if len(mandl_ctx.julia_list) <= 1:
+                print("Error: List of complex numbers for Julia walk must be at least two points")
+                sys.exit(0)
             mandl_ctx.julia_c    = mandl_ctx.julia_list[0]
         elif opt in ['--center']:
             mandl_ctx.cmplx_center = complex(arg) 
@@ -794,8 +819,6 @@ def parse_options():
                 sys.exit(0)
             view_ctx.vfilename = arg
 
-    print(mandl_ctx)
-    print(view_ctx)
 
 if __name__ == "__main__":
 
@@ -804,4 +827,5 @@ if __name__ == "__main__":
     set_default_params()
     parse_options()
 
+    view_ctx.setup()
     view_ctx.run()
