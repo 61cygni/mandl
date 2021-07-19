@@ -5,6 +5,7 @@
 # --
 
 import os
+import sys
 
 import hmac
 import hashlib
@@ -129,8 +130,11 @@ class FractalCache:
         assert frame.cw  == self.ctx.cmplx_width 
         assert frame.ch  == self.ctx.cmplx_height 
         assert frame.center   == self.ctx.cmplx_center 
-        assert frame.julia_c  == self.ctx.julia_c 
         assert frame.escape_r == self.ctx.escape_rad 
         assert frame.m_iter   == self.ctx.max_iter 
+
+        if frame.julia_c  != self.ctx.julia_c :
+            print("** error: inconsistent cache %s:%s"%(str(frame.julia_c),str(self.ctx.julia_c)))
+            return None, None
 
         return frame.values,frame.histogram
