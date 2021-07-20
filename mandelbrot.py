@@ -40,6 +40,9 @@ from moviepy.audio.tools.cuts import find_audio_period
 
 from PIL import Image, ImageDraw, ImageFont
 
+# -- our files
+import fractalcache as fc
+
 MANDL_VER = "0.1"
 
 #FLINT_HIGH_PRECISION_SIZE = 16 # 53 is how many bits are in float64
@@ -537,6 +540,12 @@ class MandlContext:
         self.duration  = 0  # int  duration of clip in seconds
         self.fps = 0 # int  number of frames per second
 
+        self.julia_c      = None
+        self.julia_orig   = None
+        self.julia_walk_c = None
+
+        self.julia_list   = None 
+
         self.palette = None
         self.burn_in = False
 
@@ -549,6 +558,9 @@ class MandlContext:
         self.cache_path = u"%s_cache" % self.project_name
         self.build_cache = False
         self.invalidate_cache = False
+        self.ver = MANDL_VER # used to version cash
+
+        self.cache   = None
 
         self.verbose = 0 # how much to print about progress
 
@@ -558,6 +570,54 @@ class MandlContext:
             self.cmplx_height *= self.scaling_factor
             self.num_epochs += 1
             iterations -= 1
+
+    # Use Bresenham's line drawing algo for a simple walk between two
+    # complex points
+    def julia_walk(self, t):
+
+        # duration of a leg
+        leg_d      = float(self.duration) / float(len(self.julia_list) - 1)
+        # which leg are we walking?
+        leg        = math.floor(float(t) / leg_d)
+        # how far along are we on that leg?
+        timeslice  = float(self.duration) / (float(self.duration) * float(self.fps))
+        fraction   = (float(t) - (float(leg) * leg_d)) / (leg_d - timeslice)
+
+        #print("T %f Leg %d leg_d %d Fraction %f"%(t,leg,leg_d,fraction))
+
+        cp1 = self.julia_list[leg]
+        cp2 = self.julia_list[leg + 1]
+
+
+        if self.julia_orig != cp1:
+            self.julia_orig = cp1
+
+        x0 = self.julia_orig.real
+        x1 = cp2.real 
+        y0 = self.julia_orig.imag 
+        y1 = cp2.imag 
+
+        new_x = ((x1 - x0)*fraction) + x0
+        new_y = ((y1 - y0)*fraction) + y0 
+        self.julia_c = complex(new_x, new_y)
+
+
+    # Some interesting c values
+    # c = complex(-0.8, 0.156)
+    # c = complex(-0.4, 0.6)
+    # c = complex(-0.7269, 0.1889)
+
+    def julia(self, c, z0):
+        z = z0
+        n = 0
+        while abs(z) <= 2 and n < self.max_iter:
+            z = z*z + c
+            n += 1
+
+        if n == self.max_iter:
+            return self.max_iter
+
+        return n + 1 - math.log(math.log2(abs(z)))
 
     def mandelbrot(self, c):
         z = self.math_support.createComplex(0, 0)
@@ -572,7 +632,7 @@ class MandlContext:
             z = z*z + c
             n += 1
 
-        if n== self.max_iter:
+        if n >= self.max_iter:
             return self.max_iter
         
         # The following code smooths out the colors so there aren't bands
@@ -610,35 +670,6 @@ class MandlContext:
 
         return frame_data
 
-    def calculate_epoch_data(self, t):
-        """Generates the data tuple for every pixel position in the frame"""
-    
-        # Use center point to determines the box in the complex plane
-        # we need to calculatee
-        re_start = self.math_support.createFloat(self.cmplx_center.real - (self.cmplx_width / 2.))
-        re_end =   self.math_support.createFloat(self.cmplx_center.real + (self.cmplx_width / 2.))
-
-        im_start = self.math_support.createFloat(self.cmplx_center.imag - (self.cmplx_height / 2.))
-        im_end   = self.math_support.createFloat(self.cmplx_center.imag + (self.cmplx_height / 2.))
-
-        if self.verbose > 0:
-            print("MandlContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
-                  (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
-                  end = " ")
-
-        values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                # map from pixels to complex coordinates
-                Re_x = re_start + (x / (self.img_width - 1)) * (re_end - re_start)
-                Im_y = im_start + (y / (self.img_height - 1)) * (im_end - im_start)
-
-                c = self.math_support.createComplex(Re_x, Im_y)
-                m = self.mandelbrot(c)
-
-                values[x,y] = m
-        return values
-
     def render_frame_number(self, frame_number, snapshot_filename=None):
         """
         Load or calculate the frame data.
@@ -652,13 +683,20 @@ class MandlContext:
         pixel_values_2d = pixel_values_2d.T
 
         # Used to create a histogram of the frequency of iteration
-        # deppths retured by the mandelbrot calculation. Helpful for 
+        # depths retured by the mandelbrot calculation. Helpful for 
         # color selection since many iterations never come up so you
         # loose fidelity by not focusing on those heavily used
+
         hist = defaultdict(int) 
         values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
 
         #print("shape of things to come: %s" % str(pixel_values_2d.shape))
+
+        # --
+        # Iterate over every point in the complex plane (1:1 mapping per
+        # pixel) and run the fractacl calculation. We save the output in
+        # a 2x2 array, and also create the histogram of values
+        # --
 
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
@@ -676,39 +714,14 @@ class MandlContext:
             hues.append(h)
         hues.append(h)
 
-        im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
-        draw = ImageDraw.Draw(im)
-        
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                m = pixel_values_2d[x,y] 
+        # -- 
+        # Create image for this frame
+        # --
 
-                if not self.palette:
-                    c = 255 - int(255 * hues[math.floor(m)]) 
-                    color=(c, c, c)
-                elif self.smoothing:
-                    c1 = self.palette[1024 - int(1024 * hues[math.floor(m)])]
-                    c2 = self.palette[1024 - int(1024 * hues[math.ceil(m)])]
-                    color = MandlPalette.linear_interpolate(c1,c2,.5) 
-                else:
-                    color = self.palette[1024 - int(1024 * hues[math.floor(m)])]
-
-                # Plot the point
-                draw.point([x, y], color) 
-
+        im = self.draw_image_PIL(pixel_values_2d, hues, frame_metadata)
 
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
-
-        if self.burn_in == True:
-            burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (frame_number, frame_metadata['mesh_center'], frame_metadata['real_width'], frame_metadata['imag_width'])
-
-            burn_in_location = (10,10)
-            burn_in_margin = 5 
-            burn_in_font = ImageFont.truetype('fonts/cour.ttf', 12)
-            burn_in_size = burn_in_font.getsize_multiline(burn_in_text)
-            draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
-            draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
         #if self.verbose > 0:
         #    print("Done]")
@@ -717,45 +730,56 @@ class MandlContext:
             return im.save(snapshot_filename,"gif")
         else:    
             return np.array(im)
-        
-    def next_epoch(self, t, snapshot_filename = None):
-        """Called for each frame of the animation. Will calculate
-        current view, and then zoom in"""
-    
-        # Used to create a histogram of the frequency of iteration
-        # deppths retured by the mandelbrot calculation. Helpful for 
-        # color selection since many iterations never come up so you
-        # loose fidelity by not focusing on those heavily used
-        hist = defaultdict(int) 
+
+    def calc_cur_frame(self, snapshot_filename = None):        
+
+        # --
+        # Calculate box in complex plane from center point
+        # --
+
+        re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
+        re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
+
+        im_start = self.math_support.createFloat(self.cmplx_center.imag - (self.cmplx_height / 2.))
+        im_end   = self.math_support.createFloat(self.cmplx_center.imag + (self.cmplx_height / 2.))
+
+        if self.verbose > 0:
+            print("MandlContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
+                  (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
+                  end = " ")
+
         values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
-
-        # Really need to build a reference function that's the frame number oracle...
-        # Until then, here's a quick and dirty way
-        quick_frame_number = math.floor(view_ctx.fps * t) 
-        pixel_values_2d = self.load_frame(quick_frame_number, build_cache=self.build_cache, cache_path=self.cache_path, invalidate_cache=self.invalidate_cache) 
-
+        hist = []
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
-                if pixel_values_2d[x,y] < self.max_iter:
-                    hist[math.floor(pixel_values_2d[x,y])] += 1
+                # map from pixels to complex coordinates
+                Re_x = re_start + (x / (self.img_width - 1)) * (re_end - re_start)
+                Im_y = im_start + (y / (self.img_height - 1)) * (im_end - im_start)
 
-        total = sum(hist.values())
-        hues = []
-        h = 0
+                c = self.math_support.createComplex(Re_x, Im_y)
 
-        # calculate percent of total for each iteration
-        for i in range(self.max_iter):
-            if total :
-                h += hist[i] / total
-            hues.append(h)
-        hues.append(h)
+                if not self.julia_c:
+                    m = self.mandelbrot(c)
+                else:        
+                    z0 = c
+                    m = self.julia(self.julia_c, z0) 
+
+                values[x,y] = m
+
+                if m < self.max_iter:
+                    hist[math.floor(m)] += 1
+
+        return values, hist
+
+        
+    def draw_image_PIL(self, values, hues, metadata=None):    
 
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
         
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
-                m = pixel_values_2d[x,y] 
+                m = values[x,y] 
 
                 if not self.palette:
                     c = 255 - int(255 * hues[math.floor(m)]) 
@@ -770,21 +794,11 @@ class MandlContext:
                 # Plot the point
                 draw.point([x, y], color) 
 
-
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
 
-        if self.burn_in == True:
-            center_string = str(self.cmplx_center)
-            range_string = "(%f,%f)" % (self.cmplx_width, self.cmplx_height)
-
-#            if self.use_high_precision == True:
-#                if self.high_precision_type == 'flint':
-#                    center_string = str(self.cmplx_center_flint)
-#                    range_string = "(%s,%s)" % (str(self.cmplx_width_flint), str(self.cmplx_height_flint))
-
-            burn_in_text = u"%d center: %s\n    size: %s" %\
-                (quick_frame_number, center_string, range_string)
+        if self.burn_in == True and metadata != None:
+            burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (metadata['frame_number'], metadata['mesh_center'], metadata['real_width'], metadata['imag_width'])
 
             burn_in_location = (10,10)
             burn_in_margin = 5 
@@ -793,8 +807,56 @@ class MandlContext:
             draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
             draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
-        # Zoom in by scaling factor
-        self.zoom_in()
+        return im    
+
+    def next_epoch(self, t, snapshot_filename = None):
+        """Called for each frame of the animation. Will calculate
+        current view, and then zoom in"""
+
+        values, hist = None, None
+        if self.cache: 
+            values, hist = self.cache.read_cache()
+
+        if not values or not hist:    
+            # call primary calculation function
+            values, hist = self.calc_cur_frame(snapshot_filename)
+
+            if self.cache:
+                self.cache.write_cache(values, hist)
+
+
+        #- 
+        # From histogram normalize to percent-of-total. This is
+        # effectively a probability distribution of escape values 
+        #
+        # Note that this is not effecitly a probability distribution for
+        # a given escape value. We can use this to calculate the Shannon 
+
+        total = sum(hist.values())
+        hues = []
+        h = 0
+
+        for i in range(self.max_iter):
+            if total :
+                h += hist[i] / total
+            hues.append(h)
+        hues.append(h)
+
+
+        # -- 
+        # Create image for this frame
+        # --
+        
+        im = self.draw_image_PIL(values, hues)
+
+        # -- 
+        # Do next step in animation
+        # -- 
+
+        if self.julia_list:
+            self.julia_walk(t)
+        else:    
+            self.zoom_in()
 
         if self.verbose > 0:
             print("Done]")
@@ -808,10 +870,10 @@ class MandlContext:
     def __repr__(self):
         return """\
 [MandlContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:s}
-Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
+Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Epochs:{e:d} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=str(self.cmplx_width),ch=str(self.cmplx_height),
-        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
+        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter,sm=self.smoothing); 
 
 class MediaView: 
     """
@@ -819,7 +881,10 @@ class MediaView:
     """
 
     def make_frame(self, t):
-        return self.ctx.render_frame_number(self.frame_number_from_time(t))
+        if self.use_epochs == True:
+            return self.ctx.next_epoch(t)
+        else:
+            return self.ctx.render_frame_number(self.frame_number_from_time(t))
 
     def __init__(self, duration, fps, ctx):
         self.duration  = duration
@@ -827,6 +892,11 @@ class MediaView:
         self.ctx       = ctx
         self.banner    = False 
         self.vfilename = None 
+
+        self.ctx.duration = duration
+        self.ctx.fps      = fps
+
+        self.use_epochs = True
 
     def frame_number_from_time(self, t):
         return math.floor(self.fps * t) 
@@ -854,6 +924,19 @@ class MediaView:
             self.vfilename = "snapshot.gif"
         
         self.ctx.next_epoch(-1,self.vfilename)
+
+
+    # --
+    # Do any setup needed prior to running the calculatiion loop 
+    # --
+
+    def setup(self):
+
+        print(self)
+        print(self.ctx)
+
+        if self.ctx.cache:
+                self.ctx.cache.setup()
 
 
     def run(self):
@@ -1860,20 +1943,24 @@ def set_demo1_params(mandl_ctx, view_ctx):
     mandl_ctx.scaling_factor = .90
 
     mandl_ctx.max_iter       = 255
-    mandl_ctx.escape_rad     = 4.
+
+    #mandl_ctx.escape_rad     = 4.
+    mandl_ctx.escape_rad     = 32768. 
     mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
 
     mandl_ctx.verbose = 3
     mandl_ctx.burn_in = True
     mandl_ctx.build_cache=True
 
-    view_ctx.duration       = 2.0 
+    view_ctx.duration       = 2.0
     #view_ctx.duration       = 10.0 
 
     # FPS still isn't set quite right, but we'll get it there eventually.
     view_ctx.fps            = 23.976 / 2.0 
     #view_ctx.fps            = 29.97 / 2.0 
 
+    # Separate execution paths for now
+    view_ctx.use_epochs = False
 
 def set_preview_mode(mandl_ctx, view_ctx):
     print("+ Running in preview mode ")
@@ -1885,7 +1972,9 @@ def set_preview_mode(mandl_ctx, view_ctx):
     mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(2.5)
 
     mandl_ctx.scaling_factor = .75
-    mandl_ctx.escape_rad     = 4.
+
+    #mandl_ctx.escape_rad     = 4.
+    mandl_ctx.escape_rad     = 32768. 
     mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
 
     view_ctx.duration       = 4
@@ -1907,7 +1996,9 @@ def set_snapshot_mode(mandl_ctx, view_ctx, snapshot_filename='snapshot.gif'):
     mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(2.5)
 
     mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
-    mandl_ctx.escape_rad     = 4.
+
+    #mandl_ctx.escape_rad     = 4.
+    mandl_ctx.escape_rad     = 32768. 
     mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
 
     view_ctx.duration       = 0
@@ -1924,6 +2015,8 @@ def parse_options(mandl_ctx, view_ctx):
                                 "max-iter=",
                                 "img-w=",
                                 "img-h=",
+                                "cmplx-w=",
+                                "cmplx-h=",
                                 "center=",
                                 "scaling-factor=",
                                 "snapshot=",
@@ -1932,6 +2025,9 @@ def parse_options(mandl_ctx, view_ctx):
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
+                                "julia=",
+                                "julia-walk=",
+                                "center=",
                                 "palette-test=",
                                 "color=",
                                 "burn",
@@ -1940,6 +2036,7 @@ def parse_options(mandl_ctx, view_ctx):
                                 "build-cache",
                                 "invalidate-cache",
                                 "banner",
+                                "cache",
                                 "smooth"])
 
     # Math support as to be handled first, so other parameter 
@@ -1958,13 +2055,18 @@ def parse_options(mandl_ctx, view_ctx):
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
-            view_ctx.duration = float(arg) 
+            view_ctx.duration  = float(arg) 
+            mandl_ctx.duration = float(arg) 
         elif opt in ['-m', '--max-iter']:
             mandl_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:
             mandl_ctx.img_width = int(arg)
         elif opt in ['-h', '--img-h']:
             mandl_ctx.img_height = int(arg)
+        elif opt in ['--cmplx-w']:
+            mandl_ctx.cmplx_width = float(arg)
+        elif opt in ['--cmplx-h']:
+            mandl_ctx.cmplx_height = float(arg)
         elif opt in ['-c', '--center']:
             mandl_ctx.cmplx_center= mandl_ctx.math_support.createComplex(arg)
         elif opt in ['--scaling-factor']:
@@ -1972,9 +2074,22 @@ def parse_options(mandl_ctx, view_ctx):
         elif opt in ['-z', '--zoom']:
             mandl_ctx.set_zoom_level = int(arg)
         elif opt in ['-f', '--fps']:
-            view_ctx.fps = int(arg)
+            view_ctx.fps  = int(arg)
+            mandl_ctx.fps = int(arg)
         elif opt in ['--smooth']:
             mandl_ctx.smoothing = True 
+        elif opt in ['--julia']:
+            mandl_ctx.julia_c = complex(arg) 
+        elif opt in ['--cache']:
+            mandl_ctx.cache = fc.FractalCache(mandl_ctx) 
+        elif opt in ['--julia-walk']:
+            mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
+            if len(mandl_ctx.julia_list) <= 1:
+                print("Error: List of complex numbers for Julia walk must be at least two points")
+                sys.exit(0)
+            mandl_ctx.julia_c    = mandl_ctx.julia_list[0]
+        elif opt in ['--center']:
+            mandl_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
             m = MandlPalette()
             if str(arg) == "gauss":
@@ -2032,8 +2147,6 @@ def parse_options(mandl_ctx, view_ctx):
                 sys.exit(0)
             view_ctx.vfilename = arg
 
-    print(mandl_ctx)
-    print(view_ctx)
 
 if __name__ == "__main__":
 
@@ -2044,5 +2157,6 @@ if __name__ == "__main__":
 
     parse_options(mandl_ctx, view_ctx)
    
+    view_ctx.setup()
     view_ctx.run()
 
