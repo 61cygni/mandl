@@ -12,6 +12,8 @@ import hashlib
 import struct
 import pickle
 
+from decimal import Decimal
+
 
 CACHE_VER = 0.11
 FRACTL_CACHE_DIR = "./.fractal_cache/"
@@ -50,28 +52,15 @@ class FractalCache:
     def create_file_name(self):
         ba = None
 
-        if not self.ctx.julia_c:
-            # create filename from a deterministic hash of the important
-            # context
-            ba = struct.pack("ffffffi",
-                                  CACHE_VER, 
-                                  self.ctx.cmplx_width,
-                                  self.ctx.cmplx_height,
-                                  self.ctx.cmplx_center.real,
-                                  self.ctx.cmplx_center.imag,
-                                  self.ctx.escape_rad,
-                                  self.ctx.max_iter)
-        else:                            
-            ba = struct.pack("ffffffffi",
-                                  CACHE_VER, 
-                                  self.ctx.cmplx_width,
-                                  self.ctx.cmplx_height,
-                                  self.ctx.cmplx_center.real,
-                                  self.ctx.cmplx_center.imag,
-                                  self.ctx.julia_c.real,
-                                  self.ctx.julia_c.imag,
-                                  self.ctx.escape_rad,
-                                  self.ctx.max_iter)
+        ba = pickle.dumps(Frame(CACHE_VER, 
+                         self.ctx.cmplx_width,
+                         self.ctx.cmplx_height,
+                         self.ctx.cmplx_center,
+                         self.ctx.julia_c,
+                         self.ctx.escape_rad,
+                         self.ctx.max_iter,
+                         None, None
+                         ))
 
         h = hmac.new(ba, digestmod=hashlib.sha1)
         return h.hexdigest()
