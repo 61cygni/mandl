@@ -32,8 +32,8 @@ import multiprocessing # Can't actually make this work yet - gonna need pickling
 from collections import defaultdict
 
 import numpy as  np
+import moviepy.editor as mpyed
 
-import moviepy.editor as mpy
 from scipy.stats import norm
 
 from moviepy.audio.tools.cuts import find_audio_period
@@ -64,7 +64,7 @@ class MandlContext:
         self.cmplx_height = self.math_support.createFloat(0.0)
 
         # point we're going to dive into 
-        self.cmplx_center = self.math_support.createComplex(0.0, 0.0) # center of image in complex plane
+        self.cmplx_center = self.math_support.createComplex(complex(0)) # center of image in complex plane
 
         self.max_iter      = 0  # int max iterations before bailing
         self.escape_rad    = 0. # float radius mod Z hits before it "escapes" 
@@ -161,7 +161,7 @@ class MandlContext:
         return n + 1 - math.log(math.log2(abs(z)))
 
     def mandelbrot(self, c):
-        z = self.math_support.createComplex(0, 0)
+        z = self.math_support.createComplex(0)
         n = 0
 
         # fabs(z) returns the modulus of a complex number, which is the
@@ -290,14 +290,15 @@ class MandlContext:
                   end = " ")
 
         values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
-        hist = []
+        hist   = defaultdict(int)
+
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
                 # map from pixels to complex coordinates
                 Re_x = re_start + (x / (self.img_width - 1)) * (re_end - re_start)
                 Im_y = im_start + (y / (self.img_height - 1)) * (im_end - im_start)
 
-                c = self.math_support.createComplex(Re_x, Im_y)
+                c = self.math_support.createComplex(complex(Re_x, Im_y))
 
                 if not self.julia_c:
                     m = self.mandelbrot(c)
@@ -358,7 +359,7 @@ class MandlContext:
         if self.cache: 
             values, hist = self.cache.read_cache()
 
-        if not values or not hist:    
+        if type(values) == type(None) or type(hist) == type(None):
             # call primary calculation function
             values, hist = self.calc_cur_frame(snapshot_filename)
 
@@ -449,7 +450,7 @@ class MediaView:
                        (w, h, str(self.ctx.cmplx_center), self.duration, self.fps)
 
 
-        txt = mpy.TextClip(banner_text, font='Amiri-regular',
+        txt = mpyed.TextClip(banner_text, font='Amiri-regular',
                            color='white',fontsize=12)
 
         txt_col = txt.on_color(size=(w + txt.w,txt.h+6),
@@ -457,7 +458,7 @@ class MediaView:
 
         txt_mov = txt_col.set_position((0,h-txt_col.h)).set_duration(4)
 
-        return mpy.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
+        return mpyed.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
 
     def create_snapshot(self):    
     
@@ -488,7 +489,7 @@ class MediaView:
 
         self.ctx.timeline =  self.construct_simple_timeline()
 
-        self.clip = mpy.VideoClip(self.make_frame, duration=self.duration)
+        self.clip = mpyed.VideoClip(self.make_frame, duration=self.duration)
 
         if self.banner:
             self.clip = self.intro_banner()

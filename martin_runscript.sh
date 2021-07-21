@@ -1,6 +1,6 @@
 #/usr/local/bin/python3 mandelbrot.py --color=exp2 --duration=16 --preview 
 
-#/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview
+/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --center="-1.769383179195515+0.004236847918736772j" --cache
 
 #/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --cache
 
@@ -21,7 +21,7 @@
 #/usr/local/bin/python3 mandelbrot.py --color=list --max-iter=2000  --img-w=600 --img-h=400 --center=".255+.29j" --julia="0.285+0.01j" --gif="test.gif"  --duration=4
 
 # Walk the Julia space 
-#/usr/local/bin/python3 mandelbrot.py --color=list --max-iter=200 --img-w=400 --img-h=300 --center="0+0j" --duration=32 --fps=16  --gif="julia.gif" --cmplx-w=3.2 --cmplx-h=2.5 --julia-walk="[0.355+0.355j, 0+0.8j,0.355+0.355j]"
+#/usr/local/bin/python3 mandelbrot.py --color=list --max-iter=200 --img-w=400 --img-h=300 --center="0+0j" --duration=32 --fps=16  --gif="julia.gif" --cmplx-w=3.2 --cmplx-h=2.5 --julia-walk="[0.355+0.355j, 0+0.8j,0.355+0.355j]" --cache
 
 # test cache
-/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --cache
+#/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --cache

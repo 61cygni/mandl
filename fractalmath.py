@@ -30,9 +30,9 @@ class DiveMathSupport:
     all the math operations will already work for custom numeric types.
     """
 
-    def createComplex(self, realComponent, imagComponent):
+    def createComplex(self, cmplx):
         """Compatible complex types will return values for .real() and .imag()"""
-        return complex(float(realComponent), float(imagComponent)) 
+        return complex(cmplx)
 
     def createFloat(self, floatValue):
         return float(floatValue)
@@ -238,8 +238,8 @@ class DiveMathSupportFlint(DiveMathSupport):
         self.flint = __import__('flint') # Only imports if you instantiate this DiveMathSupport subclass.
         self.flint.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
 
-    def createComplex(self, realComponent, imagComponent):
-        return self.flint.acb(realComponent, imagComponent)
+    def createComplex(self, cmplx):
+        return self.flint.acb(cmplx.real, cmplx.imag)
 
     def createFloat(self, floatValue):
         return self.flint.arb(floatValue)

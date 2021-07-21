@@ -8,6 +8,9 @@
 import math
 import numpy as  np
 
+import moviepy.editor as mpyed
+from PIL import Image, ImageDraw, ImageFont
+
 def gaussian(x, mu, sig):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
@@ -181,6 +184,6 @@ class MandlPalette:
              return self.palette[index]
 
     def display(self):
-        clip = mpy.VideoClip(self.make_frame, duration=64)
+        clip = mpyed.VideoClip(self.make_frame, duration=64)
         clip.preview(fps=1) #fps 1 is really all that works
 ## MandlPalette        
