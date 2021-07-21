@@ -278,8 +278,8 @@ class MandlContext:
         # Calculate box in complex plane from center point
         # --
 
-        re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
-        re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
+        re_start = self.math_support.createFloat(self.cmplx_center.real - (self.cmplx_width / 2.))
+        re_end =   self.math_support.createFloat(self.cmplx_center.real + (self.cmplx_width / 2.))
 
         im_start = self.math_support.createFloat(self.cmplx_center.imag - (self.cmplx_height / 2.))
         im_end   = self.math_support.createFloat(self.cmplx_center.imag + (self.cmplx_height / 2.))
