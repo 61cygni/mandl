@@ -209,7 +209,7 @@ class DiveMathSupport:
         #
         # However, instead we just square both sides of the inequality to
         # avoid the sqrt
-        while ((z.real*z.real)+(z.imag*z.imag)) <= escapeSquared  and n < maxIter:
+        while ((z.real**2)+(z.imag**2)) <= escapeSquared  and n < maxIter:
             z = z*z + c
             n += 1
 #
@@ -276,7 +276,7 @@ class DiveMathSupportFlint(DiveMathSupport):
         # avoid the sqrt
         #
         # Important to cast the escape answer back to float, or the arb gets sheared bizarrely
-        while (float((z.real*z.real)+(z.imag*z.imag))) <= escapeSquared  and n < maxIter:
+        while (float((z.real**2)+(z.imag**2))) <= escapeSquared  and n < maxIter:
             z = z*z + c
             n += 1
 
