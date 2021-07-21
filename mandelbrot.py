@@ -43,301 +43,18 @@ from PIL import Image, ImageDraw, ImageFont
 # -- our files
 import fractalcache   as fc
 import fractalpalette as fp
+import fractalmath    as fm
+
+import divemesh       as mesh
 
 MANDL_VER = "0.1"
-
-#FLINT_HIGH_PRECISION_SIZE = 16 # 53 is how many bits are in float64
-FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
-#FLINT_HIGH_PRECISION_SIZE = 200 
-
-class DiveMathSupport:
-    """
-    Toolbox for math functions that need to be type-aware, so we
-    can support different back-end math libraries.
-
-    This exists because globally swapping out types doesn't do enough
-    to keep numeric types all in line. Some calculations also need additional 
-    steps to make the math behave right, such as if we were using 
-    the Decimal library, and had to keep separate real and imaginary
-    components of a complex number ourselves.
-
-    Trying to preserve types where possible, without forcing casting, because sometimes
-    all the math operations will already work for custom numeric types.
-    """
-
-    def createComplex(self, realComponent, imagComponent):
-        """Compatible complex types will return values for .real() and .imag()"""
-        return complex(float(realComponent), float(imagComponent)) 
-
-    def createFloat(self, floatValue):
-        return float(floatValue)
-
-    def floor(self, value):
-        return math.floor(value)
-
-    def scaleValueByFactorForIterations(self, startValue, overallZoomFactor, iterations):
-        """
-        Shortcut calculate the starting point for the last frame's properties, 
-        which we'll use for instantiation with specific widths.  This is
-        because if any keyframes are added, the best we can do is measure an
-        effective zoom factor between any 2 frames.
-
-        Somehow, this seems to be ok for flint too?!
-        """
-        return startValue * (overallZoomFactor ** iterations)
-
-    def createLinspace(self, paramFirst, paramLast, quantity):
-        """Attempt at a mostly type-agnostic linspace(), seems to work with flint types too"""
-        dataRange = paramLast - paramFirst
-        answers = np.zeros((quantity), dtype=object)
-
-        for x in range(0, quantity):
-            answers[x] = paramFirst + dataRange * (x / (quantity - 1))
-
-        return answers
-
-    def createLinspaceAroundValuesCenter(self, valuesCenter, spreadWidth, quantity):
-        """
-        Attempt at a mostly type-agnostic linspace-from-center-and-width
-
-        Turns out, we didn't *really* need this for using flint, though it
-        was an important for a Python/Decimal version to be able to have a
-        type-specific implementation in what was a DiveMeshDecimal function
-        """
-        return self.createLinspace(valuesCenter - spreadWidth * 0.5, valuesCenter + spreadWidth * 0.5, quantity)
-
-    def interpolateLogTo(self, startX, startY, endX, endY, targetX):
-        """
-        Probably want additional log-defining params, but for now, let's just bake in one equation
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            # y1 = a * ln(b * x1)
-            # y2 = a * ln(b * x2)
-            # a = (y1-y2) / ln(x1/x2)
-            # b = exp(((y2 * ln(x1)) - (y1 * ln(x2))) / (y1-y2))
-            #
-            # y = a * ln(b * x)
-            # answer = a * ln(b * targetX)
-            # answer = ((y1-y2)/ln(x1/x2)) * ln(exp(((y2 * ln(x1)) - (y1 * ln(x2))) / (y1-y2)) * targetX)
-            # This kinda worked, but keeps the ln function so you just see part of 
-            # some curve through the query points.  Really, want to make sure the asymptote 
-            # is at or near the start (or end).
-            # aVal = ((startY-endY) / math.log(startX / endX))
-            # bVal = math.exp(startY / aVal) / startX
-            # return aVal * math.log(bVal * targetX)
-
-            # This version seems like it worked fine, but ended up with a pretty wrong
-            # transition
-            #
-            # But, if we set the crossover point to the first point (add 1 to xVal), then all we
-            # need to do is solve for a, right?  Also, using the 0-crossover as the
-            # first point means the asymptote can't be hit, because it's 1 less than 
-            # the start.
-            #
-            # endY = a * ln(endX + 1 - startX) + startY
-            # a = (endY - startY) / ln(endX - startX + 1)
-
-            aVal = (endY - startY) / math.log(endX - startX + 1)
-            return aVal * math.log(targetX - startX + 1) + startY 
-
-    def interpolateRootTo(self, startX, startY, endX, endY, targetX):
-        """ 
-        Iterative multiplications of window sizes for zooming means we want to be able to
-        interpolate between two points using the root if the frame count between them as
-        the scale factor
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            root  = endX - startX
-            scaleFactor = (endY / startY) ** (1 / root)
-            return startY * (scaleFactor ** targetX)
-
-    def interpolateQuadraticEaseIn(self, startX, startY, endX, endY, targetX):
-        """
-        QuadraticEaseIn puts the majority of changes in the start of the X range.
-        
-        I *think* this is just the backwards solution to QuadraticEaseOut?  
-        So, just swap in and out points?
-
-        Probably want additional quadratic-defining params, but for now, let's just bake in one equation
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            return self.interpolateQuadraticEaseOut(endX, endY, startX, startY, targetX)
-
-    def interpolateQuadraticEaseOut(self, startX, startY, endX, endY, targetX):
-        """
-        QuadraticEaseOut leaves the majority of changes to the end of the X range.
-
-        Probably want additional quadratic params, but for now, let's just bake in one equation
-        which uses the first point as the vertex, and passes through the second point.
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            # Find a, given that the start point is the vertex, and the parabola passes 
-            # through the other point
-            # y = a * (x - h)**2 + k
-            # y = a * (x - startX)**2 + startY
-            # endY = a * (endX - startX)**2 + startY
-            # a = ((endY-startY)/((endX-startX)**2)
-            #
-            # answer = a * (targetX - startX)**2 + startY
-            # answer = ((endY-startY)/((endX-startX)**2) * ((targetX-startX)**2) + startY
-            return (endY-startY)/((endX-startX)**2) * ((targetX-startX)**2) + startY
-
-    def interpolateQuadraticEaseInOut(self, startX, startY, endX, endY, targetX):
-        """
-        QuadraticEaseInOut finds a (linear) midpoint of the range, then leaves the 
-        majority of the change to the middle of the range, easing both out of 
-        the start, and into the end along separate parabolas.
-
-        CAUTION: This forces the 'middle' X value to floor().  The idea is that X 
-        will be frame numbers, so it should gracefully handle the inflection 
-        around an integer-valued frame, instead of doing a (maybe more 
-        complicated?) rounding inference.  
-        The problem is that this means it isn't a universal solver.
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            midpointFrame = self.floor(((endX-startX) * .5)) + startX
-            midpointY = self.interpolateLinear(startX, startY, endX, endY, midpointFrame) 
-            if targetX <= midpointFrame:
-                return self.interpolateQuadraticEaseOut(startX, startY, midpointFrame, midpointY, targetX)
-            else:
-                return self.interpolateQuadraticEaseIn(midpointFrame, midpointY, endX, endY, targetX)
-
-    def interpolateLinear(self, startX, startY, endX, endY, targetX):
-        # x1=2, y1=1, x2=12, y2=2, targetX = 7 
-        # valuesRange = endX - startX = 10
-        # targetPercent = (targetX - startX) / valuesRange = .5
-        # valuesDomain = endY - startY = 1
-        # answer = targetPercent * valuesDomain + startY = 1.5
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            return (((targetX - startX)/ (endX - startX)) * (endY - startY)) + startY
-
-    def mandelbrot(self, c, escapeSquared, maxIter, shouldSmooth=False):
-        z = self.createComplex(0, 0)
-        n = 0
-
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
-        while ((z.real*z.real)+(z.imag*z.imag)) <= escapeSquared  and n < maxIter:
-            z = z*z + c
-            n += 1
-#
-        if n == maxIter:
-            return maxIter
-        
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        if shouldSmooth == True:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(math.log(abs(z)))
-            return mu 
-        else:    
-            return n 
-
-class DiveMathSupportFlint(DiveMathSupport):
-    """
-    Overrides to instantiate flint-specific complex types
-
-    Looks like flint types are safe to use in base's createLinspace()
-    """
-    def __init__(self):
-        super().__init__()
-
-        self.flint = __import__('flint') # Only imports if you instantiate this DiveMathSupport subclass.
-        self.flint.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
-
-    def createComplex(self, realComponent, imagComponent):
-        return self.flint.acb(realComponent, imagComponent)
-
-    def createFloat(self, floatValue):
-        return self.flint.arb(floatValue)
-
-    def floor(self, value):
-        return self.flint.arb(value).floor()
-
-    def interpolateLogTo(self, startX, startY, endX, endY, targetX):
-        """
-        Probably want additional log-defining params, but for now, let's just bake in one equation
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            aVal = (endY - startY) / (self.flint.arb(endX - startX + 1).log())
-            return aVal * (self.flint.arb(targetX - startX + 1).log()) + startY 
-
-    def mandelbrot(self, c, escapeSquared, maxIter, shouldSmooth=False):
-        """ 
-        NOTE: Smoothing maybe should be only a post-processing step?  Maybe not?
-
-        This flint-specific implementation only really does flint-y logs in the smoothing.
-        The Decimal-specific implementation needed some extra steps, but I've ditched that one.
-        """
-        z = self.createComplex(0, 0)
-        n = 0
-
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
-        #
-        # Important to cast the escape answer back to float, or the arb gets sheared bizarrely
-        while (float((z.real*z.real)+(z.imag*z.imag))) <= escapeSquared  and n < maxIter:
-            z = z*z + c
-            n += 1
-
-        if n == maxIter:
-            return maxIter
-        
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        if shouldSmooth == True:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
-
-            #mu = n + 1 - math.log(self.mp.log2(abs(z))) # (and, there IS NO log2 in mpmath... hrm)
-            # Maybe this is the right way to do the same thing?!
-            mu = n + 1 - z.abs_lower().log().log()
-            return mu 
-        else:    
-            return n 
-
 
 class MandlContext:
     """
     The context for a single dive
     """
 
-    def __init__(self, math_support=DiveMathSupport()):
+    def __init__(self, math_support=fm.DiveMathSupport()):
         self.math_support = math_support
 
         self.img_width  = 0 # int : Wide of Image in pixels
@@ -848,10 +565,6 @@ class DiveTimeline:
     - DiveSpanWindowKeyframe
     - DiveSpanUniformKeyframe
     - DiveSpanTiltKeyframe
-    DiveMesh
-    MeshGenerator
-    - MeshGeneratorUniform
-    - MeshGeneratorTilt
    
     There are currently only 3 'tracks' of keyframes (for complex 
     center, window base sizes, and perspective).  Keyframes 
@@ -1061,19 +774,19 @@ class DiveTimeline:
         if previousIsUniform and nextIsUniform:
             # Might feel like "baseImagWidth" is a typo (because it's distributed vertically), but
             # it's the 'imaginary width', even though we use it as the vertical element in the final mesh
-            realMeshGenerator = MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal)
-            imagMeshGenerator = MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag)
+            realMeshGenerator = mesh.MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal)
+            imagMeshGenerator = mesh.MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag)
         else:
             (widthTiltFactor, heightTiltFactor) = self.interpolateTiltFactorsBetweenPerspectiveKeyframes(localFrameNumber, previousPerspectiveKeyframe, nextPerspectiveKeyframe)
 
             # Tilt factor is the multiplier applied to the range.
-            realMeshGenerator = MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal, tiltFactor=widthTiltFactor)
-            imagMeshGenerator = MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag, tiltFactor=heightTiltFactor)
+            realMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal, tiltFactor=widthTiltFactor)
+            imagMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag, tiltFactor=heightTiltFactor)
    
         # Passing lots into the dive mesh.  Notably, some info about the DiveTimelineSpan that was
         # responsible for creating this mesh.  Might want to store an actual reference to the object, but
         # doesn't seem needed yet?
-        diveMesh = DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, targetSpan.escapeSquared, targetSpan.maxEscapeIterations, targetSpan.shouldSmooth)
+        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, targetSpan.escapeSquared, targetSpan.maxEscapeIterations, targetSpan.shouldSmooth)
         #print (diveMesh)
         return diveMesh
 
@@ -1543,202 +1256,6 @@ class DiveSpanTiltKeyframe(DiveSpanKeyframe):
 #?rangeKeyframeAxisGenerator()?
 #...generate keyframes for target ranges, based on  this... somehow...
 
-class DiveMesh:
-    """
-    A DiveMesh is a 2D array of complex numbers that serves as a basis for
-    calculation, with the x-axis (across the width) based on real component 
-    distribution, and y-axis (across the height) based on imaginary 
-    component distribution.  Conceptually, this is the mapping of a portion 
-    of complex space into a 2D "imaging"(?) plane.  
-    
-    Two separate 2D (real-valued) meshes are generated first, one for the real component, 
-    and one for the imaginary component.  This means range and distribution types of the 
-    component meshes are the highest priority parameters.
-
-    # Not Implemented:
-    # Next,  distortions are applied separately to the real mesh, and to the imaginary mesh.
-    # Then, the separate 2D meshes are combined to become the overall mesh values.
-    # Finally, overall distortions are applied to the overall mesh values.
-    """
-    def __init__(self, width, height, center, realMeshGenerator, imagMeshGenerator, mathSupport, escapeSquared, maxEscapeIterations, shouldSmooth):
-        # Trying not to apply castings to these types, to keep them the same as
-        # the original parameters, which could make swapping out different 
-        # precision libraries simpler?
-        self.meshWidth = width
-        self.meshHeight = height
-        self.center = center
-
-        self.realMeshGenerator = realMeshGenerator
-        self.imagMeshGenerator = imagMeshGenerator
-
-        #self.realMeshDistortions = []
-        #self.imagMeshDistortions = []
-
-        #self.meshDistortions = []
-
-        # Technically, it seems redundant to have mathSupport specified separately for MeshGenerators
-        # and for DiveMesh, but it's enough of a chicken-and-egg problem that I'll just
-        # pass an extra parameter here and there.
-        self.mathSupport = mathSupport
-
-        # These properties are attached to the mesh, provided by the DiveTimelineSpan that created them
-        self.escapeSquared = escapeSquared
-        self.maxEscapeIterations = maxEscapeIterations
-        self.shouldSmooth = shouldSmooth
-
-    def generateMesh(self):
-        realMesh = self.realMeshGenerator.generateForDiveMesh(self)
-        imagMesh = self.imagMeshGenerator.generateForDiveMesh(self)
-
-        if realMesh.shape != imagMesh.shape:
-            raise ValueError("Real sub-mesh (%s) and Imaginary sub-mesh (%s) shapes don't match." % (realMesh.shape, imagMesh.shape))
-
-        meshShape = realMesh.shape
-        combinedMesh = np.zeros(meshShape, dtype=object) 
-        # The native python 'complex' type assigns into "object" type arrays without problems,
-        # but not vice-versa, so use object type for everything.
-
-        for x in range(0, meshShape[0]):
-            for y in range(0, meshShape[1]):
-                combinedMesh[x,y] = self.mathSupport.createComplex(realMesh[x,y], imagMesh[x,y])
-
-        return combinedMesh
-
-    def __repr__(self):
-        return """\
-[DiveMesh {{{mwidth},{mheight}}} realGenerator:{rgen} imagGenerator:{igen} ]\
-""".format(mwidth=self.meshWidth, mheight=self.meshHeight, rgen=str(self.realMeshGenerator), igen=str(self.imagMeshGenerator))
-
-class MeshGenerator:
-    def __init__(self, mathSupport, varyingAxis):
-        self.mathSupport = mathSupport
-
-        axisOptions = ['width', 'height']
-        if varyingAxis not in axisOptions:
-            raise ValueError("varyingAxis must be one of (%s)" % ", ".join(axisOptions))
-        self.varyingAxis = varyingAxis
-
-    def generateForDiveMesh(self):
-        raise NotImplementedError("generateForDiveMesh() must be overridden in a MeshGenerator subclass")
-
-class MeshGeneratorUniform(MeshGenerator):
-    """
-    Generates a 2D mesh of values distributed across with width, along the axis specified.
-
-    DiveMesh is used for calculations of ranges, so the DiveMesh is responsible for 
-    instantiation of correct types.  In other words, we try to avoid doing instantiations here.
-
-    Technically, should probably make the DiveMesh responsible for valuesCenter, so there's a single
-    point of reference.  It just seemed less clear that way at the moment.
-    """
-    def __init__(self, mathSupport, varyingAxis, valuesCenter, baseWidth):
-        super().__init__(mathSupport, varyingAxis)
-        self.valuesCenter = valuesCenter
-        self.baseWidth = baseWidth
-
-    def generateForDiveMesh(self, diveMesh):
-        """
-        e.g.
-        diveMesh.meshWidth=3, diveMesh.meshHeight=2, self.varyingAxis='width', self.valuesCenter=1.0, baseWidth=.2 returns:
-        [[0.9, 1.0, 1.1],
-         [0.9, 1.0, 1.1]]
-    
-        diveMesh.meshWidth=3, diveMesh.meshHeight=2, self.varyingAxis='height', self.valuesCenter=1.0, baseWidth=.2 returns:
-        [[0.9, 0.9, 0.9],
-         [1.1, 1.1, 1.1]]
-        """
-        mesh = np.zeros((diveMesh.meshHeight, diveMesh.meshWidth), dtype=object)
-
-        if self.varyingAxis == 'width':
-            #calculate start/end...  Probably need to be subtype aware for this...
-            discretizedValues = self.mathSupport.createLinspaceAroundValuesCenter(self.valuesCenter, self.baseWidth, diveMesh.meshWidth)
-            mesh[0:] = discretizedValues # Assign the one-row discretization to every row of the mesh
-        else: # self.varyingAxis == 'height'
-            discretizedValues = self.mathSupport.createLinspaceAroundValuesCenter(self.valuesCenter, self.baseWidth, diveMesh.meshHeight)
-            # Assign the one-row discretization (as a column) to every column of the mesh
-            mesh[0:] = discretizedValues[:,np.newaxis] 
-
-        return mesh
-
-    def __repr__(self):
-        return """\
-[MeshGeneratorUniform center:{vCenter} baseWidth:{vWidth} along axis:{vAxis}]\
-""".format(vCenter=self.valuesCenter, vWidth=self.baseWidth, vAxis=self.varyingAxis)
-
-# Not implemented yet: 
-# MeshGeneratorLogTilt, which uses a log scaling anchored at the middle
-# Maybe also:
-# DiveMeshGeneratorSqueeze (base-width->different-middle-width->base-width)
-# Mostly, looking for effects that give me control over something that feels
-# like camera behavior, such as lens barrel distortion.
-
-class MeshGeneratorTilt(MeshGenerator):
-    def __init__(self, mathSupport, varyingAxis, valuesCenter, baseWidth, tiltFactor):
-        """
-        Tilt is symmetric about the baseWidth.
-        Negative values aren't treated as negative factors, but instead as reversal
-        of the scaling direction (e.g. -2 means {.5,2.0}, and 2 => {2.0,.5})
-        This means tilt values should not be between {-1.0,1.0}.
-
-        Originally thought this would need 2 axis parameters, but for now, requiring
-        the tilt axis to be the same as varying axis seems to make sense.
-
-        Because the tilt factor is spread across the mesh rows, there might be
-        some strong aliasing (across dive frames) if there's an even number 
-        of rows or columns? I could imagine a back-and-forth wiggle developing if the
-        scales and factors line up the right way.
-
-        Axis discretization happens for every frame, on 2 axes (across complex range, and across real range).
-        Mesh generation is the combination of these 2 axes (perhaps plus further post-processing modifications).
-
-        A stretched axis (wider range), compared to the current frame's baseline, is akin to 
-        calculating previous steps.  For example, if you happen to stretch the axis as much as the previous 
-        frame transition's zoom factor, then you're sorta recalculating the previous frame's axis again.
-        Similarly, a squished axis (narrower range), is akin to calculating future steps.
-        """
-        super().__init__(mathSupport, varyingAxis)
-        self.valuesCenter = valuesCenter
-        self.baseWidth = baseWidth
-        self.tiltFactor = tiltFactor
-
-    def generateForDiveMesh(self, diveMesh):
-        mesh = np.zeros((diveMesh.meshHeight, diveMesh.meshWidth), dtype=object)
-
-        # Calculating only one side from the tiltFactor, then using the delta from
-        # the original as the other side's size.  This keeps our center in the linear
-        # center of the ranges, instead of shifting it some amount dependent on the factor.
-
-        # TODO: pretty sure this star/tend calculation needs to have its math done by 
-        # the MathSupport too, to keep type requirements localized there?
-        startWidth = 1.0 / self.tiltFactor * self.baseWidth
-        startDelta = self.baseWidth - startWidth
-        endWidth = self.baseWidth + startDelta
-        if self.tiltFactor < 0.0:
-            endWidth = 1.0 / self.tiltFactor * -1 * self.baseWidth
-            endDelta = self.baseWidth - endWidth
-            startWidth = self.baseWidth + endDelta
-
-        if self.varyingAxis == 'width':
-            # Values vary along the width axis, and the tiltFactor is applied to the
-            # range of each row, which effectively treats the width axis as the 
-            # rotation point
-            meshRowBaseWidths = self.mathSupport.createLinspace(startWidth, endWidth, diveMesh.meshHeight)
-            for y in range(0, diveMesh.meshHeight):
-                #calculate start/end...  Probably need to be subtype aware for this...
-                discretizedValues = self.mathSupport.createLinspaceAroundValuesCenter(self.valuesCenter, meshRowBaseWidths[y], diveMesh.meshWidth)
-                mesh[y] = discretizedValues # Assign the dscretization to this row
-        else: # self.varyingAxis == 'height'
-            meshColBaseWidths = self.mathSupport.createLinspace(startWidth, endWidth, diveMesh.meshWidth)
-            for x in range(0, diveMesh.meshWidth):
-                discretizedValues = self.mathSupport.createLinspaceAroundValuesCenter(self.valuesCenter, meshColBaseWidths[x], diveMesh.meshHeight)
-                mesh[:,x] = discretizedValues # Assign the discretization (as a column)
-
-        return mesh
-
-    def __repr__(self):
-        return """\
-[MeshGeneratorTilt center:{vCenter} baseWidth:{vWidth} tiltFactor:{tilt} along axis:'{vAxis}']\
-""".format(vCenter=self.valuesCenter, vWidth=self.baseWidth, tilt=self.tiltFactor, vAxis=self.varyingAxis)
 
 
 # --
@@ -1777,7 +1294,6 @@ def set_demo1_params(mandl_ctx, view_ctx):
     mandl_ctx.build_cache=True
 
     view_ctx.duration       = 2.0
-    #view_ctx.duration       = 10.0 
 
     # FPS still isn't set quite right, but we'll get it there eventually.
     view_ctx.fps            = 23.976 / 2.0 
@@ -1867,7 +1383,7 @@ def parse_options(mandl_ctx, view_ctx):
     # instantiations are properly typed
     for opt, arg in opts:
         if opt in ['--flint']:
-            mandl_ctx.math_support = DiveMathSupportFlint()
+            mandl_ctx.math_support = fm.DiveMathSupportFlint()
 
     for opt,arg in opts:
         if opt in ['-p', '--preview']:
