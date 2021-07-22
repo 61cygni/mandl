@@ -62,29 +62,19 @@ class MandlContext:
 
         self.cmplx_width = self.math_support.createFloat(0.0)
         self.cmplx_height = self.math_support.createFloat(0.0)
-
-        # point we're going to dive into 
         self.cmplx_center = self.math_support.createComplex(0.0, 0.0) # center of image in complex plane
 
         self.max_iter      = 0  # int max iterations before bailing
         self.escape_rad    = 0. # float radius mod Z hits before it "escapes" 
-        self.escape_squared = 0.0 # float squared radius, (redundant, but helpful)
 
         self.scaling_factor = 0.0 #  float amount to zoom each epoch
-        self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
         self.set_zoom_level = 0   # Zoom in prior to the dive
 
         self.smoothing      = False # bool turn on color smoothing
         self.snapshot       = False # Generate a single, high res shotb
 
-        self.duration  = 0  # int  duration of clip in seconds
-        self.fps = 0 # int  number of frames per second
-
-        self.julia_c      = None
-        self.julia_orig   = None
-        self.julia_walk_c = None
-
+        self.fractal = 'mandelbrot' # or 'julia'
         self.julia_list   = None 
 
         self.palette = None
@@ -95,121 +85,12 @@ class MandlContext:
         # query it for frame-specific parameters to render with.
         self.timeline = None
 
-        self.project_name = "default_project"
-        self.cache_path = u"%s_cache" % self.project_name
+        self.project_name = 'default_project'
+        self.shared_cache_path = 'shared_cache'
         self.build_cache = False
         self.invalidate_cache = False
-        self.ver = MANDL_VER # used to version cash
-
-        self.cache   = None
 
         self.verbose = 0 # how much to print about progress
-
-    def zoom_in(self, iterations=1):
-        while iterations:
-            self.cmplx_width  *= self.scaling_factor
-            self.cmplx_height *= self.scaling_factor
-            self.num_epochs += 1
-            iterations -= 1
-
-    # Use Bresenham's line drawing algo for a simple walk between two
-    # complex points
-    def julia_walk(self, t):
-
-        # duration of a leg
-        leg_d      = float(self.duration) / float(len(self.julia_list) - 1)
-        # which leg are we walking?
-        leg        = math.floor(float(t) / leg_d)
-        # how far along are we on that leg?
-        timeslice  = float(self.duration) / (float(self.duration) * float(self.fps))
-        fraction   = (float(t) - (float(leg) * leg_d)) / (leg_d - timeslice)
-
-        #print("T %f Leg %d leg_d %d Fraction %f"%(t,leg,leg_d,fraction))
-
-        cp1 = self.julia_list[leg]
-        cp2 = self.julia_list[leg + 1]
-
-
-        if self.julia_orig != cp1:
-            self.julia_orig = cp1
-
-        x0 = self.julia_orig.real
-        x1 = cp2.real 
-        y0 = self.julia_orig.imag 
-        y1 = cp2.imag 
-
-        new_x = ((x1 - x0)*fraction) + x0
-        new_y = ((y1 - y0)*fraction) + y0 
-        self.julia_c = complex(new_x, new_y)
-
-
-    # Some interesting c values
-    # c = complex(-0.8, 0.156)
-    # c = complex(-0.4, 0.6)
-    # c = complex(-0.7269, 0.1889)
-
-    def julia(self, c, z0):
-        z = z0
-        n = 0
-        while abs(z) <= 2 and n < self.max_iter:
-            z = z*z + c
-            n += 1
-
-        if n == self.max_iter:
-            return self.max_iter
-
-        return n + 1 - math.log(math.log2(abs(z)))
-
-    def mandelbrot(self, c):
-        z = self.math_support.createComplex(0, 0)
-        n = 0
-
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
-        while ((z.real*z.real)+(z.imag*z.imag)) <= self.escape_squared  and n < self.max_iter:
-            z = z*z + c
-            n += 1
-
-        if n >= self.max_iter:
-            return self.max_iter
-        
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        if self.smoothing:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(math.log(abs(z)))
-            return mu 
-        else:    
-            return n 
-
-    def load_frame(self, frame_number, cache_path, build_cache = True, invalidate_cache = False):
-        """Cache-aware data tuple loading or calculating"""
-
-        cache_file_name = os.path.join(cache_path, u"%d.npy" % frame_number)
-        #print("cache file %s" % cache_file_name)
-
-        if invalidate_cache == True and os.path.exists(cache_file_name) == True and os.path.isfile(cache_file_name):
-            os.remove(cache_file_name)
-               
-        frame_data = np.zeros((1,1), dtype=np.uint8) 
-        if os.path.exists(cache_file_name) == False:
-            frame_data = self.calculate_epoch_data(frame_number)
-
-            if build_cache == True:
-                #print("Writing cache file")
-                if not os.path.exists(cache_path):
-                    os.makedirs(cache_path)
-
-                np.save(cache_file_name, frame_data) 
-        else:
-            #print("Loading cache file")
-            frame_data = np.load(cache_file_name, allow_pickle=True)
-
-        return frame_data
 
     def render_frame_number(self, frame_number, snapshot_filename=None):
         """
@@ -217,32 +98,18 @@ class MandlContext:
 
         Once we have frame data, can perform histogram and coloring
         """
-        (pixel_values_2d, frame_metadata) = self.timeline.loadResultsForFrameNumber(frame_number, build_cache=self.build_cache, cache_path=self.cache_path, invalidate_cache=self.invalidate_cache)
+        (pixel_values_2d_raw, hist_raw, pixel_values_2d_smooth, hist_smooth, frame_metadata) = self.timeline.loadResultsForFrameNumber(frame_number, buildCache=self.build_cache, invalidateCache=self.invalidate_cache)
 
         # Capturing the transpose of our array, because it looks like I mixed
         # up rows and cols somewhere along the way.
-        pixel_values_2d = pixel_values_2d.T
-
-        # Used to create a histogram of the frequency of iteration
-        # depths retured by the mandelbrot calculation. Helpful for 
-        # color selection since many iterations never come up so you
-        # loose fidelity by not focusing on those heavily used
-
-        hist = defaultdict(int) 
-        values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
+        if self.smoothing == True:
+            pixel_values_2d = pixel_values_2d_smooth.T
+            hist = hist_smooth
+        else:
+            pixel_values_2d = pixel_values_2d_raw.T
+            hist = hist_raw
 
         #print("shape of things to come: %s" % str(pixel_values_2d.shape))
-
-        # --
-        # Iterate over every point in the complex plane (1:1 mapping per
-        # pixel) and run the fractacl calculation. We save the output in
-        # a 2x2 array, and also create the histogram of values
-        # --
-
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                if pixel_values_2d[x,y] < self.max_iter:
-                    hist[math.floor(pixel_values_2d[x,y])] += 1
 
         total = sum(hist.values())
         hues = []
@@ -271,47 +138,6 @@ class MandlContext:
             return im.save(snapshot_filename,"gif")
         else:    
             return np.array(im)
-
-    def calc_cur_frame(self, snapshot_filename = None):        
-
-        # --
-        # Calculate box in complex plane from center point
-        # --
-
-        re_start = self.math_support.createFloat(self.cmplx_center.real - (self.cmplx_width / 2.))
-        re_end =   self.math_support.createFloat(self.cmplx_center.real + (self.cmplx_width / 2.))
-
-        im_start = self.math_support.createFloat(self.cmplx_center.imag - (self.cmplx_height / 2.))
-        im_end   = self.math_support.createFloat(self.cmplx_center.imag + (self.cmplx_height / 2.))
-
-        if self.verbose > 0:
-            print("MandlContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
-                  (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
-                  end = " ")
-
-        values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
-        hist = []
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                # map from pixels to complex coordinates
-                Re_x = re_start + (x / (self.img_width - 1)) * (re_end - re_start)
-                Im_y = im_start + (y / (self.img_height - 1)) * (im_end - im_start)
-
-                c = self.math_support.createComplex(Re_x, Im_y)
-
-                if not self.julia_c:
-                    m = self.mandelbrot(c)
-                else:        
-                    z0 = c
-                    m = self.julia(self.julia_c, z0) 
-
-                values[x,y] = m
-
-                if m < self.max_iter:
-                    hist[math.floor(m)] += 1
-
-        return values, hist
-
         
     def draw_image_PIL(self, values, hues, metadata=None):    
 
@@ -339,7 +165,7 @@ class MandlContext:
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
 
         if self.burn_in == True and metadata != None:
-            burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (metadata['frame_number'], metadata['mesh_center'], metadata['real_width'], metadata['imag_width'])
+            burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (metadata['frame_number'], metadata['mesh_center'], metadata['complex_real_width'], metadata['complex_imag_width'])
 
             burn_in_location = (10,10)
             burn_in_margin = 5 
@@ -350,82 +176,21 @@ class MandlContext:
 
         return im    
 
-    def next_epoch(self, t, snapshot_filename = None):
-        """Called for each frame of the animation. Will calculate
-        current view, and then zoom in"""
-
-        values, hist = None, None
-        if self.cache: 
-            values, hist = self.cache.read_cache()
-
-        if not values or not hist:    
-            # call primary calculation function
-            values, hist = self.calc_cur_frame(snapshot_filename)
-
-            if self.cache:
-                self.cache.write_cache(values, hist)
-
-
-        #- 
-        # From histogram normalize to percent-of-total. This is
-        # effectively a probability distribution of escape values 
-        #
-        # Note that this is not effecitly a probability distribution for
-        # a given escape value. We can use this to calculate the Shannon 
-
-        total = sum(hist.values())
-        hues = []
-        h = 0
-
-        for i in range(self.max_iter):
-            if total :
-                h += hist[i] / total
-            hues.append(h)
-        hues.append(h)
-
-
-        # -- 
-        # Create image for this frame
-        # --
-        
-        im = self.draw_image_PIL(values, hues)
-
-        # -- 
-        # Do next step in animation
-        # -- 
-
-        if self.julia_list:
-            self.julia_walk(t)
-        else:    
-            self.zoom_in()
-
-        if self.verbose > 0:
-            print("Done]")
-        
-        if snapshot_filename:
-            return im.save(snapshot_filename,"gif")
-        else:    
-            return np.array(im)
-        
 
     def __repr__(self):
         return """\
 [MandlContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:s}
-Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Epochs:{e:d} Max iter:{mx:d}]\
+Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=str(self.cmplx_width),ch=str(self.cmplx_height),
-        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter,sm=self.smoothing); 
+        cc=str(self.cmplx_center),s=self.scaling_factor,mx=self.max_iter,sm=self.smoothing); 
 
 class MediaView: 
     """
     Handle displaying to gif / mp4 / screen etc.  
     """
-
     def make_frame(self, t):
-        if self.use_epochs == True:
-            return self.ctx.next_epoch(t)
-        else:
-            return self.ctx.render_frame_number(self.frame_number_from_time(t))
+        return self.ctx.render_frame_number(self.frame_number_from_time(t))
 
     def __init__(self, duration, fps, ctx):
         self.duration  = duration
@@ -433,11 +198,6 @@ class MediaView:
         self.ctx       = ctx
         self.banner    = False 
         self.vfilename = None 
-
-        self.ctx.duration = duration
-        self.ctx.fps      = fps
-
-        self.use_epochs = True
 
     def frame_number_from_time(self, t):
         return math.floor(self.fps * t) 
@@ -475,9 +235,6 @@ class MediaView:
 
         print(self)
         print(self.ctx)
-
-        if self.ctx.cache:
-                self.ctx.cache.setup()
 
 
     def run(self):
@@ -532,13 +289,40 @@ class MediaView:
         end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(start_width_real, overall_zoom_factor, frame_count - 1)
         end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(start_width_imag, overall_zoom_factor, frame_count - 1)
 
-        timeline = DiveTimeline(projectFolderName=self.ctx.project_name, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support)
-        # Here, I have ctx, which should know escapeSquared, maxIter, and shouldSmooth... 
-        #print("Trying to make span of %d frames" % frame_count)
-        span = timeline.addNewSpanAtEnd(frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag, self.ctx.escape_squared, self.ctx.max_iter, self.ctx.smoothing)
+        if self.ctx.fractal == 'julia':
+            timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='julia', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
+            # Just evenly divide the waypoints across the time for a simple timeline
+            keyframeCount = len(self.ctx.julia_list)
+            # 2 keyframes over 10 frames = 10 frames per keyframe
+            keyframeSpacing = math.floor(frame_count / (keyframeCount - 1)) 
+            if keyframeSpacing < 1:
+                raise ValueError("Can't construct julia walk with more waypoints than animation frames")
 
-        #perspectiveFrame = math.floor(frame_count * .5)
-        #span.addNewTiltKeyframe(perspectiveFrame, 4.0, 1.0) 
+            span = DiveTimelineSpan(timeline, frame_count, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
+            span.addNewWindowKeyframe(0, start_width_real, start_width_imag)
+            span.addNewWindowKeyframe(frame_count - 1, end_width_real, end_width_imag)
+            span.addNewUniformKeyframe(0)
+            span.addNewUniformKeyframe(frame_count - 1)
+
+            currKeyframeFrameNumber = 0
+            for currJuliaCenter in self.ctx.julia_list:
+                # Recognize when we're at the last item, and jump that keyframe to the final frame
+                if currKeyframeFrameNumber + keyframeSpacing > frame_count - 1:
+                    currKeyframeNumber = frame_count - 1
+                
+                span.addNewCenterKeyframe(currKeyframeFrameNumber, currJuliaCenter, transitionIn='linear', transitionOut='linear')
+                currKeyframeFrameNumber += keyframeSpacing
+
+            timeline.timelineSpans.append(span)
+
+        else:
+            timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='mandelbrot', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
+            # Here, I have ctx, which should know escapeRadius, maxIter, and shouldSmooth... 
+            #print("Trying to make span of %d frames" % frame_count)
+            span = timeline.addNewSpanAtEnd(frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
+    
+            #perspectiveFrame = math.floor(frame_count * .5)
+            #span.addNewTiltKeyframe(perspectiveFrame, 4.0, 1.0) 
 
         return timeline
 
@@ -571,9 +355,15 @@ class DiveTimeline:
     currently all live on integer frame numbers.
     """
 
-    def __init__(self, projectFolderName, framerate, frameWidth, frameHeight, mathSupport):
+    def __init__(self, projectFolderName, fractal, framerate, frameWidth, frameHeight, mathSupport, sharedCachePath):
+        
         self.projectFolderName = projectFolderName
-        self.cachePath = os.path.join("%s_cache" % projectFolderName)
+        self.sharedCachePath = sharedCachePath
+
+        fractalOptions = ['mandelbrot', 'julia']
+        if fractal not in fractalOptions:
+            raise ValueError("fractal must be one of (%s)" % ", ".join(fractalOptions))
+        self.fractalType = fractal
 
         self.framerate = float(framerate)
         self.frameWidth = int(frameWidth)
@@ -584,7 +374,7 @@ class DiveTimeline:
         # No definition made yet for edit gaps, so let's just enforce adjacency of ranges for now.
         self.timelineSpans = []
 
-    def addNewSpanAtEnd(self, frameCount, center, startWidthReal, startWidthImag, endWidthReal, endWidthImag, escapeSquared, maxEscapeIterations, shouldSmooth):
+    def addNewSpanAtEnd(self, frameCount, center, startWidthReal, startWidthImag, endWidthReal, endWidthImag, escapeRadius, maxEscapeIterations, shouldSmooth):
         """
         Constructs a new span, and adds it to the end of the existing span list
 
@@ -594,7 +384,7 @@ class DiveTimeline:
 
         Apparently also adding perspective keyframes too.
         """
-        span = DiveTimelineSpan(self, frameCount, escapeSquared, maxEscapeIterations, shouldSmooth)
+        span = DiveTimelineSpan(self, frameCount, escapeRadius, maxEscapeIterations, shouldSmooth)
         span.addNewCenterKeyframe(0, center, 'quadratic-to', 'quadratic-to')
         span.addNewCenterKeyframe(frameCount - 1, center, 'quadratic-to', 'quadratic-to')
         span.addNewWindowKeyframe(0, startWidthReal, startWidthImag)
@@ -628,63 +418,70 @@ class DiveTimeline:
 
         return None # Went past the end without finding a valid span, so it's too high a frame number
 
-    def loadResultsForFrameNumber(self, frame_number, build_cache=True, cache_path="cache", invalidate_cache=False):
-        """Cache-aware data tuple loading or calculating"""
-
-        cache_file_name = os.path.join(cache_path, u"%d.npy" % frame_number)
-        cache_metadata_file_name = os.path.join(cache_path, u"%d.npy.meta" % frame_number)
-        #print("cache file %s" % cache_file_name)
-
-        if invalidate_cache == True and os.path.exists(cache_file_name) == True and os.path.isfile(cache_file_name):
-            os.remove(cache_file_name)
-            os.remove(cache_metadata_file_name)
-               
-        frame_data = np.zeros((1,1), dtype=np.uint8) 
-        frame_metadata = {}
-        if os.path.exists(cache_file_name) == False:
-            #print("Calculating epoch results")
-            (frame_data, frame_metadata) = self.calculateResultsForFrameNumber(frame_number)
-
-            if build_cache == True:
-                #print("Writing cache file")
-                if not os.path.exists(cache_path):
-                    os.makedirs(cache_path)
-
-                # Write 2 separate files out, the numpy array, and a metadata sidecar
-                np.save(cache_file_name, frame_data) 
-                with open(cache_metadata_file_name, 'wb') as metadataHandle:
-                    pickle.dump(frame_metadata, metadataHandle)
-        else:
-            #print("Loading cache file")
-            # Load both the numpy array, and the metadata sidecar
-            frame_data = np.load(cache_file_name, allow_pickle=True)
-            with open(cache_metadata_file_name, 'rb') as metadataReadHandle:
-                frame_metadata = pickle.load(metadataReadHandle)
-        return (frame_data, frame_metadata)
-
-    def calculateResultsForFrameNumber(self, frameNumber):
+    def loadResultsForFrameNumber(self, frameNumber, buildCache=True, invalidateCache=False):
+        """ Multi-cache-aware data loading or calculating """
         diveMesh = self.getMeshForFrame(frameNumber)
+        cacheFrame = fc.Frame(self, diveMesh, frameNumber)
+
+        if invalidateCache == True:
+            cacheFrame.remove_from_results_cache()
+
+        cacheFrame.read_results_cache()
+
+        if cacheFrame.frame_info.raw_values is None or cacheFrame.frame_info.raw_histogram is None or cacheFrame.frame_info.smooth_values is None or cacheFrame.frame_info.smooth_histogram is None:
+            #print("+  calculating epoch results")
+            (rawValues, rawHistogram, smoothValues, smoothHistogram) = self.calculateResultsForDiveMesh(diveMesh)
+            cacheFrame.frame_info.raw_values = rawValues
+            cacheFrame.frame_info.raw_histogram = rawHistogram
+            cacheFrame.frame_info.smooth_values = smoothValues
+            cacheFrame.frame_info.smooth_histogram = smoothHistogram
+
+            # Fresly calculated results get saved if we're building the cache
+            if buildCache == True:
+                cacheFrame.write_results_cache()
+
+        frame_metadata = {'frame_number' : frameNumber,
+            'fractal_type': self.fractalType,
+            'precision_type': self.mathSupport.precisionType,
+            'mesh_center': str(diveMesh.center),
+            'complex_real_width' : str(diveMesh.realMeshGenerator.baseWidth),
+            'complex_imag_width' : str(diveMesh.imagMeshGenerator.baseWidth), 
+            'escape_radius' : str(diveMesh.escapeRadius),
+            'mesh_is_uniform' : str(diveMesh.isUniform()),
+            'max_escape_iterations' : str(diveMesh.maxEscapeIterations)}
+
+        return (cacheFrame.frame_info.raw_values, cacheFrame.frame_info.raw_histogram, cacheFrame.frame_info.smooth_values, cacheFrame.frame_info.smooth_histogram, frame_metadata)
+
+    def calculateResultsForDiveMesh(self, diveMesh):
         mesh = diveMesh.generateMesh()
 
         show_row_progress = False
 
-        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.uint8)
+        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=object)
+        pixel_values_2d_smoothed = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=object)
+        hist = defaultdict(int) 
+        hist_smoothed = defaultdict(int) 
         for x in range(0, mesh.shape[0]):
             for y in range(0, mesh.shape[1]):
-                pixel_values_2d[x,y] = self.mathSupport.mandelbrot(mesh[x,y], diveMesh.escapeSquared, diveMesh.maxEscapeIterations, diveMesh.shouldSmooth)
+                if self.fractalType == 'julia':
+                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.julia(diveMesh.center, mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
+                else: # self.FractalType == 'mandelbrot'
+                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.mandelbrot(mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
+
+                pixel_values_2d_smoothed[x,y] = self.mathSupport.smoothAfterCalculation(lastZee, pixel_values_2d[x,y], diveMesh.maxEscapeIterations)
+
+                # Extra casts to make flint types behave
+                if pixel_values_2d[x,y] < diveMesh.maxEscapeIterations:
+                    #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(pixel_values_2d[x,y]), str(self.mathSupport.floor(pixel_values_2d[x,y]))))
+                    hist[int(float(self.mathSupport.floor(pixel_values_2d[x,y])))] += 1
+                if pixel_values_2d_smoothed[x,y] < diveMesh.maxEscapeIterations:
+                    hist_smoothed[int(float(self.mathSupport.floor(pixel_values_2d_smoothed[x,y])))] += 1
+
             if show_row_progress == True:
                 print("%d-" % x, end="")
                 sys.stdout.flush()
 
-        frame_metadata = {'frame_number' : frameNumber, 
-            'mesh_center': str(diveMesh.center), 
-            'real_width' : str(diveMesh.realMeshGenerator.baseWidth),
-            'imag_width' : str(diveMesh.imagMeshGenerator.baseWidth),
-            'escape_squared' : str(diveMesh.escapeSquared),
-            'max_escape_iterations' : str(diveMesh.maxEscapeIterations)}
-
-        return (pixel_values_2d, frame_metadata)
-
+        return (pixel_values_2d, hist, pixel_values_2d_smoothed, hist_smoothed)
 
         ####
         # Graveyard of failed attempts at further vectorizing this, maybe there's a clue in here
@@ -700,7 +497,7 @@ class DiveTimeline:
 #
 #            # Pretty sure this is mistakenly doing an n! pass, or something just as ridiculous.
 #            #print("shape of pixel_inputs_1d: %s" % str(pixel_inputs_1d.shape))
-#            pixel_values_1d = np.array([self.mathSupport.mandelbrot(complex_value, diveMesh.escapeSquared, diveMesh.maxEscapeIterations, diveMesh.shouldSmooth) for complex_value in pixel_inputs_1d])
+#            pixel_values_1d = np.array([self.mathSupport.mandelbrot(complex_value, diveMesh.escapeRadius, diveMesh.maxEscapeIterations, diveMesh.shouldSmooth) for complex_value in pixel_inputs_1d])
 #    
 #            pixel_values_2d = pixel_values_1d.reshape((mesh.shape[0], mesh.shape[1]))
 #            #pixel_values_2d = np.squeeze(pixel_values_2d, axis=2) # Incantation to remove a sub-array level
@@ -786,7 +583,7 @@ class DiveTimeline:
         # Passing lots into the dive mesh.  Notably, some info about the DiveTimelineSpan that was
         # responsible for creating this mesh.  Might want to store an actual reference to the object, but
         # doesn't seem needed yet?
-        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, targetSpan.escapeSquared, targetSpan.maxEscapeIterations, targetSpan.shouldSmooth)
+        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, targetSpan.escapeRadius, targetSpan.maxEscapeIterations, targetSpan.shouldSmooth)
         #print (diveMesh)
         return diveMesh
 
@@ -864,11 +661,11 @@ class DiveTimelineSpan:
     """
     # ?(Can be used to observe/calculate n-1 zoom factors.)?
     """
-    def __init__(self, timeline, frameCount, escapeSquared, maxEscapeIterations, shouldSmooth):
+    def __init__(self, timeline, frameCount, escapeRadius, maxEscapeIterations, shouldSmooth):
         self.timeline = timeline
         self.frameCount = int(frameCount)
 
-        self.escapeSquared = escapeSquared
+        self.escapeRadius = escapeRadius
         self.maxEscapeIterations = maxEscapeIterations
         self.shouldSmooth = shouldSmooth
 
@@ -1263,7 +1060,7 @@ class DiveSpanTiltKeyframe(DiveSpanKeyframe):
 # command line
 # --
 def set_demo1_params(mandl_ctx, view_ctx):
-    print("+ Running in demo mode - loading default params")
+    print("+ Running in demo mode - loading default mandelbrot dive params")
     mandl_ctx.img_width  = 1024
     mandl_ctx.img_height = 768 
 
@@ -1279,18 +1076,16 @@ def set_demo1_params(mandl_ctx, view_ctx):
     mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(center_real_str, center_imag_str)
 
     mandl_ctx.project_name = 'demo1'
-    mandl_ctx.cache_path = u"%s_cache" % mandl_ctx.project_name
 
     mandl_ctx.scaling_factor = .90
 
     mandl_ctx.max_iter       = 255
 
-    #mandl_ctx.escape_rad     = 4.
-    mandl_ctx.escape_rad     = 32768. 
-    mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
+    mandl_ctx.escape_rad     = 2.
+    #mandl_ctx.escape_rad     = 32768. 
 
     mandl_ctx.verbose = 3
-    mandl_ctx.burn_in = True
+    mandl_ctx.burn_in = False
     mandl_ctx.build_cache=True
 
     view_ctx.duration       = 2.0
@@ -1299,8 +1094,40 @@ def set_demo1_params(mandl_ctx, view_ctx):
     view_ctx.fps            = 23.976 / 2.0 
     #view_ctx.fps            = 29.97 / 2.0 
 
-    # Separate execution paths for now
-    view_ctx.use_epochs = False
+def set_julia_walk_demo1_params(mandl_ctx, view_ctx):
+    print("+ Running in demo mode - loading default julia walk params")
+    mandl_ctx.img_width  = 1024
+    mandl_ctx.img_height = 768 
+
+    cmplx_width_str = '3.2'
+    cmplx_height_str = '2.5'
+    mandl_ctx.cmplx_width  = mandl_ctx.math_support.createFloat(cmplx_width_str)
+    mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(cmplx_height_str)
+
+    mandl_ctx.fractal = 'julia'
+    mandl_ctx.julia_list = [mandl_ctx.math_support.createComplex(0.355,0.355), mandl_ctx.math_support.createComplex(0.0,0.8), mandl_ctx.math_support.createComplex(0.3355,0.355)] 
+
+    mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(0,0)
+
+    mandl_ctx.project_name = 'julia_demo1'
+
+    mandl_ctx.scaling_factor = 1.0
+
+    mandl_ctx.max_iter       = 255
+
+    mandl_ctx.escape_rad     = 2.
+    #mandl_ctx.escape_rad     = 32768. 
+
+    mandl_ctx.verbose = 3
+    mandl_ctx.burn_in = True
+    mandl_ctx.build_cache = True
+
+    view_ctx.duration       = 2.0
+    #view_ctx.duration       = 0.25
+
+    # FPS still isn't set quite right, but we'll get it there eventually.
+    view_ctx.fps            = 23.976 / 2.0 
+    #view_ctx.fps            = 29.97 / 2.0 
 
 def set_preview_mode(mandl_ctx, view_ctx):
     print("+ Running in preview mode ")
@@ -1315,7 +1142,6 @@ def set_preview_mode(mandl_ctx, view_ctx):
 
     #mandl_ctx.escape_rad     = 4.
     mandl_ctx.escape_rad     = 32768. 
-    mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
@@ -1339,7 +1165,6 @@ def set_snapshot_mode(mandl_ctx, view_ctx, snapshot_filename='snapshot.gif'):
 
     #mandl_ctx.escape_rad     = 4.
     mandl_ctx.escape_rad     = 32768. 
-    mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
 
     view_ctx.duration       = 0
     view_ctx.fps            = 0
@@ -1351,7 +1176,9 @@ def parse_options(mandl_ctx, view_ctx):
     opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:h:c:",
                                ["preview",
                                 "demo",
+                                "demo-julia-walk",
                                 "duration=",
+                                "fps=",
                                 "max-iter=",
                                 "img-w=",
                                 "img-h=",
@@ -1361,11 +1188,9 @@ def parse_options(mandl_ctx, view_ctx):
                                 "scaling-factor=",
                                 "snapshot=",
                                 "zoom=",
-                                "fps=",
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
-                                "julia=",
                                 "julia-walk=",
                                 "center=",
                                 "palette-test=",
@@ -1373,10 +1198,10 @@ def parse_options(mandl_ctx, view_ctx):
                                 "burn",
                                 "flint",
                                 "project-name=",
+                                "shared-cache-path=",
                                 "build-cache",
                                 "invalidate-cache",
                                 "banner",
-                                "cache",
                                 "smooth"])
 
     # Math support as to be handled first, so other parameter 
@@ -1392,11 +1217,14 @@ def parse_options(mandl_ctx, view_ctx):
             set_snapshot_mode(mandl_ctx, view_ctx, arg)
         elif opt in ['--demo']:
             set_demo1_params(mandl_ctx, view_ctx)
+        elif opt in ['--demo-julia-walk']:
+            set_julia_walk_demo1_params(mandl_ctx, view_ctx)
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
             view_ctx.duration  = float(arg) 
-            mandl_ctx.duration = float(arg) 
+        elif opt in ['-f', '--fps']:
+            view_ctx.fps  = float(arg)
         elif opt in ['-m', '--max-iter']:
             mandl_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:
@@ -1404,30 +1232,27 @@ def parse_options(mandl_ctx, view_ctx):
         elif opt in ['-h', '--img-h']:
             mandl_ctx.img_height = int(arg)
         elif opt in ['--cmplx-w']:
-            mandl_ctx.cmplx_width = float(arg)
+            mandl_ctx.cmplx_width = mandl_ctx.math_support.createFloat(arg)
         elif opt in ['--cmplx-h']:
-            mandl_ctx.cmplx_height = float(arg)
+            mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(arg)
         elif opt in ['-c', '--center']:
             mandl_ctx.cmplx_center= mandl_ctx.math_support.createComplex(arg)
         elif opt in ['--scaling-factor']:
             mandl_ctx.scaling_factor = float(arg)
         elif opt in ['-z', '--zoom']:
             mandl_ctx.set_zoom_level = int(arg)
-        elif opt in ['-f', '--fps']:
-            view_ctx.fps  = int(arg)
-            mandl_ctx.fps = int(arg)
         elif opt in ['--smooth']:
             mandl_ctx.smoothing = True 
-        elif opt in ['--julia']:
-            mandl_ctx.julia_c = complex(arg) 
-        elif opt in ['--cache']:
-            mandl_ctx.cache = fc.FractalCache(mandl_ctx) 
-        elif opt in ['--julia-walk']:
-            mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
-            if len(mandl_ctx.julia_list) <= 1:
+        elif opt in ['--julia-list']:
+            mandl_ctx.fractal = 'julia'
+            raw_julia_list = eval(arg)  # expects a list of complex numbers
+            if len(raw_julia_list) <= 1:
                 print("Error: List of complex numbers for Julia walk must be at least two points")
                 sys.exit(0)
-            mandl_ctx.julia_c    = mandl_ctx.julia_list[0]
+            julia_list = []
+            for currCenter in raw_julia_list:
+                julia_list.append(mandl_ctx.math_support.create_complex(currCenter))
+            mandl_ctx.julia_list = julia_list
         elif opt in ['--center']:
             mandl_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
@@ -1463,7 +1288,8 @@ def parse_options(mandl_ctx, view_ctx):
             mandl_ctx.burn_in = True
         elif opt in ['--project-name']:
             mandl_ctx.project_name = arg
-            mandl_ctx.cache_path = u"%s_cache" % mandl_ctx.project_name
+        elif opt in ['--shared-cache-path']:
+            mandl_ctx.shared_cache_path = arg 
         elif opt in ['--build-cache']:
             mandl_ctx.build_cache = True
         elif opt in ['--invalidate-cache']:

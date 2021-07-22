@@ -29,6 +29,8 @@ class DiveMathSupport:
     Trying to preserve types where possible, without forcing casting, because sometimes
     all the math operations will already work for custom numeric types.
     """
+    def __init__(self):
+        self.precisionType = 'native'
 
     def createComplex(self, realComponent, imagComponent):
         """Compatible complex types will return values for .real() and .imag()"""
@@ -200,31 +202,59 @@ class DiveMathSupport:
         else:
             return (((targetX - startX)/ (endX - startX)) * (endY - startY)) + startY
 
-    def mandelbrot(self, c, escapeSquared, maxIter, shouldSmooth=False):
-        z = self.createComplex(0, 0)
-        n = 0
+    def mandelbrot(self, c, escapeRadius, maxIter):
+        """ 
+        Now that smoothing is handled separately, the native python implementation
+        COULD work for flint as well, except it uses 'complex(0,0)' instead
+        of self.createComplex(0,0).
+        The reason for this is just as below - to reduce one extra function call in 
+        the core calculation.
 
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
-        while ((z.real**2)+(z.imag**2)) <= escapeSquared  and n < maxIter:
+        Could just call julia with a zero start here, but seems wiser to
+        not have one extra function call in the core of the calculation?
+        """
+        z = complex(0,0)
+        n = 0
+        while abs(z) <= escapeRadius  and n < maxIter:
             z = z*z + c
             n += 1
-#
-        if n == maxIter:
+
+        return (n, z)
+
+    def julia(self, c, z0, escapeRadius, maxIter):
+        """
+        Some interesting c values
+        c = complex(-0.8, 0.156)
+        c = complex(-0.4, 0.6)
+        c = complex(-0.7269, 0.1889)
+
+        Looks like this implementation is able to handle flint types, now that smoothing
+        is handled separately.
+
+        fabs(z) returns the modulus of a complex number, which is the
+        distance to 0 (on a 2x2 cartesian plane)
+        However, instead we just square both sides of the inequality to
+        avoid the sqrt
+        e.g.: while (float((z.real**2)+(z.imag**2))) <= escapeSquared  and n < maxIter:
+
+        However, for python, it looks like it takes almost 1/2 of the time to do abs(Z)
+        """
+        z = z0
+        n = 0
+        while abs(z) <= escapeRadius  and n < maxIter:
+            z = z*z + c
+            n += 1
+
+        return (n, z)
+
+    def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
+        if endingIter == maxIter:
             return maxIter
-        
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        if shouldSmooth == True:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(math.log(abs(z)))
-            return mu 
-        else:    
-            return n 
+        else:
+            # The following code smooths out the colors so there aren't bands
+            # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
+            # Note: Results in a float. We think.
+            return endingIter + 1 - math.log(math.log2(abs(endingZ)))
 
 class DiveMathSupportFlint(DiveMathSupport):
     """
@@ -237,6 +267,7 @@ class DiveMathSupportFlint(DiveMathSupport):
 
         self.flint = __import__('flint') # Only imports if you instantiate this DiveMathSupport subclass.
         self.flint.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
+        self.precisionType = 'flint'
 
     def createComplex(self, realComponent, imagComponent):
         return self.flint.acb(realComponent, imagComponent)
@@ -259,40 +290,37 @@ class DiveMathSupportFlint(DiveMathSupport):
             aVal = (endY - startY) / (self.flint.arb(endX - startX + 1).log())
             return aVal * (self.flint.arb(targetX - startX + 1).log()) + startY 
 
-    def mandelbrot(self, c, escapeSquared, maxIter, shouldSmooth=False):
+    def mandelbrot(self, c, escapeRadius, maxIter):
         """ 
-        NOTE: Smoothing maybe should be only a post-processing step?  Maybe not?
+        Now that smoothing is handled separately, the native python implementation
+        COULD work for flint as well, except it uses 'complex(0,0)' instead
+        of self.createComplex(0,0).
+        The reason for this is just as below - to reduce one extra function call in 
+        the core calculation.
 
-        This flint-specific implementation only really does flint-y logs in the smoothing.
-        The Decimal-specific implementation needed some extra steps, but I've ditched that one.
+        Could just call julia with a zero start here, but seems wiser to
+        not have one extra function call in the core of the calculation?
         """
-        z = self.createComplex(0, 0)
+        z = self.flint.acb(0,0)
         n = 0
-
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
-        #
-        # Important to cast the escape answer back to float, or the arb gets sheared bizarrely
-        while (float((z.real**2)+(z.imag**2))) <= escapeSquared  and n < maxIter:
+        while abs(z) <= escapeRadius  and n < maxIter:
             z = z*z + c
             n += 1
 
-        if n == maxIter:
-            return maxIter
-        
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        if shouldSmooth == True:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
+        return (n, z)
 
-            #mu = n + 1 - math.log(self.mp.log2(abs(z))) # (and, there IS NO log2 in mpmath... hrm)
-            # Maybe this is the right way to do the same thing?!
-            mu = n + 1 - z.abs_lower().log().log()
-            return mu 
-        else:    
-            return n 
+
+    def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
+        """
+        This flint-specific implementation only really does flint-y logs in the smoothing.
+        The Decimal-specific implementation needed some extra steps, but I've ditched that one.
+        """
+        if endingIter == maxIter:
+            return maxIter
+        else:
+            # The following code smooths out the colors so there aren't bands
+            # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
+            # Note: Results in a float. We think.
+            return endingIter + 1 - endingZ.abs_lower().const_log2().const_log10()
+
 

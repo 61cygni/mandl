@@ -34,7 +34,7 @@ class DiveMesh:
     # Then, the separate 2D meshes are combined to become the overall mesh values.
     # Finally, overall distortions are applied to the overall mesh values.
     """
-    def __init__(self, width, height, center, realMeshGenerator, imagMeshGenerator, mathSupport, escapeSquared, maxEscapeIterations, shouldSmooth):
+    def __init__(self, width, height, center, realMeshGenerator, imagMeshGenerator, mathSupport, escapeRadius, maxEscapeIterations, shouldSmooth):
         # Trying not to apply castings to these types, to keep them the same as
         # the original parameters, which could make swapping out different 
         # precision libraries simpler?
@@ -56,7 +56,7 @@ class DiveMesh:
         self.mathSupport = mathSupport
 
         # These properties are attached to the mesh, provided by the DiveTimelineSpan that created them
-        self.escapeSquared = escapeSquared
+        self.escapeRadius = escapeRadius
         self.maxEscapeIterations = maxEscapeIterations
         self.shouldSmooth = shouldSmooth
 
@@ -77,6 +77,9 @@ class DiveMesh:
                 combinedMesh[x,y] = self.mathSupport.createComplex(realMesh[x,y], imagMesh[x,y])
 
         return combinedMesh
+
+    def isUniform(self):
+        return self.realMeshGenerator and isinstance(self.realMeshGenerator, MeshGeneratorUniform) and self.imagMeshGenerator and isinstance(self.imagMeshGenerator, MeshGeneratorUniform)
 
     def __repr__(self):
         return """\
