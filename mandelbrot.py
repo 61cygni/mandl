@@ -101,7 +101,8 @@ class MandlContext:
         self.invalidate_cache = False
         self.ver = MANDL_VER # used to version cash
 
-        self.cache   = None
+        self.cache      = None
+        self.ascii_dump = None
 
         self.verbose = 0 # how much to print about progress
 
@@ -319,9 +320,16 @@ class MandlContext:
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
         
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
+        for y in range(0, self.img_height):
+            for x in range(0, self.img_width):
                 m = values[x,y] 
+
+                if self.ascii_dump:
+                    if x >= self.ascii_dump[0] and x < self.ascii_dump[0] + self.ascii_dump[2]:
+                        if y >= self.ascii_dump[1] and y < self.ascii_dump[1] + self.ascii_dump[3]:
+                            print(m,end=" ")
+                            if x == (self.ascii_dump[0] + self.ascii_dump[2]) - 1:
+                                print("")
 
                 if not self.palette:
                     c = 255 - int(255 * hues[math.floor(m)]) 
@@ -1414,6 +1422,7 @@ def parse_options(mandl_ctx, view_ctx):
                                 "invalidate-cache",
                                 "banner",
                                 "cache",
+                                "ascii-dump=",
                                 "smooth"])
 
     # Math support as to be handled first, so other parameter 
@@ -1459,6 +1468,11 @@ def parse_options(mandl_ctx, view_ctx):
             mandl_ctx.julia_c = complex(arg) 
         elif opt in ['--cache']:
             mandl_ctx.cache = fc.FractalCache(mandl_ctx) 
+        elif opt in ['--ascii-dump']:
+            mandl_ctx.ascii_dump = eval(arg) # expects a tuple of 4 ints 
+            if len(mandl_ctx.ascii_dump) != 4:
+                print("Error: ascii dump expects a tuple/list of 4 items")
+                sys.exit(0)
         elif opt in ['--julia-walk']:
             mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
             if len(mandl_ctx.julia_list) <= 1:
