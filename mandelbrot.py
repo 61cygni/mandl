@@ -181,7 +181,7 @@ class MandlContext:
         if self.smoothing:
             z = z*z + c; n+=1 # a couple extra iterations helps
             z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(math.log(abs(z)))
+            mu = n + 1 - math.log(math.log(abs(z))/math.log(2.))
             return mu 
         else:    
             return n 
@@ -289,7 +289,7 @@ class MandlContext:
                   (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
                   end = " ")
 
-        values = np.zeros((self.img_width, self.img_height), dtype=np.uint8)
+        values = np.zeros((self.img_width, self.img_height), dtype=np.float)
         hist   = defaultdict(int)
 
         for x in range(0, self.img_width):
@@ -482,6 +482,14 @@ class MediaView:
 
 
     def run(self):
+
+        if self.use_epochs:
+            if self.ctx.set_zoom_level > 0:
+                print("Zooming in by %d epochs" % (self.ctx.set_zoom_level))
+                while self.ctx.set_zoom_level > 0:
+                    self.ctx.zoom_in()
+                    self.ctx.set_zoom_level -= 1
+
 
         if self.ctx.snapshot == True:
             self.create_snapshot()
@@ -1303,6 +1311,34 @@ def set_demo1_params(mandl_ctx, view_ctx):
     # Separate execution paths for now
     view_ctx.use_epochs = False
 
+# --
+# Default settings for the dive. All of these can be overridden from the
+# command line
+# --
+def set_default_params():
+
+    mandl_ctx.img_width  = 1024
+    mandl_ctx.img_height = 768
+
+    mandl_ctx.cmplx_width  = mandl_ctx.math_support.createFloat(5.0)
+    mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(3.5)
+
+    # This is close t Misiurewicz point M32,2
+    # mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
+    mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex("-1.769383179195515018213+0.00423684791873677221j")
+
+    mandl_ctx.scaling_factor = .97
+    mandl_ctx.num_epochs     = 0
+
+    mandl_ctx.max_iter       = 255
+    mandl_ctx.escape_rad     = 32768.
+    mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
+
+    mandl_ctx.precision      = 100
+
+    view_ctx.duration       = 16
+    view_ctx.fps            = 16
+
 def set_preview_mode(mandl_ctx, view_ctx):
     print("+ Running in preview mode ")
 
@@ -1314,7 +1350,7 @@ def set_preview_mode(mandl_ctx, view_ctx):
 
     mandl_ctx.scaling_factor = .75
 
-    #mandl_ctx.escape_rad     = 4.
+    mandl_ctx.max_iter       = 255
     mandl_ctx.escape_rad     = 32768. 
     mandl_ctx.escape_squared = mandl_ctx.escape_rad * mandl_ctx.escape_rad
 
@@ -1496,6 +1532,7 @@ if __name__ == "__main__":
     mandl_ctx = MandlContext()
     view_ctx  = MediaView(16, 16, mandl_ctx)
 
+    set_default_params()
     parse_options(mandl_ctx, view_ctx)
    
     view_ctx.setup()

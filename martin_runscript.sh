@@ -1,6 +1,8 @@
+/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --zoom=250  --max-iter=3000 --img-w=1400 --img-h=1200   --center="-1.769383179195515+0.004236847918736772j" --cache
+
 #/usr/local/bin/python3 mandelbrot.py --color=exp2 --duration=16 --preview 
 
-/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --center="-1.769383179195515+0.004236847918736772j" --cache
+#/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --center="-1.769383179195515+0.004236847918736772j" --cache
 
 #/usr/local/bin/python3 mandelbrot.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --cache
 
