@@ -457,8 +457,8 @@ class DiveTimeline:
 
         show_row_progress = False
 
-        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=object)
-        pixel_values_2d_smoothed = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=object)
+        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.uint32)
+        pixel_values_2d_smoothed = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.float)
         hist = defaultdict(int) 
         hist_smoothed = defaultdict(int) 
         for x in range(0, mesh.shape[0]):
@@ -470,12 +470,12 @@ class DiveTimeline:
 
                 pixel_values_2d_smoothed[x,y] = self.mathSupport.smoothAfterCalculation(lastZee, pixel_values_2d[x,y], diveMesh.maxEscapeIterations)
 
-                # Extra casts to make flint types behave
+                # Not using mathSupport's floor() here, because it should just be a normal-scale float
                 if pixel_values_2d[x,y] < diveMesh.maxEscapeIterations:
                     #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(pixel_values_2d[x,y]), str(self.mathSupport.floor(pixel_values_2d[x,y]))))
-                    hist[int(float(self.mathSupport.floor(pixel_values_2d[x,y])))] += 1
+                    hist[math.floor(pixel_values_2d[x,y])] += 1
                 if pixel_values_2d_smoothed[x,y] < diveMesh.maxEscapeIterations:
-                    hist_smoothed[int(float(self.mathSupport.floor(pixel_values_2d_smoothed[x,y])))] += 1
+                    hist_smoothed[math.floor(pixel_values_2d_smoothed[x,y])] += 1
 
             if show_row_progress == True:
                 print("%d-" % x, end="")
@@ -1085,7 +1085,7 @@ def set_demo1_params(mandl_ctx, view_ctx):
     #mandl_ctx.escape_rad     = 32768. 
 
     mandl_ctx.verbose = 3
-    mandl_ctx.burn_in = False
+    mandl_ctx.burn_in = True
     mandl_ctx.build_cache=True
 
     view_ctx.duration       = 2.0
@@ -1123,7 +1123,6 @@ def set_julia_walk_demo1_params(mandl_ctx, view_ctx):
     mandl_ctx.build_cache = True
 
     view_ctx.duration       = 2.0
-    #view_ctx.duration       = 0.25
 
     # FPS still isn't set quite right, but we'll get it there eventually.
     view_ctx.fps            = 23.976 / 2.0 

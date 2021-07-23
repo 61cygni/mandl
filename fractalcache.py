@@ -32,7 +32,12 @@ class FrameInfo:
         self.smooth_histogram   = smooth_histogram
 
     def emptyCopy(self):
+        """ Looks like storing strings of everything makes us pickle-proof? """
         return FrameInfo(str(self.mesh_width), str(self.mesh_height), str(self.center), str(self.complex_real_width), str(self.complex_imag_width), str(self.escape_r), str(self.max_escape_iter))
+        #return FrameInfo(self.mesh_width, self.mesh_height, self.center, self.complex_real_width, self.complex_imag_width, self.escape_r, self.max_escape_iter)
+
+    def pickleCopy(self):
+        return FrameInfo(str(self.mesh_width), str(self.mesh_height), str(self.center), str(self.complex_real_width), str(self.complex_imag_width), str(self.escape_r), str(self.max_escape_iter), self.raw_values, self.raw_histogram, self.smooth_values, self.smooth_histogram)
 
 class Frame:
     """
@@ -98,7 +103,7 @@ class Frame:
             raise ValueError("Aborting cache file write of missing data to \"%s\"" % filename)
 
         with open(filename, 'wb') as fd:
-            pickle.dump(self.frame_info,fd)
+            pickle.dump(self.frame_info.pickleCopy(),fd)
 
     def read_results_cache(self):
         filename = self.create_results_file_name()
@@ -111,13 +116,13 @@ class Frame:
         with open(filename, 'rb') as fd:
             frame_data = pickle.load(fd)
   
-        assert frame_data.mesh_width == self.frame_info.mesh_width
-        assert frame_data.mesh_height == self.frame_info.mesh_height
-        assert frame_data.center == self.frame_info.center
-        assert frame_data.complex_real_width == self.frame_info.complex_real_width
-        assert frame_data.complex_imag_width == self.frame_info.complex_imag_width
-        assert frame_data.escape_r == self.frame_info.escape_r
-        assert frame_data.max_escape_iter == self.frame_info.max_escape_iter
+#        assert frame_data.mesh_width == self.frame_info.mesh_width
+#        assert frame_data.mesh_height == self.frame_info.mesh_height
+#        assert frame_data.center == self.frame_info.center
+#        assert frame_data.complex_real_width == self.frame_info.complex_real_width
+#        assert frame_data.complex_imag_width == self.frame_info.complex_imag_width
+#        assert frame_data.escape_r == self.frame_info.escape_r
+#        assert frame_data.max_escape_iter == self.frame_info.max_escape_iter
 
         self.frame_info.raw_values         = frame_data.raw_values
         self.frame_info.raw_histogram      = frame_data.raw_histogram

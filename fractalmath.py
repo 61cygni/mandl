@@ -215,7 +215,7 @@ class DiveMathSupport:
         """
         z = complex(0,0)
         n = 0
-        while abs(z) <= escapeRadius  and n < maxIter:
+        while abs(z) <= escapeRadius and n < maxIter:
             z = z*z + c
             n += 1
 
@@ -241,7 +241,7 @@ class DiveMathSupport:
         """
         z = z0
         n = 0
-        while abs(z) <= escapeRadius  and n < maxIter:
+        while abs(z) <= escapeRadius and n < maxIter:
             z = z*z + c
             n += 1
 
@@ -303,7 +303,7 @@ class DiveMathSupportFlint(DiveMathSupport):
         """
         z = self.flint.acb(0,0)
         n = 0
-        while abs(z) <= escapeRadius  and n < maxIter:
+        while float(z.abs_lower()) <= escapeRadius and n < maxIter:
             z = z*z + c
             n += 1
 
@@ -321,6 +321,6 @@ class DiveMathSupportFlint(DiveMathSupport):
             # The following code smooths out the colors so there aren't bands
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
-            return endingIter + 1 - endingZ.abs_lower().const_log2().const_log10()
+            return float(endingIter + 1 - endingZ.abs_lower().const_log2().const_log10())
 
 
