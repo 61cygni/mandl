@@ -1252,8 +1252,6 @@ def parse_options(mandl_ctx, view_ctx):
             for currCenter in raw_julia_list:
                 julia_list.append(mandl_ctx.math_support.create_complex(currCenter))
             mandl_ctx.julia_list = julia_list
-        elif opt in ['--center']:
-            mandl_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
             m = fp.MandlPalette()
             if str(arg) == "gauss":
