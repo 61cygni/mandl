@@ -37,7 +37,11 @@ class Julia(Algo):
                 else:
                     print("Error: --palette arg must be one of gauss|exp|list")
                     sys.exit(0)
-                fractal_ctx.palette = m
+
+    def set_default_params(self):
+        # This is close t Misiurewicz point M32,2
+        # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
+        self.context.cmplx_center = self.context.ctxc(0,0)
 
         if not self.julia_c:
             print("Error: no julia c value specified, defaulting to %s"%(str(default_julia_c)))

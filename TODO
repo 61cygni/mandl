@@ -1,8 +1,8 @@
 
+- Set detault params that make sense per algo
+- By default create <algoname.gif> only display if the --preview flag is
+  showing
 - Fix caching to be in the algos
-- Pull coloring out of fractal.py 
-  -- XXX need to push histogram / hue calculation into palette
-- implement distance estimation method as an algo
 
 Major:
 - Create logging framework with multiple levels

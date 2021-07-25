@@ -42,6 +42,10 @@ class Mandelbrot(Algo):
                     print("Error: --palette arg must be one of gauss|exp|list")
                     sys.exit(0)
 
+    def set_default_params(self):
+        # This is close t Misiurewicz point M32,2
+        # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
+        self.context.cmplx_center = self.context.ctxc(-1.769383179195515018213,0.00423684791873677221)
 
     def _calc_pixel(self, c):
 

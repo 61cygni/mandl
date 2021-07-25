@@ -7,6 +7,9 @@ class Algo(object):
     def parse_options(self, opts, args):    
         pass
 
+    def set_default_params(self):
+        pass
+
     def setup(self):
         pass
 
@@ -21,7 +24,8 @@ class Algo(object):
 
     def zoom_in(self, iterations=1):
         while iterations:
-            self.context.cmplx_width  *= self.context.scaling_factor
-            self.context.cmplx_height *= self.context.scaling_factor
+            self.context.cmplx_width   *= self.context.scaling_factor
+            self.context.cmplx_height  *= self.context.scaling_factor
+            self.context.magnification *= self.context.scaling_factor
             self.context.num_epochs += 1
             iterations -= 1

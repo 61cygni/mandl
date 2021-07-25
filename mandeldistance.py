@@ -10,16 +10,23 @@ import math
 
 import fractalpalette as fp
 
+
 def squared_modulus(z):
     return ((z.real*z.real)+(z.imag*z.imag))
 
 def clamp(num, min_value, max_value):
    return max(min(num, max_value), min_value)
 
+
 class MandelDistance(Algo):
 
     def __init__(self, context):
         super(MandelDistance, self).__init__(context) 
+
+    def set_default_params(self):
+        # This is close t Misiurewicz point M32,2
+        # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
+        self.context.cmplx_center = self.context.ctxc("-0.05+.6805j")
 
     def calc_pixel(self, c):
 
@@ -59,7 +66,8 @@ class MandelDistance(Algo):
 
     def map_value_to_color(self, t, val):
         zoo = .1 
-        d = clamp( pow(pow(6.0,t)*val/zoo,0.1), 0.0, 1.0 );
+        zoom_level = 1. / self.context.magnification
+        d = clamp( pow(zoom_level*val/zoo,0.1), 0.0, 1.0 );
         cint = int(d*255)
 
         return (cint,cint,cint)

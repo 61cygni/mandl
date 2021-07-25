@@ -45,19 +45,22 @@ class FractalContext:
         if not mp:
             self.mp = math
 
-        self.img_width  = 0 # int : Wide of Image in pixels
-        self.img_height = 0 # int
+        self.img_width  = 1024 # int : Wide of Image in pixels
+        self.img_height = 768  # int
 
-        self.cmplx_width = 0.0 # width of visualization in complex plane
-        self.cmplx_height = 0.0
+        self.cmplx_width  = self.ctxf(5.0) # width of visualization in complex plane
+        self.cmplx_height = self.ctxf(3.5) 
+
+        self.magnification = 1.0 # track how far we've zoomed in 
 
         # point we're going to dive into 
-        self.cmplx_center = complex(0.0) # center of image in complex plane
+        self.cmplx_center = None # require algo to set this 
 
-        self.max_iter      = 0  # int max iterations before bailing
-        self.escape_rad    = 0. # float radius mod Z hits before it "escapes" 
+        # should be in the algos
+        self.max_iter      = 255    # int max iterations before bailing
+        self.escape_rad    = 32768. # float radius mod Z hits before it "escapes" 
 
-        self.scaling_factor = 0.0 #  float amount to zoom each epoch
+        self.scaling_factor = .95 #  float amount to zoom each epoch
         self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
         self.advance = 0   # Call advance for this many frames prior to rendering
@@ -67,8 +70,8 @@ class FractalContext:
 
         self.precision = 17 # int decimal precision for calculations
 
-        self.duration  = 0  # int  duration of clip in seconds
-        self.fps = 0 # int  number of frames per second
+        self.duration  = 8  # int  duration of clip in seconds
+        self.fps       = 8 # int  number of frames per second
 
         self.algo = None
 
@@ -129,7 +132,6 @@ class FractalContext:
                 m = self.algo.calc_pixel(c)
 
                 values[(x,y)] = m 
-                #self.palette.raw_calc_from_algo(m)
 
             if snapshot_filename:
                 print(".",end="")
@@ -291,8 +293,13 @@ class MediaView:
 
         if self.ctx.advance > 0:
             print("Advancing by %d epochs" % (self.ctx.advance))
+            cur_t = 0.0
             while self.ctx.advance > 0:
-                self.algo.animate_step()
+                duration = self.ctx.duration
+                fps      = self.ctx.fps
+
+                self.ctx.algo.animate_step(cur_t)
+                cur_t += 1. / (float(duration) + float(fps))
                 self.ctx.advance -= 1
             
 
@@ -330,35 +337,6 @@ fractal_ctx = FractalContext()
 view_ctx    = MediaView(16, 16, fractal_ctx)
 
 
-# --
-# Default settings for the dive. All of these can be overridden from the
-# command line
-# --
-def set_default_params():
-    global fractal_ctx
-
-    fractal_ctx.img_width  = 1024
-    fractal_ctx.img_height = 768 
-
-    fractal_ctx.cmplx_width  = fractal_ctx.ctxf(5.0)
-    fractal_ctx.cmplx_height = fractal_ctx.ctxf(3.5)
-
-    # This is close t Misiurewicz point M32,2
-    # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
-    fractal_ctx.cmplx_center = fractal_ctx.ctxc(-1.769383179195515018213,0.00423684791873677221)
-
-    fractal_ctx.scaling_factor = .97
-    fractal_ctx.num_epochs     = 0
-
-    fractal_ctx.max_iter       = 255
-    fractal_ctx.escape_rad     = 32768. 
-
-    fractal_ctx.precision      = 100
-
-    view_ctx.duration       = 16
-    view_ctx.fps            = 16
-
-
 def set_preview_mode():
     global fractal_ctx
 
@@ -371,7 +349,6 @@ def set_preview_mode():
     fractal_ctx.cmplx_height = 2.5 
 
     fractal_ctx.scaling_factor = .75
-    fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
@@ -383,15 +360,15 @@ def set_snapshot_mode():
 
     fractal_ctx.snapshot = True
 
-    fractal_ctx.img_width  = 3000
-    fractal_ctx.img_height = 2000 
+    fractal_ctx.img_width  = 3840 
+    fractal_ctx.img_height = 2160 
 
     fractal_ctx.max_iter   = 2000
 
     fractal_ctx.cmplx_width  = 3.
     fractal_ctx.cmplx_height = 2.5 
 
-    fractal_ctx.scaling_factor = .99 
+    fractal_ctx.scaling_factor = 1. 
     fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 0
@@ -444,6 +421,15 @@ def parse_options():
     if not fractal_ctx.algo:
         module = importlib.import_module("mandelbrot") 
         fractal_ctx.algo = module._instance(fractal_ctx)
+
+    print("+ Using algo %s"%(str(fractal_ctx.algo)))
+    
+    fractal_ctx.algo.set_default_params()    
+
+    if type(fractal_ctx.cmplx_center) == type(None):
+        print("Error: algo must set center value")
+        sys.exit(0)
+        
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
@@ -533,7 +519,6 @@ if __name__ == "__main__":
 
     print("++ fractal.py version %s" % (FRACTAL_VER))
     
-    set_default_params()
     parse_options()
 
     view_ctx.setup()
