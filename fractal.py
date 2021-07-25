@@ -28,7 +28,7 @@ from PIL import Image, ImageDraw, ImageFont
 import fractalcache   as fc
 import fractalpalette as fp
 
-MANDL_VER = "0.1"
+FRACTAL_VER = "0.1"
 
 
 class FractalContext:
@@ -38,7 +38,7 @@ class FractalContext:
 
     def __init__(self, ctxf = None, ctxc = None, mp = None):
 
-        self.ver = MANDL_VER # used to version cash
+        self.ver = FRACTAL_VER # used to version cash
 
         if not ctxf:
             self.ctxf = float
@@ -556,7 +556,7 @@ def parse_options():
 
 if __name__ == "__main__":
 
-    print("++ mandlebort.py version %s" % (MANDL_VER))
+    print("++ fractal.py version %s" % (FRACTAL_VER))
     
     set_default_params()
     parse_options()

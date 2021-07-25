@@ -1,5 +1,4 @@
 
-- Move zoom out of fractal and create instead "advance" to advnace the frames. Then zoom using the algos
 - Fix caching to be in the algos
 - Pull coloring out of fractal.py 
 - implement distance estimation method as an algo
