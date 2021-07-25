@@ -1,5 +1,5 @@
 # --
-# File: mandelbrot.py
+# File: fractal.py
 # 
 # Driver file for playing around with the Mandelbrot set 
 #
@@ -23,6 +23,7 @@
 import getopt
 import sys
 import math
+import importlib
 
 from collections import defaultdict
 
@@ -37,6 +38,9 @@ from moviepy.audio.tools.cuts import find_audio_period
 from PIL import Image, ImageDraw, ImageFont
 
 # -- our files
+
+from mandelbrot import Mandelbrot
+
 import fractalcache   as fc
 import fractalpalette as fp
 
@@ -87,6 +91,8 @@ class MandlContext:
 
         self.duration  = 0  # int  duration of clip in seconds
         self.fps = 0 # int  number of frames per second
+
+        self.algo = None
 
         self.julia_c      = None
         self.julia_orig   = None
@@ -139,51 +145,6 @@ class MandlContext:
         self.julia_c = complex(new_x, new_y)
 
 
-    # Some interesting c values
-    # c = complex(-0.8, 0.156)
-    # c = complex(-0.4, 0.6)
-    # c = complex(-0.7269, 0.1889)
-
-    def julia(self, c, z0):
-        z = z0
-        n = 0
-        while abs(z) <= 2 and n < self.max_iter:
-            z = z*z + c
-            n += 1
-
-        if n == self.max_iter:
-            return self.max_iter
-
-        return n + 1 - math.log(math.log2(abs(z)))
-
-    def mandelbrot(self, c):
-        z = self.ctxc(0)
-        n = 0
-
-        squared_escape = self.escape_rad * self.escape_rad
-
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
-        while ((z.real*z.real)+(z.imag*z.imag)) <= squared_escape  and n < self.max_iter:
-            z = z*z + c
-            n += 1
-
-        if n >= self.max_iter:
-            return self.max_iter
-        
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-        if self.smoothing:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(math.log2(abs(z)))
-            return mu 
-        else:    
-            return n 
-
     def calc_cur_frame(self, snapshot_filename = None):        
 
         # --
@@ -231,10 +192,10 @@ class MandlContext:
 
 
                 if not self.julia_c:
-                    m = self.mandelbrot(c)
+                    m = self.algo.calc_pixel(c)
                 else:        
                     z0 = c
-                    m = self.julia(self.julia_c, z0) 
+                    m = self.algo.calc_pixel(z0) 
 
                 values[(x,y)] = m 
                 if m < self.max_iter:
@@ -333,6 +294,8 @@ class MandlContext:
         # Do next step in animation
         # -- 
 
+        #self.algo.post_step(t)
+
         if self.julia_list:
             self.julia_walk(t)
         else:    
@@ -408,6 +371,10 @@ class MediaView:
         print(self)
         print(self.ctx)
 
+        #self.ctx.algo = Mandelbrot(self.ctx)    
+
+        self.ctx.algo.setup()
+
         if self.ctx.cache:
             self.ctx.cache.setup()
 
@@ -454,8 +421,8 @@ class MediaView:
 
 # For now, use global context for a single dive per run
 
-mandl_ctx = MandlContext()
-view_ctx  = MediaView(16, 16, mandl_ctx)
+fractal_ctx = MandlContext()
+view_ctx  = MediaView(16, 16, fractal_ctx)
 
 
 # --
@@ -463,77 +430,78 @@ view_ctx  = MediaView(16, 16, mandl_ctx)
 # command line
 # --
 def set_default_params():
-    global mandl_ctx
+    global fractal_ctx
 
-    mandl_ctx.img_width  = 1024
-    mandl_ctx.img_height = 768 
+    fractal_ctx.img_width  = 1024
+    fractal_ctx.img_height = 768 
 
-    mandl_ctx.cmplx_width  = mandl_ctx.ctxf(5.0)
-    mandl_ctx.cmplx_height = mandl_ctx.ctxf(3.5)
+    fractal_ctx.cmplx_width  = fractal_ctx.ctxf(5.0)
+    fractal_ctx.cmplx_height = fractal_ctx.ctxf(3.5)
 
     # This is close t Misiurewicz point M32,2
-    # mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
-    mandl_ctx.cmplx_center = mandl_ctx.ctxc(-1.769383179195515018213,0.00423684791873677221)
+    # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
+    fractal_ctx.cmplx_center = fractal_ctx.ctxc(-1.769383179195515018213,0.00423684791873677221)
 
-    mandl_ctx.scaling_factor = .97
-    mandl_ctx.num_epochs     = 0
+    fractal_ctx.scaling_factor = .97
+    fractal_ctx.num_epochs     = 0
 
-    mandl_ctx.max_iter       = 255
-    mandl_ctx.escape_rad     = 32768. 
+    fractal_ctx.max_iter       = 255
+    fractal_ctx.escape_rad     = 32768. 
 
-    mandl_ctx.precision      = 100
+    fractal_ctx.precision      = 100
 
     view_ctx.duration       = 16
     view_ctx.fps            = 16
 
 
 def set_preview_mode():
-    global mandl_ctx
+    global fractal_ctx
 
     print("+ Running in preview mode ")
 
-    mandl_ctx.img_width  = 300
-    mandl_ctx.img_height = 200
+    fractal_ctx.img_width  = 300
+    fractal_ctx.img_height = 200
 
-    mandl_ctx.cmplx_width  = 3.
-    mandl_ctx.cmplx_height = 2.5 
+    fractal_ctx.cmplx_width  = 3.
+    fractal_ctx.cmplx_height = 2.5 
 
-    mandl_ctx.scaling_factor = .75
-    mandl_ctx.escape_rad     = 32768. 
+    fractal_ctx.scaling_factor = .75
+    fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
 
 def set_snapshot_mode():
-    global mandl_ctx
+    global fractal_ctx
 
     print("+ Running in snapshot mode ")
 
-    mandl_ctx.snapshot = True
+    fractal_ctx.snapshot = True
 
-    mandl_ctx.img_width  = 3000
-    mandl_ctx.img_height = 2000 
+    fractal_ctx.img_width  = 3000
+    fractal_ctx.img_height = 2000 
 
-    mandl_ctx.max_iter   = 2000
+    fractal_ctx.max_iter   = 2000
 
-    mandl_ctx.cmplx_width  = 3.
-    mandl_ctx.cmplx_height = 2.5 
+    fractal_ctx.cmplx_width  = 3.
+    fractal_ctx.cmplx_height = 2.5 
 
-    mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
-    mandl_ctx.escape_rad     = 32768. 
+    fractal_ctx.scaling_factor = .99 # set so we can zoom in more accurately
+    fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 0
     view_ctx.fps            = 0
 
 
 def parse_options():
-    global mandl_ctx
+    global fractal_ctx
 
     argv = sys.argv[1:]
 
     
-    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:h:c:",
+    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:h:c:a:",
                                ["preview",
+                                "algo=",
                                 "duration=",
                                 "max-iter=",
                                 "img-w=",
@@ -548,7 +516,7 @@ def parse_options():
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
-                                "julia=",
+                                "julia-c=",
                                 "julia-walk=",
                                 "center=",
                                 "palette-test=",
@@ -563,46 +531,52 @@ def parse_options():
             set_preview_mode()
         if opt in ['-s', '--snapshot']:
             set_snapshot_mode()
+        if opt in ['-a', '--algo']:
+            module = importlib.import_module(arg) 
+            fractal_ctx.algo = module._instance(fractal_ctx)
+
+    # default to mandelbrot if nothing else is specified
+    if not fractal_ctx.algo:
+        module = importlib.import_module("mandelbrot") 
+        fractal_ctx.algo = module._instance(fractal_ctx)
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
             view_ctx.duration  = float(arg) 
-            mandl_ctx.duration = float(arg) 
+            fractal_ctx.duration = float(arg) 
         elif opt in ['-m', '--max-iter']:
-            mandl_ctx.max_iter = int(arg)
+            fractal_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:
-            mandl_ctx.img_width = int(arg)
+            fractal_ctx.img_width = int(arg)
         elif opt in ['-h', '--img-h']:
-            mandl_ctx.img_height = int(arg)
+            fractal_ctx.img_height = int(arg)
         elif opt in ['--cmplx-w']:
-            mandl_ctx.cmplx_width = float(arg)
+            fractal_ctx.cmplx_width = float(arg)
         elif opt in ['--cmplx-h']:
-            mandl_ctx.cmplx_height = float(arg)
+            fractal_ctx.cmplx_height = float(arg)
         elif opt in ['-c', '--center']:
-            mandl_ctx.cmplx_center= complex(arg)
+            fractal_ctx.cmplx_center= complex(arg)
         elif opt in ['-h', '--img-h']:
-            mandl_ctx.img_height = int(arg)
+            fractal_ctx.img_height = int(arg)
         elif opt in ['--scaling-factor']:
-            mandl_ctx.scaling_factor = float(arg)
+            fractal_ctx.scaling_factor = float(arg)
         elif opt in ['-z', '--zoom']:
-            mandl_ctx.set_zoom_level = int(arg)
+            fractal_ctx.set_zoom_level = int(arg)
         elif opt in ['-f', '--fps']:
             view_ctx.fps  = int(arg)
-            mandl_ctx.fps = int(arg)
+            fractal_ctx.fps = int(arg)
         elif opt in ['--smooth']:
-            mandl_ctx.smoothing = True 
-        elif opt in ['--julia']:
-            mandl_ctx.julia_c = complex(arg) 
+            fractal_ctx.smoothing = True 
         elif opt in ['--cache']:
-            mandl_ctx.cache = fc.FractalCache(mandl_ctx) 
-        elif opt in ['--julia-walk']:
-            mandl_ctx.julia_list = eval(arg)  # expects a list of complex numbers
-            if len(mandl_ctx.julia_list) <= 1:
-                print("Error: List of complex numbers for Julia walk must be at least two points")
-                sys.exit(0)
-            mandl_ctx.julia_c    = mandl_ctx.julia_list[0]
+            fractal_ctx.cache = fc.FractalCache(fractal_ctx) 
+        #elif opt in ['--julia-walk']:
+        #    fractal_ctx.julia_list = eval(arg)  # expects a list of complex numbers
+        #    if len(fractal_ctx.julia_list) <= 1:
+        #        print("Error: List of complex numbers for Julia walk must be at least two points")
+        #        sys.exit(0)
+        #    fractal_ctx.julia_c    = fractal_ctx.julia_list[0]
         elif opt in ['--center']:
-            mandl_ctx.cmplx_center = complex(arg) 
+            fractal_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
             m = fp.MandlPalette()
             if str(arg) == "gauss":
@@ -631,9 +605,9 @@ def parse_options():
             else:
                 print("Error: --palette-test arg must be one of gauss|exp|list")
                 sys.exit(0)
-            mandl_ctx.palette = m
+            fractal_ctx.palette = m
         elif opt in ['--burn']:
-            mandl_ctx.burn_in = True
+            fractal_ctx.burn_in = True
         elif opt in ['--banner']:
             view_ctx.banner = True
         elif opt in ['--verbose']:
@@ -641,7 +615,7 @@ def parse_options():
             if verbosity not in [0,1,2,3]:
                 print("Invalid verbosity level (%d) use range 0-3"%(verbosity))
                 sys.exit(0)
-            mandl_ctx.verbose = verbosity
+            fractal_ctx.verbose = verbosity
         elif opt in ['--gif']:
             if view_ctx.vfilename != None:
                 print("Error : Already specific media type %s"%(view_ctx.vfilename))
@@ -653,6 +627,8 @@ def parse_options():
                 sys.exit(0)
             view_ctx.vfilename = arg
 
+        
+    fractal_ctx.algo.parse_options(opts, args)
 
 if __name__ == "__main__":
 
