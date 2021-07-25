@@ -2,7 +2,7 @@
 
 #/usr/local/bin/python3 fractal.py --color=exp2 --duration=4 --preview 
 
-/usr/local/bin/python3 fractal.py --algo=mandelbrot --color=exp2 --duration=4 --preview --gif=test.gif 
+#/usr/local/bin/python3 fractal.py --algo=mandelbrot --color=exp2 --duration=4 --preview --gif=test.gif 
 #/usr/local/bin/python3 fractal.py --color=exp2 --algo=julia --duration=4 --preview --gif=test.gif 
 
 #/usr/local/bin/python3 fractal.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview
@@ -30,3 +30,6 @@
 
 # test cache
 #/usr/local/bin/python3 fractal.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --cache
+
+# take a snapshot of a complicated 
+/usr/local/bin/python3 fractal.py --algo=mandeldistance --cmplx-w=.001 --cmplx-h=.00075 --snapshot="dsnap.gif" --img-w=1024 --img-h=768 --max-iter=500 --gif=distance.gif

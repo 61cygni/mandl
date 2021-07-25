@@ -1,5 +1,6 @@
 
-- Set detault params that make sense per algo
+- Have distance compute color relative to distance calculated from
+  cmpl-w/cmplx-h rather than amplification
 - By default create <algoname.gif> only display if the --preview flag is
   showing
 - Fix caching to be in the algos
@@ -7,3 +8,6 @@
 Major:
 - Create logging framework with multiple levels
 - Testing framework!
+
+DONE
+- Set detault params that make sense per algo

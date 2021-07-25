@@ -260,11 +260,7 @@ class MediaView:
 
     def create_snapshot(self):    
     
-        if not self.vfilename:
-            self.vfilename = "snapshot.gif"
-        
         self.ctx.next_epoch(-1,self.vfilename)
-
 
     # --
     # Do any setup needed prior to running the calculatiion loop 
@@ -358,7 +354,7 @@ def set_snapshot_mode():
 
     print("+ Running in snapshot mode ")
 
-    fractal_ctx.snapshot = True
+    fractal_ctx.snapshot  = True
 
     fractal_ctx.img_width  = 3840 
     fractal_ctx.img_height = 2160 
@@ -412,6 +408,7 @@ def parse_options():
         if opt in ['-p', '--preview']:
             set_preview_mode()
         if opt in ['-s', '--snapshot']:
+            view_ctx.vfilename = arg
             set_snapshot_mode()
         if opt in ['-a', '--algo']:
             module = importlib.import_module(arg) 
