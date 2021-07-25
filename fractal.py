@@ -15,12 +15,8 @@ from collections import defaultdict
 
 import numpy as  np
 import mpmath as mp
+
 import moviepy.editor as mpy
-
-from scipy.stats import norm
-
-from moviepy.audio.tools.cuts import find_audio_period
-
 from PIL import Image, ImageDraw, ImageFont
 
 # -- our files
@@ -117,7 +113,7 @@ class FractalContext:
 
         # --
         # Iterate over every point in the complex plane (1:1 mapping per
-        # pixel) and run the fractacl calculation. We save the output in
+        # pixel) and run the fractal calculation. We save the output in
         # a 2x2 array, and also create the histogram of values
         # --
 
@@ -132,6 +128,7 @@ class FractalContext:
                 c = self.ctxc(Re_x, Im_y)
 
 
+                # Call primary calculation function here
                 m = self.algo.calc_pixel(c)
 
                 values[(x,y)] = m 
@@ -156,15 +153,7 @@ class FractalContext:
             for y in range(0, self.img_height):
                 m = values[(x,y)] 
 
-                if not self.palette:
-                    c = 255 - int(255 * hues[math.floor(m)]) 
-                    color=(c, c, c)
-                elif self.smoothing:
-                    c1 = self.palette[1024 - int(1024 * hues[math.floor(m)])]
-                    c2 = self.palette[1024 - int(1024 * hues[math.ceil(m)])]
-                    color = fp.MandlPalette.linear_interpolate(c1,c2,.5) 
-                else:
-                    color = self.palette[1024 - int(1024 * hues[math.floor(m)])]
+                color = self.palette.map_value_to_color(m, hues)
 
                 # Plot the point
                 draw.point([x, y], color) 
@@ -298,6 +287,10 @@ class MediaView:
     # --
 
     def setup(self):
+
+        if not self.ctx.palette:
+            print("No palette specified, using default")
+            self.ctx.palette = fp.FractalPalette()
 
         print(self)
         print(self.ctx)
@@ -502,7 +495,7 @@ def parse_options():
         elif opt in ['--center']:
             fractal_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
-            m = fp.MandlPalette()
+            m = fp.FractalPalette()
             if str(arg) == "gauss":
                 m.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
@@ -517,7 +510,7 @@ def parse_options():
             m.display()
             sys.exit(0)
         elif opt in ['--color']:
-            m = fp.MandlPalette()
+            m = fp.FractalPalette()
             if str(arg) == "gauss":
                 m.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
