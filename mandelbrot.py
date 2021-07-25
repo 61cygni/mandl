@@ -62,14 +62,16 @@ class MandlContext:
 
         self.cmplx_width = self.math_support.createFloat(0.0)
         self.cmplx_height = self.math_support.createFloat(0.0)
-        self.cmplx_center = self.math_support.createComplex(0.0, 0.0) # center of image in complex plane
+        self.cmplx_center = self.math_support.createComplex(0.0) # center of image in complex plane
 
         self.max_iter      = 0  # int max iterations before bailing
-        self.escape_rad    = 0. # float radius mod Z hits before it "escapes" 
+        self.escape_rad    = 2. # float radius mod Z hits before it "escapes" 
 
         self.scaling_factor = 0.0 #  float amount to zoom each epoch
 
         self.set_zoom_level = 0   # Zoom in prior to the dive
+        self.clip_start_frame = -1
+        self.clip_total_frames = 1 
 
         self.smoothing      = False # bool turn on color smoothing
         self.snapshot       = False # Generate a single, high res shotb
@@ -202,6 +204,9 @@ class MediaView:
     def frame_number_from_time(self, t):
         return math.floor(self.fps * t) 
 
+    def time_from_frame_number(self, frame_number):
+        return frame_number / self.fps
+
     def intro_banner(self):
         # Generate a text clip
         w,h = self.ctx.img_width, self.ctx.img_height
@@ -244,8 +249,16 @@ class MediaView:
             return
 
         self.ctx.timeline =  self.construct_simple_timeline()
+        # Duration may be less than overall, if this is a sub-clip, so
+        # figure out what our REAL duration is.
+        timeline_frame_count = self.ctx.timeline.getTotalSpanFrameCount()
+        timeline_duration = self.time_from_frame_number(timeline_frame_count)
 
-        self.clip = mpy.VideoClip(self.make_frame, duration=self.duration)
+        #for currFrameNumber in range(timeline_frame_count):
+        #    print(self.ctx.render_frame_number(currFrameNumber))
+        #exit(0)
+
+        self.clip = mpy.VideoClip(self.make_frame, duration=timeline_duration)
 
         if self.banner:
             self.clip = self.intro_banner()
@@ -270,44 +283,56 @@ class MediaView:
         Basically, let's construct a timeline from one set of start/end points,
         as defined by the current context.
         """
-        frame_count = self.duration * self.fps  
-        if math.floor(frame_count) != frame_count:
-            frame_count = math.floor(frame_count) + 1
+        overall_frame_count = self.duration * self.fps  
+        if math.floor(overall_frame_count) != overall_frame_count:
+            overall_frame_count = math.floor(overall_frame_count) + 1
+
+        clip_start_frame = 0
+        rendered_frame_count = overall_frame_count
+        last_frame_number = overall_frame_count
 
         overall_zoom_factor = self.ctx.scaling_factor
+    
+        if self.ctx.clip_start_frame == -1: # Whole clip is the span 
+            start_width_real = self.ctx.cmplx_width
+            start_width_imag = self.ctx.cmplx_height
+        else:
+            if self.ctx.clip_start_frame + self.ctx.clip_total_frames > overall_frame_count:
+                raise ValueError("Can't construct timeline of %d frames for a sequence of only %d frames (%f seconds at %f fps)" % (self.ctx.clip_total_frames, overall_frame_count, self.duration, self.fps))
 
-        start_width_real = self.ctx.cmplx_width
-        start_width_imag = self.ctx.cmplx_height
-        
-        # Check whether we need to zoom in prior to calculation
-        if self.ctx.set_zoom_level > 0:
-            print("Zooming in by %d epochs" % (self.ctx.set_zoom_level))
-            start_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, self.ctx.set_zoom_level) 
-            start_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, self.ctx.set_zoom_level)
-       
-        # Calculate the endpoint widths, at the last desired frame
-        end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(start_width_real, overall_zoom_factor, frame_count - 1)
-        end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(start_width_imag, overall_zoom_factor, frame_count - 1)
+            clip_start_frame = self.ctx.clip_start_frame
+            last_frame_number = clip_start_frame + self.ctx.clip_total_frames - 1
+            rendered_frame_count = last_frame_number - clip_start_frame + 1
+
+            # Start frame is 1 or greater (hopefully), so subtracting 1 from the exponent here should be okay.
+            start_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, clip_start_frame)
+            start_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, clip_start_frame)
+
+        # Sub-section the frames, if needed
+        end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, last_frame_number)
+        end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, last_frame_number)
+
+        print("{%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
 
         if self.ctx.fractal == 'julia':
             timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='julia', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
             # Just evenly divide the waypoints across the time for a simple timeline
             keyframeCount = len(self.ctx.julia_list)
             # 2 keyframes over 10 frames = 10 frames per keyframe
-            keyframeSpacing = math.floor(frame_count / (keyframeCount - 1)) 
+            keyframeSpacing = math.floor(rendered_frame_count / (keyframeCount - 1)) 
             if keyframeSpacing < 1:
                 raise ValueError("Can't construct julia walk with more waypoints than animation frames")
 
-            span = DiveTimelineSpan(timeline, frame_count, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
+            span = DiveTimelineSpan(timeline, rendered_frame_count, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
             span.addNewWindowKeyframe(0, start_width_real, start_width_imag)
-            span.addNewWindowKeyframe(frame_count - 1, end_width_real, end_width_imag)
+            span.addNewWindowKeyframe(rendered_frame_count - 1, end_width_real, end_width_imag)
             span.addNewUniformKeyframe(0)
-            span.addNewUniformKeyframe(frame_count - 1)
+            span.addNewUniformKeyframe(rendered_frame_count - 1)
 
             currKeyframeFrameNumber = 0
             for currJuliaCenter in self.ctx.julia_list:
                 # Recognize when we're at the last item, and jump that keyframe to the final frame
-                if currKeyframeFrameNumber + keyframeSpacing > frame_count - 1:
+                if currKeyframeFrameNumber + keyframeSpacing > rendered_frame_count - 1:
                     currKeyframeNumber = frame_count - 1
                 
                 span.addNewCenterKeyframe(currKeyframeFrameNumber, currJuliaCenter, transitionIn='linear', transitionOut='linear')
@@ -319,7 +344,7 @@ class MediaView:
             timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='mandelbrot', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
             # Here, I have ctx, which should know escapeRadius, maxIter, and shouldSmooth... 
             #print("Trying to make span of %d frames" % frame_count)
-            span = timeline.addNewSpanAtEnd(frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
+            span = timeline.addNewSpanAtEnd(rendered_frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
     
             #perspectiveFrame = math.floor(frame_count * .5)
             #span.addNewTiltKeyframe(perspectiveFrame, 4.0, 1.0) 
@@ -373,6 +398,12 @@ class DiveTimeline:
 
         # No definition made yet for edit gaps, so let's just enforce adjacency of ranges for now.
         self.timelineSpans = []
+
+    def getTotalSpanFrameCount(self):
+        seenFrameCount = 0
+        for currSpan in self.timelineSpans:
+            seenFrameCount += currSpan.frameCount
+        return seenFrameCount
 
     def addNewSpanAtEnd(self, frameCount, center, startWidthReal, startWidthImag, endWidthReal, endWidthImag, escapeRadius, maxEscapeIterations, shouldSmooth):
         """
@@ -1071,9 +1102,11 @@ def set_demo1_params(mandl_ctx, view_ctx):
 
     # This is close t Misiurewicz point M32,2
     # mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
-    center_real_str = '-1.769383179195515018213'
-    center_imag_str = '0.00423684791873677221'
-    mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(center_real_str, center_imag_str)
+    #center_real_str = '-1.769383179195515018213'
+    #center_imag_str = '0.00423684791873677221'
+    #mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(center_real_str, center_imag_str)
+    center_str = '-1.769383179195515018213+0.00423684791873677221j'
+    mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(center_str)
 
     mandl_ctx.project_name = 'demo1'
 
@@ -1089,6 +1122,7 @@ def set_demo1_params(mandl_ctx, view_ctx):
     mandl_ctx.build_cache=True
 
     view_ctx.duration       = 2.0
+    #view_ctx.duration       = 0.25
 
     # FPS still isn't set quite right, but we'll get it there eventually.
     view_ctx.fps            = 23.976 / 2.0 
@@ -1178,6 +1212,8 @@ def parse_options(mandl_ctx, view_ctx):
                                 "demo-julia-walk",
                                 "duration=",
                                 "fps=",
+                                "clip-start-frame=",
+                                "clip-total-frames=",
                                 "max-iter=",
                                 "img-w=",
                                 "img-h=",
@@ -1196,6 +1232,7 @@ def parse_options(mandl_ctx, view_ctx):
                                 "color=",
                                 "burn",
                                 "flint",
+                                "gmp",
                                 "project-name=",
                                 "shared-cache-path=",
                                 "build-cache",
@@ -1206,7 +1243,9 @@ def parse_options(mandl_ctx, view_ctx):
     # Math support as to be handled first, so other parameter 
     # instantiations are properly typed
     for opt, arg in opts:
-        if opt in ['--flint']:
+        if opt in ['--gmp']:
+            mandl_ctx.math_support = fm.DiveMathSupportGmp()
+        elif opt in ['--flint']:
             mandl_ctx.math_support = fm.DiveMathSupportFlint()
 
     for opt,arg in opts:
@@ -1224,6 +1263,10 @@ def parse_options(mandl_ctx, view_ctx):
             view_ctx.duration  = float(arg) 
         elif opt in ['-f', '--fps']:
             view_ctx.fps  = float(arg)
+        elif opt in ['--clip-start-frame']:
+            mandl_ctx.clip_start_frame = int(arg)
+        elif opt in ['--clip-total-frames']:
+            mandl_ctx.clip_total_frames = int(arg)
         elif opt in ['-m', '--max-iter']:
             mandl_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:

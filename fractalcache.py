@@ -39,6 +39,11 @@ class FrameInfo:
     def pickleCopy(self):
         return FrameInfo(str(self.mesh_width), str(self.mesh_height), str(self.center), str(self.complex_real_width), str(self.complex_imag_width), str(self.escape_r), str(self.max_escape_iter), self.raw_values, self.raw_histogram, self.smooth_values, self.smooth_histogram)
 
+    def __repr__(self):
+        return """\
+[FrameInfo complex_range {{{cw},{ch}}} center ({cc})]\
+""".format(cw=str(self.complex_real_width),ch=str(self.complex_imag_width),cc=str(self.center)); 
+    
 class Frame:
     """
     Two different results caches available, one for uniform meshes 
@@ -97,6 +102,7 @@ class Frame:
 
         filename = self.create_results_file_name()
         #print("+  writing frame to cache file %s ...  "%(filename))
+        #print("Writing: %s" % str(self.frame_info))
 
         # Probably a mistake to write a no-data cache file, so panic.
         if self.frame_info.raw_values is None or self.frame_info.smooth_values is None:
@@ -111,6 +117,8 @@ class Frame:
             return 
 
         #print("+  frame from cache file %s ...  "%(filename))
+        #print("Reading: %s" % str(self.frame_info))
+
         frame_data = None 
 
         with open(filename, 'rb') as fd:

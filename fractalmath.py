@@ -13,6 +13,8 @@ import numpy as np
 FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
 #FLINT_HIGH_PRECISION_SIZE = 200 
 
+GMP_HIGH_PRECISION_SIZE=53
+
 class DiveMathSupport:
     """
     Toolbox for math functions that need to be type-aware, so we
@@ -32,9 +34,13 @@ class DiveMathSupport:
     def __init__(self):
         self.precisionType = 'native'
 
-    def createComplex(self, realComponent, imagComponent):
-        """Compatible complex types will return values for .real() and .imag()"""
-        return complex(float(realComponent), float(imagComponent)) 
+    def createComplex(self, *args):
+        """
+        Compatible complex types will return values for .real() and .imag()
+
+        Native complex type just passes on all params to complex()
+        """
+        return complex(*args) 
 
     def createFloat(self, floatValue):
         return float(floatValue)
@@ -249,11 +255,15 @@ class DiveMathSupport:
 
     def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
         if endingIter == maxIter:
-            return maxIter
+            return float(maxIter)
         else:
             # The following code smooths out the colors so there aren't bands
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
+            #if endingIter != 1:
+            #    print("iter was %d" % endingIter)
+            #print("z: \"%s\" max_iter: %d iter: %d" % (endingZ, maxIter, endingIter))
+            #return endingIter + 1 - math.log(math.log2(abs(endingZ)))
             return endingIter + 1 - math.log(math.log2(abs(endingZ)))
 
 class DiveMathSupportFlint(DiveMathSupport):
@@ -269,8 +279,89 @@ class DiveMathSupportFlint(DiveMathSupport):
         self.flint.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
         self.precisionType = 'flint'
 
-    def createComplex(self, realComponent, imagComponent):
-        return self.flint.acb(realComponent, imagComponent)
+    def createComplex(self, *args):
+        """ 
+        Flint complex type doesn't accept a string for instantiation.
+
+        So, we do a string conversion here, to be flexible
+        """
+        if len(args) == 2:
+            realPart = self.flint.arb(args[0])
+            imagPart = self.flint.arb(args[1])
+            return self.flint.acb(realPart, imagPart)
+        elif len(args) == 1:
+            if isinstance(args[0], str):
+                partsString = args[0]
+
+                # Trim off the leading sign
+                firstIsPositive = True
+                if partsString.startswith('+'):
+                    partsString = partsString[1:]
+                elif partsString.startswith('-'):
+                    firstIsPositive = False
+                    partsString = partsString[1:]
+
+                # Trim off the trailing letter 
+                lastIsImag = False
+                if partsString.endswith('j'):
+                    lastIsImag = True
+                    partsString = partsString[:-1]
+
+                # Remaining string might have an internal sign.
+                # If there's no internal sign, then the whole remaining
+                # string is either the real or the complex
+                positiveParts = partsString.split('+')
+                negativeParts = partsString.split('-')
+
+                realIsPositive = True
+                imagIsPositive = True
+                realPart = ""
+                imagPart = ""
+                if len(positiveParts) == 2:
+                    realIsPositive = firstIsPositive
+                    realPart = positiveParts[0]
+                    imagIsPositive = True
+                    imagPart = positiveParts[1]
+                elif len(negativeParts) == 2:
+                    realIsPositive = firstIsPositive
+                    realPart = negativeParts[0]
+                    imagIsPositive = False
+                    imagPart = negativeParts[1]
+                elif len(positiveParts) == 1 and len(negativeParts) == 1:
+                    # No internal + or -, so it should just be a number
+                    if lastIsImag == True:
+                        imagPart = partsString
+                        imagIsPositive = firstIsPositive
+                    else:
+                        realPart = partsString
+                        realIsPositive = firstIsPositive
+                else:
+                    raise ValueError("String parameter not identifiably a complex number, in createComplex()")
+
+                preparedReal = '0.0'
+                preparedImag = '0.0'
+                if realPart != "":
+                    if realIsPositive == True:
+                        preparedReal = realPart
+                    else:
+                        preparedReal = "-%s" % realPart
+
+                if imagPart != "":
+                    if imagIsPositive == True:
+                        preparedImag = imagPart
+                    else:
+                        preparedImag = "-%s" % imagPart
+
+                return self.flint.acb(preparedReal, preparedImag)
+            else:
+                if isinstance(args[0], complex):
+                    return self.flint.acb(args[0].real, args[0].imag)
+                else:
+                    return self.flint.acb(args[0]) # Just a constant, so make a 0-imaginary value
+        elif len(args) == 0:
+            return self.flint.acb(0,0)
+        else:
+            raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
 
     def createFloat(self, floatValue):
         return self.flint.arb(floatValue)
@@ -309,6 +400,96 @@ class DiveMathSupportFlint(DiveMathSupport):
 
         return (n, z)
 
+    def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
+        """
+        This flint-specific implementation only really does flint-y logs in the smoothing.
+        The Decimal-specific implementation needed some extra steps, but I've ditched that one.
+        """
+        if endingIter == maxIter:
+            return float(maxIter)
+        else:
+            # The following code smooths out the colors so there aren't bands
+            # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
+            # Note: Results in a float. We think.
+            return float(endingIter + 1 - endingZ.abs_lower().const_log2().const_log10())
+
+class DiveMathSupportGmp(DiveMathSupport):
+    """
+    Overrides to instantiate gmpy2-specific complex types
+
+    Note from the GMP docs - contexts and context managers are not thread-safe!  
+    Modifying the context in one thread will impact all other threads.
+    """
+    def __init__(self):
+        super().__init__()
+
+        self.gmp = __import__('gmpy2') # Only imports if you instantiate this DiveMathSupport subclass.
+        self.gmp.get_context().precision = GMP_HIGH_PRECISION_SIZE
+        self.precisionType = 'gmp'
+
+    def createComplex(self, *args):
+        """
+        gmpy2.mpc() accepts one of:
+        1 string (a native python complex string, with real and/or imag components)
+        1 complex object (python native)
+        1 float (no imaginary component)
+        2 floats
+        2 mpfr (gmp's float type)
+        """
+        if len(args) == 2:
+            realPart = self.gmp.mpfr(args[0])
+            imagPart = self.gmp.mpfr(args[1])
+            return self.gmp.mpc(realPart, imagPart)
+        elif len(args) == 1:
+             return self.gmp.mpc(args[0])
+        elif len(args) == 0:
+            return self.gmp.mpc(0.0)
+        else:
+            raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
+
+    def createFloat(self, floatValue):
+        return self.gmp.mpfr(floatValue)
+
+    def floor(self, value):
+        return self.gmp.floor(value)
+
+    def interpolateLogTo(self, startX, startY, endX, endY, targetX):
+        """
+        Probably want additional log-defining params, but for now, let's just bake in one equation
+        """
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            aVal = (endY - startY) / (self.gmp.log(endX - startX + 1))
+            return aVal * (self.gmp.log(targetX - startX + 1)) + startY 
+
+    def mandelbrot(self, c, escapeRadius, maxIter):
+        """ 
+        Now that smoothing is handled separately, the native python implementation
+        COULD work for flint as well, except it uses 'complex(0,0)' instead
+        of self.createComplex(0,0).
+        The reason for this is just as below - to reduce one extra function call in 
+        the core calculation.
+
+        Could just call julia with a zero start here, but seems wiser to
+        not have one extra function call in the core of the calculation?
+
+        Really super didn't help to try locally caching function names
+        and using paren syntax - it doubled the runtime.  Trying that was
+        probably just old advice for pre-python3?
+        """
+        z = self.gmp.mpc(0.0)
+        n = 0
+
+        # Because norm() doesn't work for python3-gmp2 v 2.1.0a4 
+        #while float(self.gmp.sqrt(self.gmp.square(z.real) + self.gmp.square(z.imag))) <= escapeRadius and n < maxIter:
+        # looks like abs() gets to the right place, even though there's no explicit abs_lower() in libgmp?
+        while abs(z) <= escapeRadius and n < maxIter:
+            z = z*z + c
+            n += 1
+        return (n, z)
 
     def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
         """
@@ -316,11 +497,12 @@ class DiveMathSupportFlint(DiveMathSupport):
         The Decimal-specific implementation needed some extra steps, but I've ditched that one.
         """
         if endingIter == maxIter:
-            return maxIter
+            return float(maxIter)
         else:
             # The following code smooths out the colors so there aren't bands
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
-            return float(endingIter + 1 - endingZ.abs_lower().const_log2().const_log10())
+            return float(endingIter + 1 - self.gmp.log10(self.gmp.log2(self.gmp.norm(endingZ))))
+            #return float(endingIter + 1 - self.gmp.log10(self.gmp.log10(self.gmp.sqrt(self.gmp.square(endingZ.real) + self.gmp.square(endingZ.imag)))))
 
 
