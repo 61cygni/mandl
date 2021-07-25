@@ -31,5 +31,7 @@
 # test cache
 #/usr/local/bin/python3 fractal.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview --cache
 
-# take a snapshot of a complicated 
-/usr/local/bin/python3 fractal.py --algo=mandeldistance --cmplx-w=.001 --cmplx-h=.00075 --snapshot="dsnap.gif" --img-w=1024 --img-h=768 --max-iter=500 --gif=distance.gif
+# take a snapshot of a busy section with a modest zoom into the  mandelbrought set. This is a good expose 
+# of the ability for distance estimation to show detail 
+
+/usr/local/bin/python3 fractal.py --algo=mandeldistance --cmplx-w=.001 --cmplx-h=.00075 --snapshot="dsnap.gif" --img-w=2048 --img-h=1536 --max-iter=500
