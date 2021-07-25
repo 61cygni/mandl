@@ -1,10 +1,29 @@
+# --
+# File: mandelbrot.py
+#
+# Basic escape iteration method for calculating the mandlebrot set
+#
+# Code cribbed from all over the place ... notably :
+#
+# https://www.codingame.com/playgrounds/2358/how-to-plot-the-mandelbrot-set/mandelbrot-set
+# http://linas.org/art-gallery/escape/escape.html
+#
+# Misiurewicz points also cribbed from all over 
+#
+# https://mrob.com/pub/muency/misiurewiczpoint.html
+# https://www.youtube.com/watch?v=u1pwtSBTnPU&t=274s
+#
+#
+# MPs:
+#
+# 0.4244 + 0.200759i;
 from algo import Algo
 
 
 class Mandelbrot(Algo):
     
     def __init__(self, context):
-        super(Algo, self).__init__(context) 
+        super(Mandelbrot, self).__init__(context) 
 
     def calc_pixel(self, c):
 
@@ -34,6 +53,9 @@ class Mandelbrot(Algo):
             return mu 
         else:    
             return n 
+
+    def animate_step(self, t):
+        self.context.zoom_in()
 
 def _instance(context):
     return Mandelbrot(context)

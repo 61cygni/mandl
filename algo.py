@@ -5,8 +5,11 @@ class Algo(object):
         self.context = context
 
 
-    def parse_opts(self, opts, args):    
+    def parse_options(self, opts, args):    
         pass
 
     def setup(self):
+        pass
+
+    def animate_step(self, t):
         pass

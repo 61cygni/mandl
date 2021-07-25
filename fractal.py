@@ -1,22 +1,8 @@
 # --
 # File: fractal.py
 # 
-# Driver file for playing around with the Mandelbrot set 
+# Driver file for playing around with fractals 
 #
-# Code cribbed from all over the place ... notably :
-#
-# https://www.codingame.com/playgrounds/2358/how-to-plot-the-mandelbrot-set/mandelbrot-set
-# http://linas.org/art-gallery/escape/escape.html
-#
-# Misiurewicz points also cribbed from all over 
-#
-# https://mrob.com/pub/muency/misiurewiczpoint.html
-# https://www.youtube.com/watch?v=u1pwtSBTnPU&t=274s
-#
-#
-# MPs:
-#
-# 0.4244 + 0.200759i;
 #
 # --
 
@@ -39,17 +25,15 @@ from PIL import Image, ImageDraw, ImageFont
 
 # -- our files
 
-from mandelbrot import Mandelbrot
-
 import fractalcache   as fc
 import fractalpalette as fp
 
 MANDL_VER = "0.1"
 
 
-class MandlContext:
+class FractalContext:
     """
-    The context for a single dive
+    Parameters used across frames for a given animation 
     """
 
     def __init__(self, ctxf = None, ctxc = None, mp = None):
@@ -94,12 +78,6 @@ class MandlContext:
 
         self.algo = None
 
-        self.julia_c      = None
-        self.julia_orig   = None
-        self.julia_walk_c = None
-
-        self.julia_list   = None 
-
         self.palette = None
         self.burn_in = False
 
@@ -114,35 +92,6 @@ class MandlContext:
             self.num_epochs += 1
             iterations -= 1
 
-    # Use Bresenham's line drawing algo for a simple walk between two
-    # complex points
-    def julia_walk(self, t):
-
-        # duration of a leg
-        leg_d      = float(self.duration) / float(len(self.julia_list) - 1)
-        # which leg are we walking?
-        leg        = math.floor(float(t) / leg_d)
-        # how far along are we on that leg?
-        timeslice  = float(self.duration) / (float(self.duration) * float(self.fps))
-        fraction   = (float(t) - (float(leg) * leg_d)) / (leg_d - timeslice)
-
-        #print("T %f Leg %d leg_d %d Fraction %f"%(t,leg,leg_d,fraction))
-
-        cp1 = self.julia_list[leg]
-        cp2 = self.julia_list[leg + 1]
-
-
-        if self.julia_orig != cp1:
-            self.julia_orig = cp1
-
-        x0 = self.julia_orig.real
-        x1 = cp2.real 
-        y0 = self.julia_orig.imag 
-        y1 = cp2.imag 
-
-        new_x = ((x1 - x0)*fraction) + x0
-        new_y = ((y1 - y0)*fraction) + y0 
-        self.julia_c = complex(new_x, new_y)
 
 
     def calc_cur_frame(self, snapshot_filename = None):        
@@ -158,7 +107,7 @@ class MandlContext:
         im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
 
         if self.verbose > 0:
-            print("MandlContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
+            print("FractalContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
                   (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
                   end = " ")
 
@@ -191,11 +140,7 @@ class MandlContext:
                 c = self.ctxc(Re_x, Im_y)
 
 
-                if not self.julia_c:
-                    m = self.algo.calc_pixel(c)
-                else:        
-                    z0 = c
-                    m = self.algo.calc_pixel(z0) 
+                m = self.algo.calc_pixel(c)
 
                 values[(x,y)] = m 
                 if m < self.max_iter:
@@ -294,12 +239,7 @@ class MandlContext:
         # Do next step in animation
         # -- 
 
-        #self.algo.post_step(t)
-
-        if self.julia_list:
-            self.julia_walk(t)
-        else:    
-            self.zoom_in()
+        self.algo.animate_step(t)
 
         if self.verbose > 0:
             print("Done]")
@@ -312,7 +252,7 @@ class MandlContext:
 
     def __repr__(self):
         return """\
-[MandlContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
+[FractalContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
 Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Epochs:{e:d} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=self.cmplx_width,ch=self.cmplx_height,
@@ -421,8 +361,8 @@ class MediaView:
 
 # For now, use global context for a single dive per run
 
-fractal_ctx = MandlContext()
-view_ctx  = MediaView(16, 16, fractal_ctx)
+fractal_ctx = FractalContext()
+view_ctx    = MediaView(16, 16, fractal_ctx)
 
 
 # --
@@ -569,12 +509,6 @@ def parse_options():
             fractal_ctx.smoothing = True 
         elif opt in ['--cache']:
             fractal_ctx.cache = fc.FractalCache(fractal_ctx) 
-        #elif opt in ['--julia-walk']:
-        #    fractal_ctx.julia_list = eval(arg)  # expects a list of complex numbers
-        #    if len(fractal_ctx.julia_list) <= 1:
-        #        print("Error: List of complex numbers for Julia walk must be at least two points")
-        #        sys.exit(0)
-        #    fractal_ctx.julia_c    = fractal_ctx.julia_list[0]
         elif opt in ['--center']:
             fractal_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:

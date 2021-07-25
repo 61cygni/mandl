@@ -1,28 +1,8 @@
-Minor:
-- Add debug printing levels (verbosity 0,1,2,3)
+
+- Move zoom out of fractal and create instead "advance" to advnace the frames. Then zoom using the algos
+- Fix caching to be in the algos
+- Pull coloring out of fractal.py 
+- implement distance estimation method as an algo
 
 Major:
-
-- Add simple testing framework.
-
-- Color palette 
-  
-   Coloring is still pretty shoddy. The blacks tend to wash out fidelity
-   at mid-altitude. The best deep dives use a color other than black to
-   articulate the swirls ... we should probably do same
-
-- Snapshot
-
-  Take a single, high-res, snaphot and save as an image
-    
-- Caching raw calculations
-
-- Distribution
-
-Research:
-
-- Music
-
-Completed:
-
-- Burn in Framework
+- Create logging framework with multiple levels
