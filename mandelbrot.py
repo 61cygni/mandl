@@ -17,15 +17,33 @@
 # MPs:
 #
 # 0.4244 + 0.200759i;
-from algo import Algo
 
+from algo import Algo
+import fractalpalette as fp
 
 class Mandelbrot(Algo):
     
     def __init__(self, context):
         super(Mandelbrot, self).__init__(context) 
+        self.palette = fp.FractalPalette(context)
 
-    def calc_pixel(self, c):
+    def parse_options(self, opts, args):    
+        for opt,arg in opts:
+            if opt in ['--color']:
+                if str(arg) == "gauss":
+                    self.palette.create_gauss_gradient((255,255,255),(0,0,0))
+                elif str(arg) == "exp":    
+                    self.palette.create_exp_gradient((255,255,255),(0,0,0))
+                elif str(arg) == "exp2":    
+                    self.palette.create_exp2_gradient((0,0,0),(128,128,128))
+                elif str(arg) == "list":    
+                    self.palette.create_gradient_from_list()
+                else:
+                    print("Error: --palette arg must be one of gauss|exp|list")
+                    sys.exit(0)
+
+
+    def _calc_pixel(self, c):
 
         z = self.context.ctxc(0)
         n = 0
@@ -54,6 +72,20 @@ class Mandelbrot(Algo):
         else:    
             return n 
 
+    def calc_pixel(self, c):
+        m = self._calc_pixel(c)
+        self.palette.raw_calc_from_algo(m)
+        return m 
+
+    def map_value_to_color(self, val):
+        return self.palette.map_value_to_color(val)
+        
+    def pre_image_hook(self):
+        self.palette.calc_hues()
+
+    def per_frame_reset(self):
+        self.palette.per_frame_reset()
+        
     def animate_step(self, t):
         self.zoom_in()
 

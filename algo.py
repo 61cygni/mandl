@@ -14,6 +14,12 @@ class Algo(object):
     def animate_step(self, t):
         pass
 
+    def pre_image_hook(self):
+        pass
+
+    def per_frame_reset(self):
+        pass
+
     def zoom_in(self, iterations=1):
         while iterations:
             self.context.cmplx_width  *= self.context.scaling_factor

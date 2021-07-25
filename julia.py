@@ -8,6 +8,7 @@ class Julia(Algo):
     
     def __init__(self, context):
         super(Julia, self).__init__(context) 
+        self.palette = fp.FractalPalette(context)
 
         self.julia_c    = None
         self.julia_list = None
@@ -24,6 +25,19 @@ class Julia(Algo):
                     print("Error: List of complex numbers for Julia walk must be at least two points")
                     sys.exit(0)
                 self.julia_c    = self.julia_list[0]
+            elif opt in ['--color']:
+                if str(arg) == "gauss":
+                    self.palette.create_gauss_gradient((255,255,255),(0,0,0))
+                elif str(arg) == "exp":    
+                    self.palette.create_exp_gradient((255,255,255),(0,0,0))
+                elif str(arg) == "exp2":    
+                    self.palette.create_exp2_gradient((0,0,0),(128,128,128))
+                elif str(arg) == "list":    
+                    self.palette.create_gradient_from_list()
+                else:
+                    print("Error: --palette arg must be one of gauss|exp|list")
+                    sys.exit(0)
+                fractal_ctx.palette = m
 
         if not self.julia_c:
             print("Error: no julia c value specified, defaulting to %s"%(str(default_julia_c)))
@@ -35,7 +49,7 @@ class Julia(Algo):
     # c = complex(-0.4, 0.6)
     # c = complex(-0.7269, 0.1889)
 
-    def calc_pixel(self, z0):
+    def _calc_pixel(self, c):
         z = z0
         n = 0
         while abs(z) <= 2 and n < self.context.max_iter:
@@ -83,6 +97,20 @@ class Julia(Algo):
         new_x = ((x1 - x0)*fraction) + x0
         new_y = ((y1 - y0)*fraction) + y0 
         self.julia_c = complex(new_x, new_y)
+
+    def calc_pixel(self, z0):
+        m = self._calc_pixel(c)
+        self.palette.raw_calc_from_algo(m)
+        return m 
+
+    def map_value_to_color(self, val):
+        return self.palette.map_value_to_color(val)
+
+    def pre_image_hook(self):
+        self.palette.calc_hues()
+
+    def per_frame_reset(self):
+        self.palette.per_frame_reset()
 
 def _instance(context):
     return Julia(context)

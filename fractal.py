@@ -129,7 +129,7 @@ class FractalContext:
                 m = self.algo.calc_pixel(c)
 
                 values[(x,y)] = m 
-                self.palette.raw_calc_from_algo(m)
+                #self.palette.raw_calc_from_algo(m)
 
             if snapshot_filename:
                 print(".",end="")
@@ -149,7 +149,8 @@ class FractalContext:
             for y in range(0, self.img_height):
                 m = values[(x,y)] 
 
-                color = self.palette.map_value_to_color(m)
+                color = self.algo.map_value_to_color(m)
+                #color = self.palette.map_value_to_color(m)
 
                 # Plot the point
                 draw.point([x, y], color) 
@@ -191,9 +192,8 @@ class FractalContext:
         # Create image for this frame
         # --
         
-        self.palette.calc_hues()
+        self.algo.pre_image_hook()
         im = self.draw_image_PIL(values)
-        self.palette.per_frame_reset()
 
         # -- 
         # Do next step in animation
@@ -203,6 +203,8 @@ class FractalContext:
 
         if self.verbose > 0:
             print("Done]")
+
+        self.algo.per_frame_reset()
         
         if snapshot_filename:
             return im.save(snapshot_filename,"gif")
@@ -500,7 +502,7 @@ def parse_options():
             elif str(arg) == "list":    
                 m.create_gradient_from_list()
             else:
-                print("Error: --palette-test arg must be one of gauss|exp|list")
+                print("Error: --palette arg must be one of gauss|exp|list")
                 sys.exit(0)
             fractal_ctx.palette = m
         elif opt in ['--burn']:
