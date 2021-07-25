@@ -4,7 +4,6 @@ class Algo(object):
     def __init__(self, context):
         self.context = context
 
-
     def parse_options(self, opts, args):    
         pass
 

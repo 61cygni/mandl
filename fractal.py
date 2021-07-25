@@ -140,7 +140,7 @@ class FractalContext:
 
         return values
 
-    def draw_image_PIL(self, values):    
+    def draw_image_PIL(self, t, values):    
 
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
@@ -149,7 +149,7 @@ class FractalContext:
             for y in range(0, self.img_height):
                 m = values[(x,y)] 
 
-                color = self.algo.map_value_to_color(m)
+                color = self.algo.map_value_to_color(t,m)
                 #color = self.palette.map_value_to_color(m)
 
                 # Plot the point
@@ -193,7 +193,7 @@ class FractalContext:
         # --
         
         self.algo.pre_image_hook()
-        im = self.draw_image_PIL(values)
+        im = self.draw_image_PIL(t, values)
 
         # -- 
         # Do next step in animation
