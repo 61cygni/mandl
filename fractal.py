@@ -66,7 +66,7 @@ class FractalContext:
         self.scaling_factor = 0.0 #  float amount to zoom each epoch
         self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
-        self.set_zoom_level = 0   # Zoom in prior to the dive
+        self.advance = 0   # Call advance for this many frames prior to rendering
 
         self.smoothing      = False # bool turn on color smoothing
         self.snapshot       = False # Generate a single, high res shotb
@@ -84,14 +84,6 @@ class FractalContext:
         self.cache   = None
 
         self.verbose = 0 # how much to print about progress
-
-    def zoom_in(self, iterations=1):
-        while iterations:
-            self.cmplx_width  *= self.scaling_factor
-            self.cmplx_height *= self.scaling_factor
-            self.num_epochs += 1
-            iterations -= 1
-
 
 
     def calc_cur_frame(self, snapshot_filename = None):        
@@ -196,9 +188,8 @@ class FractalContext:
 
     def next_epoch(self, t, snapshot_filename = None):
         """Called for each frame of the animation. Will calculate
-        current view, and then zoom in"""
+        current view, and then animate next step"""
     
-
         values, hist = None, None
         if self.cache: 
             values, hist = self.cache.read_cache()
@@ -311,8 +302,6 @@ class MediaView:
         print(self)
         print(self.ctx)
 
-        #self.ctx.algo = Mandelbrot(self.ctx)    
-
         self.ctx.algo.setup()
 
         if self.ctx.cache:
@@ -322,13 +311,14 @@ class MediaView:
 
     def run(self):
 
-        # Check whether we need to zoom in prior to calculation
+        # Check whether we need to advance the animation prior to
+        # starting 
 
-        if self.ctx.set_zoom_level > 0:
-            print("Zooming in by %d epochs" % (self.ctx.set_zoom_level))
-            while self.ctx.set_zoom_level > 0:
-                self.ctx.zoom_in()
-                self.ctx.set_zoom_level -= 1
+        if self.ctx.advance > 0:
+            print("Advancing by %d epochs" % (self.ctx.advance))
+            while self.ctx.advance > 0:
+                self.algo.animate_step()
+                self.ctx.advance -= 1
             
 
         if self.ctx.snapshot == True:
@@ -426,7 +416,7 @@ def set_snapshot_mode():
     fractal_ctx.cmplx_width  = 3.
     fractal_ctx.cmplx_height = 2.5 
 
-    fractal_ctx.scaling_factor = .99 # set so we can zoom in more accurately
+    fractal_ctx.scaling_factor = .99 
     fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 0
@@ -439,7 +429,7 @@ def parse_options():
     argv = sys.argv[1:]
 
     
-    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:h:c:a:",
+    opts, args = getopt.getopt(argv, "pd:m:s:f:w:h:c:a:",
                                ["preview",
                                 "algo=",
                                 "duration=",
@@ -451,7 +441,7 @@ def parse_options():
                                 "center=",
                                 "scaling-factor=",
                                 "snapshot=",
-                                "zoom=",
+                                "advance=",
                                 "fps=",
                                 "gif=",
                                 "mpeg=",
@@ -500,8 +490,8 @@ def parse_options():
             fractal_ctx.img_height = int(arg)
         elif opt in ['--scaling-factor']:
             fractal_ctx.scaling_factor = float(arg)
-        elif opt in ['-z', '--zoom']:
-            fractal_ctx.set_zoom_level = int(arg)
+        elif opt in ['--advance']:
+            fractal_ctx.advance = int(arg)
         elif opt in ['-f', '--fps']:
             view_ctx.fps  = int(arg)
             fractal_ctx.fps = int(arg)

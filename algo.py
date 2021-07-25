@@ -13,3 +13,10 @@ class Algo(object):
 
     def animate_step(self, t):
         pass
+
+    def zoom_in(self, iterations=1):
+        while iterations:
+            self.context.cmplx_width  *= self.context.scaling_factor
+            self.context.cmplx_height *= self.context.scaling_factor
+            self.context.num_epochs += 1
+            iterations -= 1

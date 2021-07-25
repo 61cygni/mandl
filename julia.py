@@ -50,6 +50,11 @@ class Julia(Algo):
     # Use Bresenham's line drawing algo for a simple walk between two
     # complex points
     def animate_step(self, t):
+
+        if type(self.julia_list) == type(None):
+            self.zoom_in()
+            return
+    
         duration   = self.context.duration
         fps        = self.context.fps
 

@@ -55,7 +55,7 @@ class Mandelbrot(Algo):
             return n 
 
     def animate_step(self, t):
-        self.context.zoom_in()
+        self.zoom_in()
 
 def _instance(context):
     return Mandelbrot(context)
