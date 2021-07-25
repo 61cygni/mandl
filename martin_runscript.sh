@@ -1,7 +1,8 @@
-/usr/local/bin/python3 fractal.py --duration=4 --preview 
+#/usr/local/bin/python3 fractal.py --duration=4 --preview 
 
 #/usr/local/bin/python3 fractal.py --color=exp2 --duration=4 --preview 
 
+/usr/local/bin/python3 fractal.py --algo=mandelbrot --duration=4 --preview --gif=test.gif 
 #/usr/local/bin/python3 fractal.py --color=exp2 --algo=julia --duration=4 --preview --gif=test.gif 
 
 #/usr/local/bin/python3 fractal.py --gif=test.gif --duration=32 --color=exp2 --max-iter=1000 --verbose=3 --preview

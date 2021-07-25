@@ -5,6 +5,8 @@
 #
 # --
 
+from collections import defaultdict
+
 import math
 import numpy as  np
 
@@ -17,28 +19,58 @@ class FractalPalette:
     """
 
     # Color in RGB 
-    def __init__(self):
+    def __init__(self, context):
+        self.context = context
+
         self.gradient_size = 1024
         self.palette   = []
-        self.histogram = []
+
+        self.hues      = None
+        self.histogram = None
+        self.per_frame_reset()
 
 
-    def map_value_to_color(self, m, hues, smoothing=False):
+    # called for each pixel
+    def raw_calc_from_algo(self, m):
+        if m < self.context.max_iter:
+            self.histogram[math.floor(m)] += 1
+
+    def calc_hues(self):        
+        #- 
+        # From histogram normalize to percent-of-total. This is
+        # effectively a probability distribution of escape values 
+        #
+        # Note that this is not effecitly a probability distribution for
+        # a given escape value. We can use this to calculate the Shannon 
+
+        total = sum(self.histogram.values())
+        h = 0
+
+        for i in range(self.context.max_iter):
+            if total :
+                h += self.histogram[i] / total
+            self.hues.append(h)
+        self.hues.append(h)
+
+    def per_frame_reset(self):
+        self.hues      = [] 
+        self.histogram = defaultdict(int) 
+
+
+    def map_value_to_color(self, m, smoothing=False):
 
         if len(self.palette) == 0: 
-            c = 255 - int(255 * hues[math.floor(m)]) 
+            c = 255 - int(255 * self.hues[math.floor(m)]) 
             return (c, c, c)
             
-        color = None
         if smoothing:
-            c1 = self.palette[1024 - int(1024 * hues[math.floor(m)])]
-            c2 = self.palette[1024 - int(1024 * hues[math.ceil(m)])]
-            color = fp.FractalPalette.linear_interpolate(c1,c2,.5) 
+            c1 = self.palette[1024 - int(1024 * self.hues[math.floor(m)])]
+            c2 = self.palette[1024 - int(1024 * self.hues[math.ceil(m)])]
+            return fp.FractalPalette.linear_interpolate(c1,c2,.5) 
         else:
-            color = self.palette[1024 - int(1024 * hues[math.floor(m)])]
+            c = self.palette[1024 - int(1024 * self.hues[math.floor(m)])]
+            return c 
 
-        return color    
-        
 
     def linear_interpolate(color1, color2, fraction):
         new_r = int(math.ceil((color2[0] - color1[0])*fraction) + color1[0])

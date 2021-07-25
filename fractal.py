@@ -11,8 +11,6 @@ import sys
 import math
 import importlib
 
-from collections import defaultdict
-
 import numpy as  np
 import mpmath as mp
 
@@ -105,7 +103,6 @@ class FractalContext:
         # color selection since many iterations never come up so you
         # loose fidelity by not focusing on those heavily used
 
-        hist = defaultdict(int) 
         values = {}
 
         if snapshot_filename:
@@ -132,8 +129,7 @@ class FractalContext:
                 m = self.algo.calc_pixel(c)
 
                 values[(x,y)] = m 
-                if m < self.max_iter:
-                    hist[math.floor(m)] += 1
+                self.palette.raw_calc_from_algo(m)
 
             if snapshot_filename:
                 print(".",end="")
@@ -142,9 +138,9 @@ class FractalContext:
         if snapshot_filename:
             print("]")
 
-        return values, hist    
+        return values
 
-    def draw_image_PIL(self, values, hues):    
+    def draw_image_PIL(self, values):    
 
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
@@ -153,7 +149,7 @@ class FractalContext:
             for y in range(0, self.img_height):
                 m = values[(x,y)] 
 
-                color = self.palette.map_value_to_color(m, hues)
+                color = self.palette.map_value_to_color(m)
 
                 # Plot the point
                 draw.point([x, y], color) 
@@ -179,41 +175,25 @@ class FractalContext:
         """Called for each frame of the animation. Will calculate
         current view, and then animate next step"""
     
-        values, hist = None, None
-        if self.cache: 
-            values, hist = self.cache.read_cache()
+        values = None, None
+        #if self.cache: 
+        #    values, hist = self.cache.read_cache()
 
-        if not values or not hist:    
-            # call primary calculation function
-            values, hist = self.calc_cur_frame(snapshot_filename)
+        #if not values or not hist:    
+        # call primary calculation function
+        values = self.calc_cur_frame(snapshot_filename)
 
-            if self.cache:
-                self.cache.write_cache(values, hist)
-
-
-        #- 
-        # From histogram normalize to percent-of-total. This is
-        # effectively a probability distribution of escape values 
-        #
-        # Note that this is not effecitly a probability distribution for
-        # a given escape value. We can use this to calculate the Shannon 
-
-        total = sum(hist.values())
-        hues = []
-        h = 0
-
-        for i in range(self.max_iter):
-            if total :
-                h += hist[i] / total
-            hues.append(h)
-        hues.append(h)
+            #if self.cache:
+            #    self.cache.write_cache(values, hist)
 
 
         # -- 
         # Create image for this frame
         # --
         
-        im = self.draw_image_PIL(values, hues)
+        self.palette.calc_hues()
+        im = self.draw_image_PIL(values)
+        self.palette.per_frame_reset()
 
         # -- 
         # Do next step in animation
@@ -290,7 +270,7 @@ class MediaView:
 
         if not self.ctx.palette:
             print("No palette specified, using default")
-            self.ctx.palette = fp.FractalPalette()
+            self.ctx.palette = fp.FractalPalette(self.ctx)
 
         print(self)
         print(self.ctx)
@@ -495,7 +475,7 @@ def parse_options():
         elif opt in ['--center']:
             fractal_ctx.cmplx_center = complex(arg) 
         elif opt in ['--palette-test']:
-            m = fp.FractalPalette()
+            m = fp.FractalPalette(fractal_ctx)
             if str(arg) == "gauss":
                 m.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
@@ -510,7 +490,7 @@ def parse_options():
             m.display()
             sys.exit(0)
         elif opt in ['--color']:
-            m = fp.FractalPalette()
+            m = fp.FractalPalette(fractal_ctx)
             if str(arg) == "gauss":
                 m.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
