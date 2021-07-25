@@ -140,7 +140,7 @@ class MandlContext:
             return im.save(snapshot_filename,"gif")
         else:    
             return np.array(im)
-        
+
     def draw_image_PIL(self, values, hues, metadata=None):    
 
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
@@ -253,10 +253,6 @@ class MediaView:
         # figure out what our REAL duration is.
         timeline_frame_count = self.ctx.timeline.getTotalSpanFrameCount()
         timeline_duration = self.time_from_frame_number(timeline_frame_count)
-
-        #for currFrameNumber in range(timeline_frame_count):
-        #    print(self.ctx.render_frame_number(currFrameNumber))
-        #exit(0)
 
         self.clip = mpy.VideoClip(self.make_frame, duration=timeline_duration)
 
@@ -486,21 +482,22 @@ class DiveTimeline:
     def calculateResultsForDiveMesh(self, diveMesh):
         mesh = diveMesh.generateMesh()
 
-        show_row_progress = False
+        if self.fractalType == 'julia':
+            juliaFunction = np.vectorize(self.mathSupport.julia)
+            (pixel_values_2d, lastZees) = juliaFunction(diveMesh.center, mesh, diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
+        else: # self.FractalType == 'mandelbrot'
+            mandelbrotFunction = np.vectorize(self.mathSupport.mandelbrot)
+            (pixel_values_2d, lastZees) = mandelbrotFunction(mesh, diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
 
-        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.uint32)
-        pixel_values_2d_smoothed = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.float)
+        smoothingFunction = np.vectorize(self.mathSupport.smoothAfterCalculation)
+        pixel_values_2d_smoothed = smoothingFunction(lastZees, pixel_values_2d, diveMesh.maxEscapeIterations)
+
         hist = defaultdict(int) 
         hist_smoothed = defaultdict(int) 
+
+        show_row_progress = False
         for x in range(0, mesh.shape[0]):
             for y in range(0, mesh.shape[1]):
-                if self.fractalType == 'julia':
-                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.julia(diveMesh.center, mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
-                else: # self.FractalType == 'mandelbrot'
-                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.mandelbrot(mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
-
-                pixel_values_2d_smoothed[x,y] = self.mathSupport.smoothAfterCalculation(lastZee, pixel_values_2d[x,y], diveMesh.maxEscapeIterations)
-
                 # Not using mathSupport's floor() here, because it should just be a normal-scale float
                 if pixel_values_2d[x,y] < diveMesh.maxEscapeIterations:
                     #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(pixel_values_2d[x,y]), str(self.mathSupport.floor(pixel_values_2d[x,y]))))
@@ -508,9 +505,32 @@ class DiveTimeline:
                 if pixel_values_2d_smoothed[x,y] < diveMesh.maxEscapeIterations:
                     hist_smoothed[math.floor(pixel_values_2d_smoothed[x,y])] += 1
 
-            if show_row_progress == True:
-                print("%d-" % x, end="")
-                sys.stdout.flush()
+
+#        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.uint32)
+#        pixel_values_2d_smoothed = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.float)
+#        hist = defaultdict(int) 
+#        hist_smoothed = defaultdict(int) 
+#
+#        show_row_progress = True
+#        for x in range(0, mesh.shape[0]):
+#            for y in range(0, mesh.shape[1]):
+#                if self.fractalType == 'julia':
+#                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.julia(diveMesh.center, mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
+#                else: # self.FractalType == 'mandelbrot'
+#                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.mandelbrot(mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
+#
+#                pixel_values_2d_smoothed[x,y] = self.mathSupport.smoothAfterCalculation(lastZee, pixel_values_2d[x,y], diveMesh.maxEscapeIterations)
+#
+#                # Not using mathSupport's floor() here, because it should just be a normal-scale float
+#                if pixel_values_2d[x,y] < diveMesh.maxEscapeIterations:
+#                    #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(pixel_values_2d[x,y]), str(self.mathSupport.floor(pixel_values_2d[x,y]))))
+#                    hist[math.floor(pixel_values_2d[x,y])] += 1
+#                if pixel_values_2d_smoothed[x,y] < diveMesh.maxEscapeIterations:
+#                    hist_smoothed[math.floor(pixel_values_2d_smoothed[x,y])] += 1
+#
+#            if show_row_progress == True:
+#                print("%d-" % x, end="")
+#                sys.stdout.flush()
 
         return (pixel_values_2d, hist, pixel_values_2d_smoothed, hist_smoothed)
 
