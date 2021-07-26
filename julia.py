@@ -1,6 +1,8 @@
 import math
 from algo import Algo
 
+import fractalpalette as fp
+
 default_julia_c = -.8+.145j
 
 
@@ -13,6 +15,7 @@ class Julia(Algo):
         self.julia_c    = None
         self.julia_list = None
         self.julia_orig = None
+
 
     def parse_options(self, opts, args):    
 
@@ -47,13 +50,16 @@ class Julia(Algo):
             print("Error: no julia c value specified, defaulting to %s"%(str(default_julia_c)))
             self.julia_c = default_julia_c
 
+        # needed to uniquely identify cache frame
+        self.algo_specific_cache = self.julia_c    
+
 
     # Some interesting c values
     # c = complex(-0.8, 0.156)
     # c = complex(-0.4, 0.6)
     # c = complex(-0.7269, 0.1889)
 
-    def _calc_pixel(self, c):
+    def _calc_pixel(self, z0):
         z = z0
         n = 0
         while abs(z) <= 2 and n < self.context.max_iter:
@@ -102,8 +108,11 @@ class Julia(Algo):
         new_y = ((y1 - y0)*fraction) + y0 
         self.julia_c = complex(new_x, new_y)
 
+        # needed to uniquely identify cache frame
+        self.algo_specific_cache = self.julia_c    
+
     def calc_pixel(self, z0):
-        m = self._calc_pixel(c)
+        m = self._calc_pixel(z0)
         self.palette.raw_calc_from_algo(m)
         return m 
 

@@ -3,6 +3,7 @@ class Algo(object):
 
     def __init__(self, context):
         self.context = context
+        self.algo_specific_cache = None
 
     def parse_options(self, opts, args):    
         pass

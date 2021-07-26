@@ -20,13 +20,14 @@ FRACTL_CACHE_DIR = "./.fractal_cache/"
 
 class Frame:
 
-    def __init__(self, ver, cw, ch, center, escape_r, m_iter, values):
+    def __init__(self, ver, cw, ch, center, escape_r, m_iter, algo_specific_cache, values):
         self.ver = ver
         self.cw  = cw
         self.ch  = ch
         self.center    = center
         self.escape_r  = escape_r
         self.m_iter    = m_iter
+        self.algo_specific_cache = algo_specific_cache 
         self.values    = values
 
 
@@ -62,6 +63,7 @@ class FractalCache:
                          self.ctx.cmplx_center,
                          self.ctx.escape_rad,
                          self.ctx.max_iter,
+                         self.ctx.algo.algo_specific_cache,
                          None
                          ))
 
@@ -98,6 +100,7 @@ class FractalCache:
                       self.ctx.cmplx_center,
                       self.ctx.escape_rad,
                       self.ctx.max_iter,
+                      self.ctx.algo.algo_specific_cache,
                       values)
 
         with open(filename, 'wb') as fd:
@@ -122,9 +125,6 @@ class FractalCache:
         assert frame.center   == self.ctx.cmplx_center 
         assert frame.escape_r == self.ctx.escape_rad 
         assert frame.m_iter   == self.ctx.max_iter 
-
-       # if frame.julia_c  != self.ctx.julia_c :
-       #     print("** error: inconsistent cache %s:%s"%(str(frame.julia_c),str(self.ctx.julia_c)))
-       #     return None
+        assert frame.algo_specific_cache   == self.ctx.algo.algo_specific_cache
 
         return frame.values
