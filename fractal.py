@@ -152,7 +152,6 @@ class FractalContext:
                 m = values[(x,y)] 
 
                 color = self.algo.map_value_to_color(t,m)
-                #color = self.palette.map_value_to_color(m)
 
                 # Plot the point
                 draw.point([x, y], color) 
@@ -178,16 +177,19 @@ class FractalContext:
         """Called for each frame of the animation. Will calculate
         current view, and then animate next step"""
     
-        values = None, None
-        #if self.cache: 
-        #    values, hist = self.cache.read_cache()
+        values = None
+        
+        if self.cache: 
+            values = self.cache.read_cache()
+            if values:
+                self.algo.cache_loaded(values)
 
-        #if not values or not hist:    
-        # call primary calculation function
-        values = self.calc_cur_frame(snapshot_filename)
+        if not values:    
+            # call primary calculation function
+            values = self.calc_cur_frame(snapshot_filename)
 
-            #if self.cache:
-            #    self.cache.write_cache(values, hist)
+            if self.cache:
+                self.cache.write_cache(values)
 
 
         # -- 
@@ -279,7 +281,6 @@ class MediaView:
 
         if self.ctx.cache:
             self.ctx.cache.setup()
-
 
 
     def run(self):

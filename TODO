@@ -4,6 +4,8 @@
 - By default create <algoname.gif> only display if the --preview flag is
   showing
 - Fix caching to be in the algos
+    - Partway there. Need to include algo specific stuff in the hash
+      (e.g. julia_c)
 
 Major:
 - Create logging framework with multiple levels

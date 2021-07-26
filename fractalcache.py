@@ -20,16 +20,14 @@ FRACTL_CACHE_DIR = "./.fractal_cache/"
 
 class Frame:
 
-    def __init__(self, ver, cw, ch, center, julia_c, escape_r, m_iter, values, histogram):
+    def __init__(self, ver, cw, ch, center, escape_r, m_iter, values):
         self.ver = ver
         self.cw  = cw
         self.ch  = ch
         self.center    = center
-        self.julia_c   = julia_c
         self.escape_r  = escape_r
         self.m_iter    = m_iter
         self.values    = values
-        self.histogram = histogram
 
 
 class FractalCache:
@@ -42,10 +40,16 @@ class FractalCache:
 
     def create_subdir_name(self):
         filename = self.root_dir + "/"
-        if not self.ctx.julia_c:
-            filename = filename + "mandelbrot/"
-        else:    
-            filename = filename + "juliaset/"
+
+        # Grab algo name to create directory per algo 
+        # this is probably super brittle ... but seems to 
+        # work
+        #
+        # Assumes name is of for
+        # <algomod.Algoname object at 0xdeadbeef>
+        algoname = str(self.ctx.algo).split('.')[0][1:]
+
+        filename = filename + algoname 
 
         return filename + "/" + str(self.ctx.img_width)+"x"+str(self.ctx.img_height)
 
@@ -56,10 +60,9 @@ class FractalCache:
                          self.ctx.cmplx_width,
                          self.ctx.cmplx_height,
                          self.ctx.cmplx_center,
-                         self.ctx.julia_c,
                          self.ctx.escape_rad,
                          self.ctx.max_iter,
-                         None, None
+                         None
                          ))
 
         h = hmac.new(ba, digestmod=hashlib.sha1)
@@ -85,7 +88,7 @@ class FractalCache:
             return False
         return True    
 
-    def write_cache(self, values, histogram):
+    def write_cache(self, values):
         
         filename = self.subdir + "/" + self.create_file_name()
         print("+  writing frame to cache file %s ...  "%(filename))
@@ -93,11 +96,9 @@ class FractalCache:
                       self.ctx.cmplx_width,
                       self.ctx.cmplx_height,
                       self.ctx.cmplx_center,
-                      self.ctx.julia_c,
                       self.ctx.escape_rad,
                       self.ctx.max_iter,
-                      values,
-                      histogram)
+                      values)
 
         with open(filename, 'wb') as fd:
             pickle.dump(frame,fd)
@@ -105,7 +106,7 @@ class FractalCache:
     def read_cache(self):
         
         if not self.check_cache():
-            return None, None
+            return None
 
         filename = self.subdir + "/" + self.create_file_name()
 
@@ -122,8 +123,8 @@ class FractalCache:
         assert frame.escape_r == self.ctx.escape_rad 
         assert frame.m_iter   == self.ctx.max_iter 
 
-        if frame.julia_c  != self.ctx.julia_c :
-            print("** error: inconsistent cache %s:%s"%(str(frame.julia_c),str(self.ctx.julia_c)))
-            return None, None
+       # if frame.julia_c  != self.ctx.julia_c :
+       #     print("** error: inconsistent cache %s:%s"%(str(frame.julia_c),str(self.ctx.julia_c)))
+       #     return None
 
-        return frame.values,frame.histogram
+        return frame.values

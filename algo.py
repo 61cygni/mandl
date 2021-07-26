@@ -22,6 +22,9 @@ class Algo(object):
     def per_frame_reset(self):
         pass
 
+    def cache_loaded(self, values):
+        pass 
+
     def zoom_in(self, iterations=1):
         while iterations:
             self.context.cmplx_width   *= self.context.scaling_factor

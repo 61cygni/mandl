@@ -87,6 +87,12 @@ class Mandelbrot(Algo):
     def pre_image_hook(self):
         self.palette.calc_hues()
 
+    def cache_loaded(self, values):
+        self.palette.per_frame_reset() # just in case
+        for coords in values:
+            self.palette.raw_calc_from_algo(values[coords])
+        
+
     def per_frame_reset(self):
         self.palette.per_frame_reset()
         
