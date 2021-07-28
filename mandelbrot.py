@@ -76,7 +76,6 @@ class Mandelbrot(Algo):
         # https://www.iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
         if self.context.smoothing:
             mu = n  - math.log2(math.log2(squared_modulus(z))) + 4.0
-            print(mu)
             return mu 
         else:    
             return n 

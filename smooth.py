@@ -64,16 +64,17 @@ class Smooth(Algo):
         denom = math.log(math.log(magnification))
 
         if self.color:
+            # (yellow blue 0,.6,1.0)
             c1 =  0.5 + 0.5*math.cos( 3.0 + val*0.15 + 0.0);
-            c2 =  0.5 + 0.5*math.cos( 3.0 + val*0.15 + 0.6);
-            c3 =  0.5 + 0.5*math.cos( 3.0 + val*0.15 + 1.0);
+            c2 =  0.5 + 0.5*math.cos( 3.0 + val*0.15 + 0.0);
+            c3 =  0.5 + 0.5*math.cos( 3.0 + val*0.15 + 0.0);
             c1int = int(255.*(c1 * 3.) / denom)
             c2int = int(255.*(c2 * 3.) / denom)
             c3int = int(255.*(c3 * 3.) / denom)
             return (c1int,c2int,c3int)
         else:        
             #magnification = 1. / self.context.cmplx_width
-            cint = int((val * 3.) / denom
+            cint = int((val * 3.) / denom)
             return (cint,cint,cint)
         
 
