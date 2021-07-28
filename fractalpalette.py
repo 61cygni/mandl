@@ -64,9 +64,11 @@ class FractalPalette:
             return (c, c, c)
             
         if smoothing:
+            print(self.hues)
+            
             c1 = self.palette[1024 - int(1024 * self.hues[math.floor(m)])]
             c2 = self.palette[1024 - int(1024 * self.hues[math.ceil(m)])]
-            return fp.FractalPalette.linear_interpolate(c1,c2,.5) 
+            return linear_interpolate(c1,c2,.5) 
         else:
             c = self.palette[1024 - int(1024 * self.hues[math.floor(m)])]
             return c 

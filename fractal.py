@@ -475,20 +475,6 @@ def parse_options():
                 sys.exit(0)
             m.display()
             sys.exit(0)
-        elif opt in ['--color']:
-            m = fp.FractalPalette(fractal_ctx)
-            if str(arg) == "gauss":
-                m.create_gauss_gradient((255,255,255),(0,0,0))
-            elif str(arg) == "exp":    
-                m.create_exp_gradient((255,255,255),(0,0,0))
-            elif str(arg) == "exp2":    
-                m.create_exp2_gradient((0,0,0),(128,128,128))
-            elif str(arg) == "list":    
-                m.create_gradient_from_list()
-            else:
-                print("Error: --palette arg must be one of gauss|exp|list")
-                sys.exit(0)
-            fractal_ctx.palette = m
         elif opt in ['--burn']:
             fractal_ctx.burn_in = True
         elif opt in ['--banner']:

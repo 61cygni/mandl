@@ -1,7 +1,7 @@
 # --
 # File: mandeldistance.py
 #
-#
+# https://www.shadertoy.com/view/lsX3W4
 # --
 
 from algo import Algo

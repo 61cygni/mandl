@@ -18,8 +18,14 @@
 #
 # 0.4244 + 0.200759i;
 
+import math
+
 from algo import Algo
 import fractalpalette as fp
+
+
+def squared_modulus(z):
+    return ((z.real*z.real)+(z.imag*z.imag))
 
 class Mandelbrot(Algo):
     
@@ -66,12 +72,11 @@ class Mandelbrot(Algo):
         if n >= self.context.max_iter:
             return self.context.max_iter
         
-        # The following code smooths out the colors so there aren't bands
-        # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
+        # Smoothing algorithm from 
+        # https://www.iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
         if self.context.smoothing:
-            z = z*z + c; n+=1 # a couple extra iterations helps
-            z = z*z + c; n+=1 # decrease the size of the error
-            mu = n + 1 - math.log(math.log2(abs(z)))
+            mu = n  - math.log2(math.log2(squared_modulus(z))) + 4.0
+            print(mu)
             return mu 
         else:    
             return n 
