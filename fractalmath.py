@@ -79,6 +79,25 @@ class DiveMathSupport:
         """
         return self.createLinspace(valuesCenter - spreadWidth * 0.5, valuesCenter + spreadWidth * 0.5, quantity)
 
+    def interpolate(self, transitionType, startX, startY, endX, endY, targetX, extraParams={}):
+        """
+        Resisted having a single call point, in case more parameters
+        were needed for each type, but we might just be able to pass
+        in an extra param hash?
+        """
+        if transitionType == 'log-to':
+            return self.interpolateLogTo(startX, startY, endX, endY, targetX)
+        elif transitionType == 'root-to':
+            return self.interpolateRootTo(startX, startY, endX, endY, targetX)
+        elif transitionType == 'linear':
+            return self.interpolateLinear(startX, startY, endX, endY, targetX)
+        elif transitionType == 'quadratic-to':
+            return self.interpolateQuadraticEaseOut(startX, startY, endX, endY, targetX)
+        elif transitionType == 'quadratic-from':
+            return self.interpolateQuadraticEaseIn(startX, startY, endX, endY, targetX)
+        else: # transitionType == 'quadratic-to-from'
+            return self.interpolateQuadraticEaseInOut(startX, startY, endX, endY, targetX)
+
     def interpolateLogTo(self, startX, startY, endX, endY, targetX):
         """
         Probably want additional log-defining params, but for now, let's just bake in one equation
@@ -234,8 +253,8 @@ class DiveMathSupport:
         c = complex(-0.4, 0.6)
         c = complex(-0.7269, 0.1889)
 
-        Looks like this implementation is able to handle flint types, now that smoothing
-        is handled separately.
+        Looks like this implementation is able to handle flint types, 
+        now that smoothing is handled separately.
 
         fabs(z) returns the modulus of a complex number, which is the
         distance to 0 (on a 2x2 cartesian plane)

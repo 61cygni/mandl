@@ -44,12 +44,16 @@ from PIL import Image, ImageDraw, ImageFont
 import fractalcache   as fc
 import fractalpalette as fp
 import fractalmath    as fm
-
 import divemesh       as mesh
+
+from algo import Algo # Abstract base class import, because we rely on it.
+from julia import Julia 
+from mandelbrot import Mandelbrot
+from mandeldistance import MandelDistance
 
 MANDL_VER = "0.1"
 
-class MandlContext:
+class FractalContext:
     """
     The context for a single dive
     """
@@ -76,13 +80,11 @@ class MandlContext:
         self.smoothing      = False # bool turn on color smoothing
         self.snapshot       = False # Generate a single, high res shotb
 
-        self.fractal = 'mandelbrot' # or 'julia'
-        self.julia_list   = None 
+        self.julia_list   = None # Used just for timeline construction
 
         self.palette = None
-        self.burn_in = False
 
-        # Shifting from the MandlContext being the oracle of frame information, to the Timeline being the oracle.
+        # Shifting from the FractalContext being the oracle of frame information, to the Timeline being the oracle.
         # Rather than keeping 'current frame' info in the context, we just keep the timeline, and
         # query it for frame-specific parameters to render with.
         self.timeline = None
@@ -92,107 +94,58 @@ class MandlContext:
         self.build_cache = False
         self.invalidate_cache = False
 
+        self.algorithm_map = {'julia' : Julia, 
+                'mandelbrot' : Mandelbrot,
+                'mandeldistance' : MandelDistance}
+        self.algorithm_name = None
+        self.algorithm_extra_params = {} # Keeps command-line params for later use
+
         self.verbose = 0 # how much to print about progress
 
-    def render_frame_number(self, frame_number, snapshot_filename=None):
-        """
-        Load or calculate the frame data.
+    def render_frame_number(self, frame_number):
+        extra_params = {}
+        if self.algorithm_name in self.algorithm_extra_params:
+            extra_params = self.algorithm_extra_params[self.algorithm_name]
 
-        Once we have frame data, can perform histogram and coloring
-        """
-        (pixel_values_2d_raw, hist_raw, pixel_values_2d_smooth, hist_smooth, frame_metadata) = self.timeline.loadResultsForFrameNumber(frame_number, buildCache=self.build_cache, invalidateCache=self.invalidate_cache)
+        #dive_mesh realizes more info is needed, so stashes it into its extraParams
+        # Gotta retrieve that in calculateResults, right?
+        # So, extra_params needs to be looked at, and algo params need to be set by the values, right?
+        # Algorithm gets instantiated with all its parts in place...
+        # We've gotta allow mesh's extra params to add to and override the overall algorithm's extra params?
 
-        # Capturing the transpose of our array, because it looks like I mixed
-        # up rows and cols somewhere along the way.
-        if self.smoothing == True:
-            pixel_values_2d = pixel_values_2d_smooth.T
-            hist = hist_smooth
-        else:
-            pixel_values_2d = pixel_values_2d_raw.T
-            hist = hist_raw
+        dive_mesh = self.timeline.getMeshForFrame(frame_number)
+        #print("extra params from mesh: %s" % str(dive_mesh.extraParams))
+        extra_params.update(dive_mesh.extraParams) # Allow per-frame info to overwrite algorithm info?
 
-        #print("shape of things to come: %s" % str(pixel_values_2d.shape))
+        #print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
+        frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh, frame_number, self.project_name, self.shared_cache_path, self.build_cache, self.invalidate_cache, extra_params)
 
-        total = sum(hist.values())
-        hues = []
-        h = 0
-
-        # calculate percent of total for each iteration
-        for i in range(self.max_iter):
-            if total :
-                h += hist[i] / total
-            hues.append(h)
-        hues.append(h)
-
-        # -- 
-        # Create image for this frame
-        # --
-
-        im = self.draw_image_PIL(pixel_values_2d, hues, frame_metadata)
-
-        #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
-        #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
-
-        #if self.verbose > 0:
-        #    print("Done]")
+        frame_algorithm.beginning_hook()
         
-        if snapshot_filename:
-            return im.save(snapshot_filename,"gif")
-        else:    
-            return np.array(im)
-
-    def draw_image_PIL(self, values, hues, metadata=None):    
-
-        im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
-        draw = ImageDraw.Draw(im)
+        frame_algorithm.generate_results()
         
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                m = values[x,y] 
+        frame_algorithm.pre_image_hook()
 
-                if not self.palette:
-                    c = 255 - int(255 * hues[math.floor(m)]) 
-                    color=(c, c, c)
-                elif self.smoothing:
-                    c1 = self.palette[1024 - int(1024 * hues[math.floor(m)])]
-                    c2 = self.palette[1024 - int(1024 * hues[math.ceil(m)])]
-                    color = fp.MandlPalette.linear_interpolate(c1,c2,.5) 
-                else:
-                    color = self.palette[1024 - int(1024 * hues[math.floor(m)])]
+        frame_image = frame_algorithm.generate_image()
 
-                # Plot the point
-                draw.point([x, y], color) 
+        frame_algorithm.ending_hook()
 
-        #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
-        #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
-
-        if self.burn_in == True and metadata != None:
-            burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (metadata['frame_number'], metadata['mesh_center'], metadata['complex_real_width'], metadata['complex_imag_width'])
-
-            burn_in_location = (10,10)
-            burn_in_margin = 5 
-            burn_in_font = ImageFont.truetype('fonts/cour.ttf', 12)
-            burn_in_size = burn_in_font.getsize_multiline(burn_in_text)
-            draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
-            draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
-
-        return im    
-
+        return frame_image
 
     def __repr__(self):
         return """\
-[MandlContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:s}
-Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Max iter:{mx:d}]\
+[FractalContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:s}
+Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=str(self.cmplx_width),ch=str(self.cmplx_height),
-        cc=str(self.cmplx_center),s=self.scaling_factor,mx=self.max_iter,sm=self.smoothing); 
+        cc=str(self.cmplx_center),s=self.scaling_factor,mx=self.max_iter); 
 
 class MediaView: 
     """
     Handle displaying to gif / mp4 / screen etc.  
     """
     def make_frame(self, t):
-        return self.ctx.render_frame_number(self.frame_number_from_time(t))
+        return np.array(self.ctx.render_frame_number(self.frame_number_from_time(t)))
 
     def __init__(self, duration, fps, ctx):
         self.duration  = duration
@@ -308,10 +261,12 @@ class MediaView:
         end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, last_frame_number)
         end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, last_frame_number)
 
-        print("{%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
+        print("Timeline ranges: {%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
 
-        if self.ctx.fractal == 'julia':
-            timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='julia', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
+        timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm_name=self.ctx.algorithm_name, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
+         
+        if timeline.algorithm_name == 'julia':
+            #timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='julia', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
             # Just evenly divide the waypoints across the time for a simple timeline
             keyframeCount = len(self.ctx.julia_list)
             # 2 keyframes over 10 frames = 10 frames per keyframe
@@ -319,28 +274,32 @@ class MediaView:
             if keyframeSpacing < 1:
                 raise ValueError("Can't construct julia walk with more waypoints than animation frames")
 
-            span = DiveTimelineSpan(timeline, rendered_frame_count, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
+            span = DiveTimelineSpan(timeline, rendered_frame_count)
             span.addNewWindowKeyframe(0, start_width_real, start_width_imag)
             span.addNewWindowKeyframe(rendered_frame_count - 1, end_width_real, end_width_imag)
             span.addNewUniformKeyframe(0)
             span.addNewUniformKeyframe(rendered_frame_count - 1)
 
+            span.addNewCenterKeyframe(0, self.ctx.cmplx_center)
+            span.addNewCenterKeyframe(rendered_frame_count - 1, self.ctx.cmplx_center)
+
             currKeyframeFrameNumber = 0
             for currJuliaCenter in self.ctx.julia_list:
                 # Recognize when we're at the last item, and jump that keyframe to the final frame
                 if currKeyframeFrameNumber + keyframeSpacing > rendered_frame_count - 1:
-                    currKeyframeNumber = frame_count - 1
+                    currKeyframeNumber = rendered_frame_count - 1
                 
-                span.addNewCenterKeyframe(currKeyframeFrameNumber, currJuliaCenter, transitionIn='linear', transitionOut='linear')
+                #span.addNewCenterKeyframe(currKeyframeFrameNumber, currJuliaCenter, transitionIn='linear', transitionOut='linear')
+                span.addNewComplexParameterKeyframe(currKeyframeFrameNumber, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
                 currKeyframeFrameNumber += keyframeSpacing
 
             timeline.timelineSpans.append(span)
 
         else:
-            timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='mandelbrot', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
-            # Here, I have ctx, which should know escapeRadius, maxIter, and shouldSmooth... 
+            #timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='mandelbrot', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
+            #timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm=self.ctx.algorithm, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
             #print("Trying to make span of %d frames" % frame_count)
-            span = timeline.addNewSpanAtEnd(rendered_frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag, self.ctx.escape_rad, self.ctx.max_iter, self.ctx.smoothing)
+            span = timeline.addNewSpanAtEnd(rendered_frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag)
     
             #perspectiveFrame = math.floor(frame_count * .5)
             #span.addNewTiltKeyframe(perspectiveFrame, 4.0, 1.0) 
@@ -376,15 +335,12 @@ class DiveTimeline:
     currently all live on integer frame numbers.
     """
 
-    def __init__(self, projectFolderName, fractal, framerate, frameWidth, frameHeight, mathSupport, sharedCachePath):
+    def __init__(self, projectFolderName, algorithm_name, framerate, frameWidth, frameHeight, mathSupport, sharedCachePath):
         
         self.projectFolderName = projectFolderName
         self.sharedCachePath = sharedCachePath
 
-        fractalOptions = ['mandelbrot', 'julia']
-        if fractal not in fractalOptions:
-            raise ValueError("fractal must be one of (%s)" % ", ".join(fractalOptions))
-        self.fractalType = fractal
+        self.algorithm_name = algorithm_name
 
         self.framerate = float(framerate)
         self.frameWidth = int(frameWidth)
@@ -401,7 +357,7 @@ class DiveTimeline:
             seenFrameCount += currSpan.frameCount
         return seenFrameCount
 
-    def addNewSpanAtEnd(self, frameCount, center, startWidthReal, startWidthImag, endWidthReal, endWidthImag, escapeRadius, maxEscapeIterations, shouldSmooth):
+    def addNewSpanAtEnd(self, frameCount, center, startWidthReal, startWidthImag, endWidthReal, endWidthImag):
         """
         Constructs a new span, and adds it to the end of the existing span list
 
@@ -411,7 +367,7 @@ class DiveTimeline:
 
         Apparently also adding perspective keyframes too.
         """
-        span = DiveTimelineSpan(self, frameCount, escapeRadius, maxEscapeIterations, shouldSmooth)
+        span = DiveTimelineSpan(self, frameCount)
         span.addNewCenterKeyframe(0, center, 'quadratic-to', 'quadratic-to')
         span.addNewCenterKeyframe(frameCount - 1, center, 'quadratic-to', 'quadratic-to')
         span.addNewWindowKeyframe(0, startWidthReal, startWidthImag)
@@ -444,131 +400,6 @@ class DiveTimeline:
                 return currSpan
 
         return None # Went past the end without finding a valid span, so it's too high a frame number
-
-    def loadResultsForFrameNumber(self, frameNumber, buildCache=True, invalidateCache=False):
-        """ Multi-cache-aware data loading or calculating """
-        diveMesh = self.getMeshForFrame(frameNumber)
-        cacheFrame = fc.Frame(self, diveMesh, frameNumber)
-
-        if invalidateCache == True:
-            cacheFrame.remove_from_results_cache()
-
-        cacheFrame.read_results_cache()
-
-        if cacheFrame.frame_info.raw_values is None or cacheFrame.frame_info.raw_histogram is None or cacheFrame.frame_info.smooth_values is None or cacheFrame.frame_info.smooth_histogram is None:
-            #print("+  calculating epoch results")
-            (rawValues, rawHistogram, smoothValues, smoothHistogram) = self.calculateResultsForDiveMesh(diveMesh)
-            cacheFrame.frame_info.raw_values = rawValues
-            cacheFrame.frame_info.raw_histogram = rawHistogram
-            cacheFrame.frame_info.smooth_values = smoothValues
-            cacheFrame.frame_info.smooth_histogram = smoothHistogram
-
-            # Fresly calculated results get saved if we're building the cache
-            if buildCache == True:
-                cacheFrame.write_results_cache()
-
-        frame_metadata = {'frame_number' : frameNumber,
-            'fractal_type': self.fractalType,
-            'precision_type': self.mathSupport.precisionType,
-            'mesh_center': str(diveMesh.center),
-            'complex_real_width' : str(diveMesh.realMeshGenerator.baseWidth),
-            'complex_imag_width' : str(diveMesh.imagMeshGenerator.baseWidth), 
-            'escape_radius' : str(diveMesh.escapeRadius),
-            'mesh_is_uniform' : str(diveMesh.isUniform()),
-            'max_escape_iterations' : str(diveMesh.maxEscapeIterations)}
-
-        return (cacheFrame.frame_info.raw_values, cacheFrame.frame_info.raw_histogram, cacheFrame.frame_info.smooth_values, cacheFrame.frame_info.smooth_histogram, frame_metadata)
-
-    def calculateResultsForDiveMesh(self, diveMesh):
-        mesh = diveMesh.generateMesh()
-
-        if self.fractalType == 'julia':
-            juliaFunction = np.vectorize(self.mathSupport.julia)
-            (pixel_values_2d, lastZees) = juliaFunction(diveMesh.center, mesh, diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
-        else: # self.FractalType == 'mandelbrot'
-            mandelbrotFunction = np.vectorize(self.mathSupport.mandelbrot)
-            (pixel_values_2d, lastZees) = mandelbrotFunction(mesh, diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
-
-        smoothingFunction = np.vectorize(self.mathSupport.smoothAfterCalculation)
-        pixel_values_2d_smoothed = smoothingFunction(lastZees, pixel_values_2d, diveMesh.maxEscapeIterations)
-
-        hist = defaultdict(int) 
-        hist_smoothed = defaultdict(int) 
-
-        show_row_progress = False
-        for x in range(0, mesh.shape[0]):
-            for y in range(0, mesh.shape[1]):
-                # Not using mathSupport's floor() here, because it should just be a normal-scale float
-                if pixel_values_2d[x,y] < diveMesh.maxEscapeIterations:
-                    #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(pixel_values_2d[x,y]), str(self.mathSupport.floor(pixel_values_2d[x,y]))))
-                    hist[math.floor(pixel_values_2d[x,y])] += 1
-                if pixel_values_2d_smoothed[x,y] < diveMesh.maxEscapeIterations:
-                    hist_smoothed[math.floor(pixel_values_2d_smoothed[x,y])] += 1
-
-
-#        pixel_values_2d = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.uint32)
-#        pixel_values_2d_smoothed = np.zeros((mesh.shape[0], mesh.shape[1]), dtype=np.float)
-#        hist = defaultdict(int) 
-#        hist_smoothed = defaultdict(int) 
-#
-#        show_row_progress = True
-#        for x in range(0, mesh.shape[0]):
-#            for y in range(0, mesh.shape[1]):
-#                if self.fractalType == 'julia':
-#                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.julia(diveMesh.center, mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
-#                else: # self.FractalType == 'mandelbrot'
-#                    (pixel_values_2d[x,y], lastZee) = self.mathSupport.mandelbrot(mesh[x,y], diveMesh.escapeRadius, diveMesh.maxEscapeIterations)
-#
-#                pixel_values_2d_smoothed[x,y] = self.mathSupport.smoothAfterCalculation(lastZee, pixel_values_2d[x,y], diveMesh.maxEscapeIterations)
-#
-#                # Not using mathSupport's floor() here, because it should just be a normal-scale float
-#                if pixel_values_2d[x,y] < diveMesh.maxEscapeIterations:
-#                    #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(pixel_values_2d[x,y]), str(self.mathSupport.floor(pixel_values_2d[x,y]))))
-#                    hist[math.floor(pixel_values_2d[x,y])] += 1
-#                if pixel_values_2d_smoothed[x,y] < diveMesh.maxEscapeIterations:
-#                    hist_smoothed[math.floor(pixel_values_2d_smoothed[x,y])] += 1
-#
-#            if show_row_progress == True:
-#                print("%d-" % x, end="")
-#                sys.stdout.flush()
-
-        return (pixel_values_2d, hist, pixel_values_2d_smoothed, hist_smoothed)
-
-        ####
-        # Graveyard of failed attempts at further vectorizing this, maybe there's a clue in here
-        # somewhere...
-        ####
-
-        # In search of efficient ways to apply the map, and getting stuck with various issues
-        # like pickling, which are keeping me from using multiprocessing.Pool
-
-# Seemed to go exponential run time for some bizarre reason
-#            # Probably not necessary, but lining up the 2-element subarray
-#            pixel_inputs_1d = pixel_values_2d.reshape((mesh.shape[0] * mesh.shape[1]))
-#
-#            # Pretty sure this is mistakenly doing an n! pass, or something just as ridiculous.
-#            #print("shape of pixel_inputs_1d: %s" % str(pixel_inputs_1d.shape))
-#            pixel_values_1d = np.array([self.mathSupport.mandelbrot(complex_value, diveMesh.escapeRadius, diveMesh.maxEscapeIterations, diveMesh.shouldSmooth) for complex_value in pixel_inputs_1d])
-#    
-#            pixel_values_2d = pixel_values_1d.reshape((mesh.shape[0], mesh.shape[1]))
-#            #pixel_values_2d = np.squeeze(pixel_values_2d, axis=2) # Incantation to remove a sub-array level
-#            #print("shape of pixel_values_2d: %s" % str(pixel_values_2d.shape))
-
-        #nope
-        #theFunction = np.vectorize(self.mandelbrot_flint)
-        #pixel_values_1d = theFunction(pixel_inputs_1d)
-
-        #pixel_inputs_1d = pixel_inputs.reshape(1,self.img_width * self.img_height)
-
-        #pixel_values_1d = map(self.mandelbrot_flint, pixel_inputs_1d)
-        #pixel_values_1d = np.array(list(map(self.mandelbrot_flint, pixel_inputs_1d)))
-        #print("shape of pixel_values_1d: %s" % str(pixel_values_1d.shape))
-
-        # Can't pikcle... hmm
-        #mandelpool = multiprocessing.Pool(processes = 1)
-        #pixel_values_1d = mandelpool.map(self.mandelbrot_flint, pixel_inputs_1d)
-        #mandelpool.close()
-        #mandelpool.join()
 
     def getMeshForFrame(self, frameNumber):
         """
@@ -630,11 +461,21 @@ class DiveTimeline:
             # Tilt factor is the multiplier applied to the range.
             realMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal, tiltFactor=widthTiltFactor)
             imagMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag, tiltFactor=heightTiltFactor)
-   
-        # Passing lots into the dive mesh.  Notably, some info about the DiveTimelineSpan that was
-        # responsible for creating this mesh.  Might want to store an actual reference to the object, but
-        # doesn't seem needed yet?
-        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, targetSpan.escapeRadius, targetSpan.maxEscapeIterations, targetSpan.shouldSmooth)
+ 
+        extraFrameParams = {}
+        parameterKeyframePairs = targetSpan.getParameterKeyframePairsClosestToFrameNumber('complex', localFrameNumber)
+        # parameterKeyframePairs['paramName'] -> [(previousKeyframe, nextKeyframe) , (previousKeyframe, nextKeyframe)...]
+        for currParamName, currKeyframePairs in parameterKeyframePairs.items():
+            for (leftKeyframe, rightKeyframe) in currKeyframePairs:
+                extraFrameParams[currParamName] = targetSpan.interpolateComplexBetweenParameterKeyframes(localFrameNumber, leftKeyframe, rightKeyframe) 
+            
+        parameterKeyframePairs = targetSpan.getParameterKeyframePairsClosestToFrameNumber('float', localFrameNumber)
+        # parameterKeyframePairs['paramName'] -> [(previousKeyframe, nextKeyframe) , (previousKeyframe, nextKeyframe)...]
+        for currParamName, currKeyframePairs in parameterKeyframePairs.items():
+            for (leftKeyframe, rightKeyframe) in currKeyframePairs:
+                extraFrameParams[currParamName] = self.interpolateFloatBetweenParameterKeyframes(localFrameNumber, leftKeyframe, rightKeyframe) 
+
+        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, extraFrameParams)
         #print (diveMesh)
         return diveMesh
 
@@ -677,24 +518,8 @@ class DiveTimeline:
             rightWidthValue = rightKeyframe.widthFactor
             rightHeightValue = rightKeyframe.heightFactor
 
-        if transitionType == 'log-to':
-            widthTiltFactor = self.mathSupport.interpolateLogTo(leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-            heightTiltFactor = self.mathSupport.interpolateLogTo(leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
-        elif transitionType == 'root-to':
-            widthTiltFactor = self.mathSupport.interpolateRootTo(leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-            heightTiltFactor = self.mathSupport.interpolateRootTo(leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
-        elif transitionType == 'linear':
-            widthTiltFactor = self.mathSupport.interpolateLinearTo(leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-            heightTiltFactor = self.mathSupport.interpolateLinearTo(leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
-        elif transitionType == 'quadratic-to':
-            widthTiltFactor = self.mathSupport.interpolateQuadraticEaseOut(leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-            heightTiltFactor = self.mathSupport.interpolateQuadraticEaseOut(leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
-        elif transitionType == 'quadratic-from':
-            widthTiltFactor = self.mathSupport.interpolateQuadraticEaseIn(leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-            heightTiltFactor = self.mathSupport.interpolateQuadraticEaseIn(leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
-        else: # transitionType == 'quadratic-to-from'
-            widthTiltFactor = self.mathSupport.interpolateQuadraticEaseInOut(leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-            heightTiltFactor = self.mathSupport.interpolateQuadraticEaseInOut(leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
+        widthTiltFactor = self.mathSupport.interpolate(transitionType, leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
+        heightTiltFactor = self.mathSupport.interpolate(transitionType, leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
 
         return(widthTiltFactor, heightTiltFactor)
 
@@ -712,13 +537,9 @@ class DiveTimelineSpan:
     """
     # ?(Can be used to observe/calculate n-1 zoom factors.)?
     """
-    def __init__(self, timeline, frameCount, escapeRadius, maxEscapeIterations, shouldSmooth):
+    def __init__(self, timeline, frameCount):
         self.timeline = timeline
         self.frameCount = int(frameCount)
-
-        self.escapeRadius = escapeRadius
-        self.maxEscapeIterations = maxEscapeIterations
-        self.shouldSmooth = shouldSmooth
 
         # Only a single 'track' for each keyframe type to begin with, represented
         # just as a keyframe lookup for each track.  Being able to stack multiples of
@@ -726,6 +547,12 @@ class DiveTimelineSpan:
         self.centerKeyframes = {}
         self.windowKeyframes = {}
         self.perspectiveKeyframes = {}
+
+        self.complexParameterKeyframes = defaultdict(dict)
+        self.floatParameterKeyframes = defaultdict(dict)
+        # parameterKeyframes['julia_center'][25] = complex(0,0)
+        # parameterKeyframes['julia_center'][40] = complex(0,0)
+
         # Currently, not allowing keyframes to exist outside of the span, even though
         # that is often helpful for defining pleasing transitions.
         # Currently, also not allowing keyframes to exist at non-frame targets, which
@@ -788,6 +615,20 @@ class DiveTimelineSpan:
         self.perspectiveKeyframes[frameNumber] = newKeyframe
         return newKeyframe
 
+    def addNewComplexParameterKeyframe(self, frameNumber, name, value, transitionIn='linear', transitionOut='linear'):
+        # TODO: Would like to be unable to assign keyframes with identical
+        # names to both the complex and float parameter sets.
+        newKeyframe = DiveSpanParameterKeyframe(self, value, transitionIn, transitionOut)
+        self.complexParameterKeyframes[name][frameNumber] = newKeyframe
+        # parameterKeyframes['julia_center'][40] = complex(0,0)
+        return newKeyframe
+
+    def addNewFloatParameterKeyframe(self, frameNumber, name, value, transitionIn='linear', transitionOut='linear'):
+        newKeyframe = DiveSpanParameterKeyframe(self, value, transitionIn, transitionOut)
+        self.floatParameterKeyframes[name][frameNumber] = newKeyframe
+        # parameterKeyframes['a_value'][40] = 1.234
+        return newKeyframe
+
     def getKeyframesClosestToFrameNumber(self, keyframeType, frameNumber):
         """
         Returns a tuple of keyframes, which are the nearest left and right keyframes for the frameNumber.
@@ -830,6 +671,50 @@ class DiveTimelineSpan:
 
         return (previousKeyframe, nextKeyframe)
 
+    def getParameterKeyframePairsClosestToFrameNumber(self, keyframeType, frameNumber):
+        typeOptions = ['float', 'complex']
+        if keyframeType not in typeOptions:
+            raise ValueError("keyframeType must be one of (%s)" % ", ".join(typeOptions))
+
+        if frameNumber >= self.frameCount:
+            raise IndexError("Requested %s keyframe frame number '%d' is out of range for a span that's '%d' frames long" % (keyframeType, frameNumber, self.frameCount))
+
+        outerKeyframeHash = None
+        if keyframeType == 'complex':
+            outerKeyframeHash = self.complexParameterKeyframes
+        else: #keyframeType == 'float':
+            outerKeyframeHash = self.floatParameterKeyframes
+
+
+        answerKeyframes = defaultdict(list) 
+        # answerKeyframes['paramName'] -> [(previousKeyframe, nextKeyframe) , (previousKeyframe, nextKeyframe)...]
+
+        for currParamName, keyframeHash in outerKeyframeHash.items():
+            #print("Looking at %s" % currParamName)
+            # Direct hit 
+            if frameNumber in keyframeHash:
+                targetKeyframe = keyframeHash[frameNumber]
+                targetKeyframe.lastObservedFrameNumber = frameNumber
+                answerKeyframes[currParamName].append((targetKeyframe, targetKeyframe))
+                continue
+    
+            previousKeyframe = None
+            nextKeyframe = None
+            for currFrameNumber in sorted(keyframeHash.keys()):
+                if currFrameNumber <= frameNumber:
+                    previousKeyframe = keyframeHash[currFrameNumber]
+                    previousKeyframe.lastObservedFrameNumber = currFrameNumber
+                if currFrameNumber > frameNumber:
+                    nextKeyframe = keyframeHash[currFrameNumber]
+                    nextKeyframe.lastObservedFrameNumber = currFrameNumber
+                    break # Past the sorted range, so done looking
+  
+            if previousKeyframe != None and nextKeyframe != None:
+                answerKeyframes[currParamName].append((previousKeyframe, nextKeyframe))
+
+        #print("found: %s" % str(answerKeyframes))
+        return answerKeyframes
+
     def interpolateCenterValueBetweenKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
         """
         Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
@@ -856,27 +741,10 @@ class DiveTimelineSpan:
         #
         # And I kept all these separate, because I'm prety sure there will be more
         # interpolation-specific parameters needed when all's said and done.
-        if transitionType == 'log-to':
-            interpolatedReal = self.timeline.mathSupport.interpolateLogTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-            interpolatedImag = self.timeline.mathSupport.interpolateLogTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-        elif transitionType == 'root-to':
-            interpolatedReal = self.timeline.mathSupport.interpolateRootTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-            interpolatedImag = self.timeline.mathSupport.interpolateRootTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-        elif transitionType == 'linear':
-            interpolatedReal = self.timeline.mathSupport.interpolateLinear(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-            interpolatedImag = self.timeline.mathSupport.interpolateLinear(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-        elif transitionType == 'quadratic-to':
-            interpolatedReal = self.timeline.mathSupport.interpolateQuadraticEaseOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-            interpolatedImag = self.timeline.mathSupport.interpolateQuadraticEaseOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-        elif transitionType == 'quadratic-from':
-            interpolatedReal = self.timeline.mathSupport.interpolateQuadraticEaseIn(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-            interpolatedImag = self.timeline.mathSupport.interpolateQuadraticEaseIn(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-        else: # transitionType == 'quadratic-to-from':
-            interpolatedReal = self.timeline.mathSupport.interpolateQuadraticEaseInOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-            interpolatedImag = self.timeline.mathSupport.interpolateQuadraticEaseInOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-            
-        interpolatedCenter = self.timeline.mathSupport.createComplex(interpolatedReal, interpolatedImag)
-        return interpolatedCenter
+        interpolatedReal = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
+        interpolatedImag = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
+
+        return self.timeline.mathSupport.createComplex(interpolatedReal, interpolatedImag)
 
     def interpolateWindowValuesBetweenKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
         """
@@ -899,26 +767,74 @@ class DiveTimelineSpan:
 
         # And I kept all these separate, because I'm prety sure there will be more
         # interpolation-specific parameters needed when all's said and done.
-        if transitionType == 'log-to':
-            interpolatedRealWidth = self.timeline.mathSupport.interpolateLogTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-            interpolatedImagWidth = self.timeline.mathSupport.interpolateLogTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
-        elif transitionType == 'root-to':
-            interpolatedRealWidth = self.timeline.mathSupport.interpolateRootTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-            interpolatedImagWidth = self.timeline.mathSupport.interpolateRootTo(leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
-        elif transitionType == 'linear':
-            interpolatedRealWidth = self.timeline.mathSupport.interpolateLinear(leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-            interpolatedImagWidth = self.timeline.mathSupport.interpolateLinear(leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
-        elif transitionType == 'quadratic-to':
-            interpolatedRealWidth = self.timeline.mathSupport.interpolateQuadraticEaseOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-            interpolatedImagWidth = self.timeline.mathSupport.interpolateQuadraticEaseOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
-        elif transitionType == 'quadratic-from':
-            interpolatedRealWidth = self.timeline.mathSupport.interpolateQuadraticEaseIn(leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-            interpolatedImagWidth = self.timeline.mathSupport.interpolateQuadraticEaseIn(leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
-        else: # transitionType == 'quadratic-to-from':
-            interpolatedRealWidth = self.timeline.mathSupport.interpolateQuadraticEaseInOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-            interpolatedImagWidth = self.timeline.mathSupport.interpolateQuadraticEaseInOut(leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
+        interpolatedRealWidth = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
+        interpolatedImagWidth = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
+
+        #print("window interpolates from: (%s,%s) to: (%s,%s) as: (%s,%s)" % (leftKeyframe.realWidth, leftKeyframe.imagWidth, rightKeyframe.realWidth, rightKeyframe.imagWidth, interpolatedRealWidth, interpolatedImagWidth))
 
         return (interpolatedRealWidth, interpolatedImagWidth)
+
+    def interpolateComplexBetweenParameterKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
+        """
+        Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
+        """
+        #print("interpolating %s -> %s at frame %s" % (str(leftKeyframe), str(rightKeyframe), str(frameNumber)))
+
+        # Recognize when left and right are the same, and dont' calculate anything.
+        if leftKeyframe == rightKeyframe:
+            return leftKeyframe.value
+
+        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
+            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
+
+        # May want to consider 'close' rather than equal for the center equivalence check.
+        if leftKeyframe.value == rightKeyframe.value:
+            return leftKeyframe.value
+
+        # Enforce that left keyframe's transitionOut should match right keyframe's transitionIn
+        if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
+            raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
+        transitionType = leftKeyframe.transitionOut
+
+        # Python scopes seep like this, right? Just use the value later?
+        #
+        # And I kept all these separate, because I'm prety sure there will be more
+        # interpolation-specific parameters needed when all's said and done.
+        interpolatedReal = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.value.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.value.real, frameNumber)
+        interpolatedImag = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.value.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.value.imag, frameNumber)
+
+        return self.timeline.mathSupport.createComplex(interpolatedReal, interpolatedImag)
+
+    def interpolateFloatBetweenParameterKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
+        """
+        Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
+        """
+        #print("interpolating %s -> %s at frame %s" % (str(leftKeyframe), str(rightKeyframe), str(frameNumber)))
+
+        # Recognize when left and right are the same, and dont' calculate anything.
+        if leftKeyframe == rightKeyframe:
+            return leftKeyframe.value
+
+        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
+            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
+
+        # May want to consider 'close' rather than equal for the center equivalence check.
+        if leftKeyframe.value == rightKeyframe.value:
+            return leftKeyframe.value
+
+        # Enforce that left keyframe's transitionOut should match right keyframe's transitionIn
+        if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
+            raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
+        transitionType = leftKeyframe.transitionOut
+
+        # Python scopes seep like this, right? Just use the value later?
+        #
+        # And I kept all these separate, because I'm prety sure there will be more
+        # interpolation-specific parameters needed when all's said and done.
+        interpolatedReal = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedKeyframeNumber, leftKeyframe.value, rightKeyframe.lastObservedFrameNumber, rightKeyframe.value, frameNumber)
+
+        return interpolatedReal
+
 
     def __repr__(self):
         return """\
@@ -965,6 +881,11 @@ class DiveSpanTiltKeyframe(DiveSpanKeyframe):
         super().__init__(span, transitionIn, transitionOut)
         self.widthFactor = widthFactor
         self.heightFactor = heightFactor
+
+class DiveSpanParameterKeyframe(DiveSpanKeyframe):
+    def __init__(self, span, value, transitionIn='quadratic-to', transitionOut='quadratic-from'):
+        super().__init__(span, transitionIn, transitionOut)
+        self.value = value
 
 ####
 # Big bunch of 'still thinking about' comments here.  Probably should have kept them on my own branch.
@@ -1110,130 +1031,142 @@ class DiveSpanTiltKeyframe(DiveSpanKeyframe):
 # Default settings for the dive. All of these can be overridden from the
 # command line
 # --
-def set_demo1_params(mandl_ctx, view_ctx):
+def set_demo1_params(fractal_ctx, view_ctx):
     print("+ Running in demo mode - loading default mandelbrot dive params")
-    mandl_ctx.img_width  = 1024
-    mandl_ctx.img_height = 768 
+    fractal_ctx.img_width  = 1024
+    fractal_ctx.img_height = 768 
 
     cmplx_width_str = '5.0'
     cmplx_height_str = '3.5'
-    mandl_ctx.cmplx_width  = mandl_ctx.math_support.createFloat(cmplx_width_str)
-    mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(cmplx_height_str)
+    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
+    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
 
     # This is close t Misiurewicz point M32,2
-    # mandl_ctx.cmplx_center = mandl_ctx.ctxc(-.77568377, .13646737)
+    # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
     #center_real_str = '-1.769383179195515018213'
     #center_imag_str = '0.00423684791873677221'
-    #mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(center_real_str, center_imag_str)
+    #fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_real_str, center_imag_str)
     center_str = '-1.769383179195515018213+0.00423684791873677221j'
-    mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(center_str)
+    fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_str)
 
-    mandl_ctx.project_name = 'demo1'
+    fractal_ctx.project_name = 'demo1'
 
-    mandl_ctx.scaling_factor = .90
+    fractal_ctx.scaling_factor = .90
 
-    mandl_ctx.max_iter       = 255
+    fractal_ctx.max_iter       = 255
 
-    mandl_ctx.escape_rad     = 2.
-    #mandl_ctx.escape_rad     = 32768. 
+    fractal_ctx.escape_rad     = 2.
+    #fractal_ctx.escape_rad     = 32768. 
 
-    mandl_ctx.verbose = 3
-    mandl_ctx.burn_in = True
-    mandl_ctx.build_cache=True
+    fractal_ctx.verbose = 3
+    fractal_ctx.build_cache=True
 
     view_ctx.duration       = 2.0
+    #view_ctx.duration       = 1.0
     #view_ctx.duration       = 0.25
 
     # FPS still isn't set quite right, but we'll get it there eventually.
     view_ctx.fps            = 23.976 / 2.0 
     #view_ctx.fps            = 29.97 / 2.0 
 
-def set_julia_walk_demo1_params(mandl_ctx, view_ctx):
+def set_julia_walk_demo1_params(fractal_ctx, view_ctx):
     print("+ Running in demo mode - loading default julia walk params")
-    mandl_ctx.img_width  = 1024
-    mandl_ctx.img_height = 768 
+    fractal_ctx.img_width  = 1024
+    fractal_ctx.img_height = 768 
 
     cmplx_width_str = '3.2'
     cmplx_height_str = '2.5'
-    mandl_ctx.cmplx_width  = mandl_ctx.math_support.createFloat(cmplx_width_str)
-    mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(cmplx_height_str)
+    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
+    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
 
-    mandl_ctx.fractal = 'julia'
-    mandl_ctx.julia_list = [mandl_ctx.math_support.createComplex(0.355,0.355), mandl_ctx.math_support.createComplex(0.0,0.8), mandl_ctx.math_support.createComplex(0.3355,0.355)] 
 
-    mandl_ctx.cmplx_center = mandl_ctx.math_support.createComplex(0,0)
+    #fractal_ctx.algorithm_extra_params['julia_center'] = fractal_ctx.math_support.createComplex(-.8,.145)
+    fractal_ctx.algorithm_extra_params['julia']['julia_center'] = fractal_ctx.math_support.createComplex(-.8,.145)
 
-    mandl_ctx.project_name = 'julia_demo1'
+    #fractal_ctx.algorithm_extra_params['julia_center'] = fractal_ctx.math_support.createComplex(0,0)
+    fractal_ctx.julia_list = [fractal_ctx.math_support.createComplex(0.355,0.355), fractal_ctx.math_support.createComplex(0.0,0.8), fractal_ctx.math_support.createComplex(0.3355,0.355)] 
 
-    mandl_ctx.scaling_factor = 1.0
+    fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(0,0)
 
-    mandl_ctx.max_iter       = 255
+    fractal_ctx.project_name = 'julia_demo1'
 
-    mandl_ctx.escape_rad     = 2.
-    #mandl_ctx.escape_rad     = 32768. 
+    fractal_ctx.scaling_factor = 1.0
 
-    mandl_ctx.verbose = 3
-    mandl_ctx.burn_in = True
-    mandl_ctx.build_cache = True
+    fractal_ctx.max_iter       = 255
+
+    fractal_ctx.escape_rad     = 2.
+    #fractal_ctx.escape_rad     = 32768. 
+
+    fractal_ctx.verbose = 3
+    fractal_ctx.build_cache = True
 
     view_ctx.duration       = 2.0
+    #view_ctx.duration = 0.5
 
     # FPS still isn't set quite right, but we'll get it there eventually.
     view_ctx.fps            = 23.976 / 2.0 
     #view_ctx.fps            = 29.97 / 2.0 
 
-def set_preview_mode(mandl_ctx, view_ctx):
+def set_preview_mode(fractal_ctx, view_ctx):
     print("+ Running in preview mode ")
 
-    mandl_ctx.img_width  = 300
-    mandl_ctx.img_height = 200
+    fractal_ctx.img_width  = 300
+    fractal_ctx.img_height = 200
 
-    mandl_ctx.cmplx_width  = mandl_ctx.math_support.createFloat(3.0)
-    mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(2.5)
+    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(3.0)
+    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(2.5)
 
-    mandl_ctx.scaling_factor = .75
+    fractal_ctx.scaling_factor = .75
 
-    #mandl_ctx.escape_rad     = 4.
-    mandl_ctx.escape_rad     = 32768. 
+    #fractal_ctx.escape_rad     = 4.
+    fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 4
     view_ctx.fps            = 4
 
 
-def set_snapshot_mode(mandl_ctx, view_ctx, snapshot_filename='snapshot.gif'):
+def set_snapshot_mode(fractal_ctx, view_ctx, snapshot_filename='snapshot.gif'):
     print("+ Running in snapshot mode ")
 
-    mandl_ctx.snapshot = True
+    fractal_ctx.snapshot = True
     view_ctx.vfilename = snapshot_filename
 
-    mandl_ctx.img_width  = 3000
-    mandl_ctx.img_height = 2000 
+    fractal_ctx.img_width  = 3000
+    fractal_ctx.img_height = 2000 
 
-    mandl_ctx.max_iter   = 2000
+    fractal_ctx.max_iter   = 2000
 
-    mandl_ctx.cmplx_width  = mandl_ctx.math_support.createFloat(3.0)
-    mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(2.5)
+    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(3.0)
+    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(2.5)
 
-    mandl_ctx.scaling_factor = .99 # set so we can zoom in more accurately
+    fractal_ctx.scaling_factor = .99 # set so we can zoom in more accurately
 
-    #mandl_ctx.escape_rad     = 4.
-    mandl_ctx.escape_rad     = 32768. 
+    #fractal_ctx.escape_rad     = 4.
+    fractal_ctx.escape_rad     = 32768. 
 
     view_ctx.duration       = 0
     view_ctx.fps            = 0
 
 
-def parse_options(mandl_ctx, view_ctx):
+def parse_options(fractal_ctx, view_ctx):
     argv = sys.argv[1:]
     
-    opts, args = getopt.getopt(argv, "pd:m:s:f:z:w:h:c:",
+    opts, args = getopt.getopt(argv, "pd:m:s:f:w:h:c:a:",
                                ["preview",
+                                "algo=",
+                                "flint",
+                                "gmp",
                                 "demo",
                                 "demo-julia-walk",
                                 "duration=",
                                 "fps=",
                                 "clip-start-frame=",
                                 "clip-total-frames=",
+                                "project-name=",
+                                "shared-cache-path=",
+                                "build-cache",
+                                "invalidate-cache",
+                                "banner",
                                 "max-iter=",
                                 "img-w=",
                                 "img-h=",
@@ -1242,41 +1175,53 @@ def parse_options(mandl_ctx, view_ctx):
                                 "center=",
                                 "scaling-factor=",
                                 "snapshot=",
-                                "zoom=",
                                 "gif=",
                                 "mpeg=",
                                 "verbose=",
-                                "julia-walk=",
-                                "center=",
                                 "palette-test=",
                                 "color=",
-                                "burn",
-                                "flint",
-                                "gmp",
-                                "project-name=",
-                                "shared-cache-path=",
-                                "build-cache",
-                                "invalidate-cache",
-                                "banner",
-                                "smooth"])
+                                "julia-center=", # Julia
+                                "julia-list=", # Julia
+                                "burn", # Hopefully all algorithms?
+                                "escape_radius", # Mandelbrot, Julia
+                                "max_escape_iterations", # Mandelbrot, Julia
+                                "smooth", # Mandelbrot, Julia
+                                ])
 
-    # Math support as to be handled first, so other parameter 
-    # instantiations are properly typed
+
+    # First-pass parameters handled so others can be responsive
+    # - Math support, so instantiations are properly typed
+    # - Algorithm name, so additional parameters can be read
     for opt, arg in opts:
         if opt in ['--gmp']:
-            mandl_ctx.math_support = fm.DiveMathSupportGmp()
+            fractal_ctx.math_support = fm.DiveMathSupportGmp()
         elif opt in ['--flint']:
-            mandl_ctx.math_support = fm.DiveMathSupportFlint()
+            fractal_ctx.math_support = fm.DiveMathSupportFlint()
+        elif opt in ['-a', '--algo']:
+            if str(arg) in fractal_ctx.algorithm_map:
+                fractal_ctx.algorithm_name = str(arg)
+
+    if fractal_ctx.algorithm_name is None:
+        fractal_ctx.algorithm_name = 'mandelbrot'
+
+    # Kinda a crazy invocation.  Loads algorithm-specific parameters into
+    # a dictionary, based on that algorithm's static class parse function.
+    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name] = fractal_ctx.algorithm_map[fractal_ctx.algorithm_name].parse_options(opts)
+    # Theoretically possible we'll eventually want to run this for all
+    # possible algorithm types, but for now, just loading for the 
+    # 'active' algorithm.
 
     for opt,arg in opts:
         if opt in ['-p', '--preview']:
-            set_preview_mode(mandl_ctx, view_ctx)
+            set_preview_mode(fractal_ctx, view_ctx)
         elif opt in ['-s', '--snapshot']:
-            set_snapshot_mode(mandl_ctx, view_ctx, arg)
+            set_snapshot_mode(fractal_ctx, view_ctx, arg)
         elif opt in ['--demo']:
-            set_demo1_params(mandl_ctx, view_ctx)
+            set_demo1_params(fractal_ctx, view_ctx)
         elif opt in ['--demo-julia-walk']:
-            set_julia_walk_demo1_params(mandl_ctx, view_ctx)
+            set_julia_walk_demo1_params(fractal_ctx, view_ctx)
+
+    palette = fp.FractalPalette() # Will get stashed for the algorithm to use
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
@@ -1284,76 +1229,72 @@ def parse_options(mandl_ctx, view_ctx):
         elif opt in ['-f', '--fps']:
             view_ctx.fps  = float(arg)
         elif opt in ['--clip-start-frame']:
-            mandl_ctx.clip_start_frame = int(arg)
+            fractal_ctx.clip_start_frame = int(arg)
         elif opt in ['--clip-total-frames']:
-            mandl_ctx.clip_total_frames = int(arg)
+            fractal_ctx.clip_total_frames = int(arg)
         elif opt in ['-m', '--max-iter']:
-            mandl_ctx.max_iter = int(arg)
+            fractal_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:
-            mandl_ctx.img_width = int(arg)
+            fractal_ctx.img_width = int(arg)
         elif opt in ['-h', '--img-h']:
-            mandl_ctx.img_height = int(arg)
+            fractal_ctx.img_height = int(arg)
         elif opt in ['--cmplx-w']:
-            mandl_ctx.cmplx_width = mandl_ctx.math_support.createFloat(arg)
+            fractal_ctx.cmplx_width = fractal_ctx.math_support.createFloat(arg)
         elif opt in ['--cmplx-h']:
-            mandl_ctx.cmplx_height = mandl_ctx.math_support.createFloat(arg)
+            fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(arg)
         elif opt in ['-c', '--center']:
-            mandl_ctx.cmplx_center= mandl_ctx.math_support.createComplex(arg)
+            fractal_ctx.cmplx_center= fractal_ctx.math_support.createComplex(arg)
         elif opt in ['--scaling-factor']:
-            mandl_ctx.scaling_factor = float(arg)
+            fractal_ctx.scaling_factor = float(arg)
         elif opt in ['-z', '--zoom']:
-            mandl_ctx.set_zoom_level = int(arg)
-        elif opt in ['--smooth']:
-            mandl_ctx.smoothing = True 
+            fractal_ctx.set_zoom_level = int(arg)
+
+        # Worth noting, julia-list is used only for Timeline construction, 
+        # and isn't an intrisic thing to the Algo.
         elif opt in ['--julia-list']:
-            mandl_ctx.fractal = 'julia'
             raw_julia_list = eval(arg)  # expects a list of complex numbers
             if len(raw_julia_list) <= 1:
                 print("Error: List of complex numbers for Julia walk must be at least two points")
                 sys.exit(0)
             julia_list = []
             for currCenter in raw_julia_list:
-                julia_list.append(mandl_ctx.math_support.create_complex(currCenter))
-            mandl_ctx.julia_list = julia_list
+                julia_list.append(fractal_ctx.math_support.create_complex(currCenter))
+            fractal_ctx.julia_list = julia_list
         elif opt in ['--palette-test']:
-            m = fp.MandlPalette()
             if str(arg) == "gauss":
-                m.create_gauss_gradient((255,255,255),(0,0,0))
+                palette.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
-                m.create_exp_gradient((255,255,255),(0,0,0))
+                palette.create_exp_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp2":    
-                m.create_exp2_gradient((0,0,0),(128,128,128))
+                palette.create_exp2_gradient((0,0,0),(128,128,128))
             elif str(arg) == "list":    
-                m.create_gradient_from_list()
+                palette.create_gradient_from_list()
             else:
                 print("Error: --palette-test arg must be one of gauss|exp|list")
                 sys.exit(0)
-            m.display()
+            palette.display()
             sys.exit(0)
         elif opt in ['--color']:
-            m = fp.MandlPalette()
             if str(arg) == "gauss":
-                m.create_gauss_gradient((255,255,255),(0,0,0))
+                palette.create_gauss_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp":    
-                m.create_exp_gradient((255,255,255),(0,0,0))
+                palette.create_exp_gradient((255,255,255),(0,0,0))
             elif str(arg) == "exp2":    
-                m.create_exp2_gradient((0,0,0),(128,128,128))
+                palette.create_exp2_gradient((0,0,0),(128,128,128))
             elif str(arg) == "list":    
-                m.create_gradient_from_list()
+                palette.create_gradient_from_list()
             else:
                 print("Error: --palette-test arg must be one of gauss|exp|list")
                 sys.exit(0)
-            mandl_ctx.palette = m
-        elif opt in ['--burn']:
-            mandl_ctx.burn_in = True
+            fractal_ctx.palette = palette
         elif opt in ['--project-name']:
-            mandl_ctx.project_name = arg
+            fractal_ctx.project_name = arg
         elif opt in ['--shared-cache-path']:
-            mandl_ctx.shared_cache_path = arg 
+            fractal_ctx.shared_cache_path = arg 
         elif opt in ['--build-cache']:
-            mandl_ctx.build_cache = True
+            fractal_ctx.build_cache = True
         elif opt in ['--invalidate-cache']:
-            mandl_ctx.invalidate_cache = True
+            fractal_ctx.invalidate_cache = True
         elif opt in ['--banner']:
             view_ctx.banner = True
         elif opt in ['--verbose']:
@@ -1361,7 +1302,7 @@ def parse_options(mandl_ctx, view_ctx):
             if verbosity not in [0,1,2,3]:
                 print("Invalid verbosity level (%d) use range 0-3"%(verbosity))
                 sys.exit(0)
-            mandl_ctx.verbose = verbosity
+            fractal_ctx.verbose = verbosity
         elif opt in ['--gif']:
             if view_ctx.vfilename != None:
                 print("Error : Already specific media type %s"%(view_ctx.vfilename))
@@ -1373,15 +1314,18 @@ def parse_options(mandl_ctx, view_ctx):
                 sys.exit(0)
             view_ctx.vfilename = arg
 
+    # Stash the palette as an extra parameter
+    extra_params = fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]
+    extra_params['palette'] = palette
 
 if __name__ == "__main__":
 
-    print("++ mandlebort.py version %s" % (MANDL_VER))
+    print("++ fractal.py version %s" % (MANDL_VER))
 
-    mandl_ctx = MandlContext()
-    view_ctx  = MediaView(16, 16, mandl_ctx)
+    fractal_ctx = FractalContext()
+    view_ctx  = MediaView(16, 16, fractal_ctx)
 
-    parse_options(mandl_ctx, view_ctx)
+    parse_options(fractal_ctx, view_ctx)
    
     view_ctx.setup()
     view_ctx.run()

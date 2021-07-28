@@ -5,13 +5,15 @@
 #
 # --
 
+from collections import defaultdict
+
 import math
 import numpy as  np
 
 def gaussian(x, mu, sig):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
-class MandlPalette:
+class FractalPalette:
     """
     Color gradient
     """
@@ -19,7 +21,53 @@ class MandlPalette:
     # Color in RGB 
     def __init__(self):
         self.gradient_size = 1024
-        self.palette = []
+        self.palette   = []
+
+        self.hues      = None
+        self.histogram = None
+        self.per_frame_reset()
+
+
+#    # called for each pixel
+#    def raw_calc_from_algo(self, m):
+#        if m < self.context.max_iter:
+#            self.histogram[math.floor(m)] += 1
+
+    def calc_hues(self, value_range):        
+        #- 
+        # From histogram normalize to percent-of-total. This is
+        # effectively a probability distribution of escape values 
+        #
+        # Note that this is not effecitly a probability distribution for
+        # a given escape value. We can use this to calculate the Shannon 
+
+        total = sum(self.histogram.values())
+        h = 0
+
+        for i in range(value_range):
+            if total :
+                h += self.histogram[i] / total
+            self.hues.append(h)
+        self.hues.append(h)
+
+    def per_frame_reset(self):
+        self.hues      = [] 
+        self.histogram = defaultdict(int) 
+
+
+    def map_value_to_color(self, m, smoothing=False):
+
+        if len(self.palette) == 0: 
+            c = 255 - int(255 * self.hues[math.floor(m)]) 
+            return (c, c, c)
+            
+        if smoothing:
+            c1 = self.palette[1024 - int(1024 * self.hues[math.floor(m)])]
+            c2 = self.palette[1024 - int(1024 * self.hues[math.ceil(m)])]
+            return fp.FractalPalette.linear_interpolate(c1,c2,.5) 
+        else:
+            c = self.palette[1024 - int(1024 * self.hues[math.floor(m)])]
+            return c 
 
 
     def linear_interpolate(color1, color2, fraction):
@@ -42,7 +90,7 @@ class MandlPalette:
         x = 0.0
         while len(self.palette) <= self.gradient_size:
             g = gaussian(x,0,.10)
-            c = MandlPalette.linear_interpolate(c1, c2, g) 
+            c = FractalPalette.linear_interpolate(c1, c2, g) 
             self.palette.append(c)
             x = x + (1./(self.gradient_size+1))
 
@@ -59,7 +107,7 @@ class MandlPalette:
 
         while len(self.palette) <= self.gradient_size:
             fraction = math.pow(math.e,-15.*x)
-            c = MandlPalette.linear_interpolate(c1, c2, fraction)
+            c = FractalPalette.linear_interpolate(c1, c2, fraction)
             self.palette.append(c)
             x = x + (1. / 1025) 
 
@@ -78,7 +126,7 @@ class MandlPalette:
         # Do a very quick decent for the first 1/16 
         while len(self.palette) <= float(self.gradient_size)/32.:
             fraction = math.pow(math.e,-30.*x)
-            c = MandlPalette.linear_interpolate((255,255,255), c1, fraction)
+            c = FractalPalette.linear_interpolate((255,255,255), c1, fraction)
             self.palette.append(c)
             x = x + (1. / float(self.gradient_size)) 
 
@@ -87,7 +135,7 @@ class MandlPalette:
         # Do another quick decent back to first color for the next 1/16 
         while len(self.palette) <= 2.*(float(self.gradient_size) / 16.):
             fraction = math.pow(math.e,-15.*x)
-            c = MandlPalette.linear_interpolate((255,255,255), last_c, fraction)
+            c = FractalPalette.linear_interpolate((255,255,255), last_c, fraction)
             self.palette.append(c)
             x = x + (1. / float(self.gradient_size)) 
 
@@ -96,7 +144,7 @@ class MandlPalette:
         # Do another quick decent back to first color for the next 1/16 
         while len(self.palette) <= 2.*(float(self.gradient_size) / 16.):
             fraction = math.pow(math.e,-5.*x)
-            c = MandlPalette.linear_interpolate((255,255,255), last_c, fraction)
+            c = FractalPalette.linear_interpolate((255,255,255), last_c, fraction)
             self.palette.append(c)
             x = x + (1. / float(self.gradient_size)) 
 
@@ -105,7 +153,7 @@ class MandlPalette:
         x = 0.0
         while len(self.palette) <= self.gradient_size :
             fraction = math.pow(math.e,-2.*x)
-            c = MandlPalette.linear_interpolate((255,255,255),last_c, fraction)
+            c = FractalPalette.linear_interpolate((255,255,255),last_c, fraction)
             self.palette.append(c)
             x = x + (1. / float(self.gradient_size)) 
 
@@ -118,7 +166,7 @@ class MandlPalette:
 
         fraction = 1.
         while len(self.palette) <= self.gradient_size:
-            c = MandlPalette.linear_interpolate(c1, c2, fraction)
+            c = FractalPalette.linear_interpolate(c1, c2, fraction)
             self.palette.append(c)
             fraction = fraction / decay_const
             
@@ -137,10 +185,10 @@ class MandlPalette:
         #the first few colors are critical, so just fill by hand.
         self.palette.append((0,0,0))
         self.palette.append((0,0,0))
-        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.2))
-        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.4))
-        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.6))
-        self.palette.append(MandlPalette.linear_interpolate((0,0,0),(255,255,255),.8))
+        self.palette.append(FractalPalette.linear_interpolate((0,0,0),(255,255,255),.2))
+        self.palette.append(FractalPalette.linear_interpolate((0,0,0),(255,255,255),.4))
+        self.palette.append(FractalPalette.linear_interpolate((0,0,0),(255,255,255),.6))
+        self.palette.append(FractalPalette.linear_interpolate((0,0,0),(255,255,255),.8))
 
         # The magic number 6 here just denotes the previous colors we
         # filled by hand
@@ -149,7 +197,7 @@ class MandlPalette:
         for c in range(0, len(color_list) - 1): 
             for i in range(0, section_size+1): 
                 fraction = float(i)/float(section_size)
-                new_color = MandlPalette.linear_interpolate(color_list[c], color_list[c+1], fraction)
+                new_color = FractalPalette.linear_interpolate(color_list[c], color_list[c+1], fraction)
                 self.palette.append(new_color)
         while len(self.palette) < self.gradient_size:
             c = self.palette[-1]
@@ -183,4 +231,4 @@ class MandlPalette:
     def display(self):
         clip = mpy.VideoClip(self.make_frame, duration=64)
         clip.preview(fps=1) #fps 1 is really all that works
-## MandlPalette        
+## FractalPalette        
