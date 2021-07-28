@@ -8,5 +8,14 @@ Major:
 - Create logging framework with multiple levels
 - Testing framework!
 
+Ideas:
+- Create histogram (and display it using testing) and use that to
+  determine when to use distance method, and when to use iteration 
+  escape with smooth. The idea is for the white valleys, use iteration
+  escape with smoothing. Should be pretty apparent in the histogram ..
+
+  Perhaps do CDF and choose when second derivative is 0?
+ 
+
 DONE
 - Set detault params that make sense per algo
