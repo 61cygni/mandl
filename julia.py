@@ -116,8 +116,8 @@ class Julia(Algo):
         self.palette.raw_calc_from_algo(m)
         return m 
 
-    def map_value_to_color(self, t, val):
-        return self.palette.map_value_to_color(val)
+    def map_value_to_color(self, loc, vals):
+        return self.palette.map_value_to_color(vals[loc])
 
     def pre_image_hook(self):
         self.palette.calc_hues()

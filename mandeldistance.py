@@ -64,10 +64,10 @@ class MandelDistance(Algo):
         
         return d             
 
-    def map_value_to_color(self, t, val):
+    def map_value_to_color(self, loc, vals):
         zoo = .1 
         zoom_level = 1. / (self.context.cmplx_width)
-        d = clamp( pow(zoom_level*val/zoo,0.1), 0.0, 1.0 );
+        d = clamp( pow(zoom_level*loc[vals]/zoo,0.1), 0.0, 1.0 );
         cint = int(d*255)
 
         return (cint,cint,cint)

@@ -16,6 +16,15 @@ Ideas:
 
   Perhaps do CDF and choose when second derivative is 0?
  
+- Sample multiple points per pixel and plot the average. This should
+  smooth out some of the pixelation you see in the iteration escape
+  method. Maybe do 1/2 the distance between pixels?
+  -- This does't seem to work. It's just too chaotic underneath. 
+     should try with a bunch of random points just for kicks
+
+- Should implement keyframes to get better fidelity. Basically just
+  super high res frames you use scaling to zoom into, until you hit
+  another keyframe
 
 DONE
 - Set detault params that make sense per algo
