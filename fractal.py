@@ -1037,10 +1037,12 @@ def set_demo1_params(fractal_ctx, view_ctx):
     fractal_ctx.img_width  = 1024
     fractal_ctx.img_height = 768 
 
-    #cmplx_width_str = '5.0'
-    #cmplx_height_str = '3.5'
-    cmplx_width_str = '.001'
-    cmplx_height_str = '.00075'
+    cmplx_width_str = '5.0'
+    cmplx_height_str = '3.5'
+    #cmplx_width_str = '.001'
+    #cmplx_height_str = '.00075'
+    #cmplx_width_str = '2.0'
+    #cmplx_height_str = str(1024*2/768) 
     fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
     fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
 
@@ -1055,25 +1057,26 @@ def set_demo1_params(fractal_ctx, view_ctx):
 
     fractal_ctx.project_name = 'demo1'
 
-    fractal_ctx.scaling_factor = .90
+    fractal_ctx.scaling_factor = .70
 
-    #fractal_ctx.max_iter       = 255
-    fractal_ctx.max_iter       = 500
+    fractal_ctx.max_iter       = 255
+    #fractal_ctx.max_iter       = 500
 
-    #fractal_ctx.escape_rad     = 2.
-    fractal_ctx.escape_rad     = math.sqrt(1024.0)
+    fractal_ctx.escape_rad     = 2.
+    #fractal_ctx.escape_rad     = math.sqrt(1024.0)
     #fractal_ctx.escape_rad     = 32768. 
 
     fractal_ctx.verbose = 3
     fractal_ctx.build_cache=True
 
+    #view_ctx.duration       = 4.0
     view_ctx.duration       = 2.0
     #view_ctx.duration       = 1.0
     #view_ctx.duration       = 0.25
 
     # FPS still isn't set quite right, but we'll get it there eventually.
-    view_ctx.fps            = 23.976 / 4.0 
-    #view_ctx.fps            = 23.976 / 8.0 
+    #view_ctx.fps            = 23.976 / 4.0 
+    view_ctx.fps            = 23.976 / 8.0 
     #view_ctx.fps            = 23.976
     #view_ctx.fps            = 29.97 / 2.0 
 

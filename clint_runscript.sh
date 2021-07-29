@@ -2,8 +2,8 @@
 #python3 fractal.py --gif=native_demo.gif --color=exp2 --demo --burn
 #python3 fractal.py --gif=native_demo_fresh.gif --color=exp2 --demo --burn --invalidate-cache
 
-python3 fractal.py --gif=native_distance_demo.gif --algo=mandeldistance --demo --burn
-#python3 fractal.py --gif=native_distance_demo_fresh.gif --algo=mandeldistance --demo --burn --invalidate-cache
+#python3 fractal.py --gif=native_distance_demo.gif --algo=mandeldistance --demo --burn
+python3 fractal.py --gif=native_distance_demo_fresh.gif --algo=mandeldistance --demo --burn --invalidate-cache --smooth
 
 #python3 fractal.py --gif=flint_distance_demo.gif --algo=mandeldistance --flint --demo --burn
 #python3 fractal.py --gif=flint_distance_demo_fresh.gif --algo=mandeldistance --flint --demo --burn --invalidate-cache

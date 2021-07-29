@@ -298,23 +298,61 @@ class DiveMathSupport:
         didEscape = False
         z = complex(0,0)
         dz = complex(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
-
-        for i in range(0, maxIter):
-            if abs(z) > escapeRadius:
-                didEscape = True
-                break
-
+        absOfZ = 0.0 # Will re-use the final result for smoothing
+        n = 0
+        while absOfZ < escapeRadius and n < maxIter:
             # Z' -> 2·Z·Z' + 1
             dz = 2.0 * (z*dz) + 1
             # Z -> Z² + c           
             z = z*z + c
 
-        if didEscape == False:
-            return 0.0
+            absOfZ = abs(z)
+            n += 1
+
+        if n == maxIter:
+            return (n, 0.0)
         else:    
-            absZ = abs(z)
-            return absZ * math.log(absZ) / abs(dz)
-  
+            return (n, absOfZ * math.log(absOfZ) / abs(dz))
+
+#        lastIter = 0
+#        for i in range(0, maxIter):
+#            if abs(z) > escapeRadius:
+#               didEscape = True
+#               break
+#
+#            # Z' -> 2·Z·Z' + 1
+#            dz = 2.0 * (z*dz) + 1
+#            # Z -> Z² + c           
+#            z = z*z + c
+#
+#            lastIter += 1
+#
+#        if didEscape == False:
+#            return (lastIter, 0.0)
+#        else:    
+#            absZ = abs(z) # Save an extra multiply
+#            return (lastIter, absZ * math.log(absZ) / abs(dz))
+
+
+    def rescaleForRange(self, rawValue, endingIter, maxIter, scaleRange):
+#        #print("rescale %s for range %s" % (str(rawValue), str(scaleRange)))
+#        if endingIter == maxIter or rawValue <= 0.0:
+#            return 0.0
+#        else:
+#            zoomValue = float(math.pow((1/scaleRange) * rawValue / 0.1, 0.1))
+#            return self.clamp(zoomValue, 0.0, 1.0)
+
+        val = float(rawValue)
+        if val < 0.0:
+            val = 0.0
+        zoo = .1 
+        zoom_level = 1. / scaleRange 
+        d = self.clamp( pow(zoom_level * val/zoo,0.1), 0.0, 1.0 );
+        return float(d)
+
+    def clamp(self, num, min_value, max_value):
+       return max(min(num, max_value), min_value)
+
     def orig_mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
         c2 = c.real*c.real + c.imag*c.imag
         # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
