@@ -117,7 +117,7 @@ class FractalContext:
         #print("extra params from mesh: %s" % str(dive_mesh.extraParams))
         extra_params.update(dive_mesh.extraParams) # Allow per-frame info to overwrite algorithm info?
 
-        #print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
+        print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
         frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh, frame_number, self.project_name, self.shared_cache_path, self.build_cache, self.invalidate_cache, extra_params)
 
         frame_algorithm.beginning_hook()
@@ -215,6 +215,7 @@ class MediaView:
         if not self.vfilename:
             self.clip.preview(fps=1) #fps 1 is really all that works
         elif self.vfilename.endswith(".gif"):
+            print("fps: %s" % str(self.fps))
             self.clip.write_gif(self.vfilename, fps=self.fps)
         elif self.vfilename.endswith(".mp4"):
             self.clip.write_videofile(self.vfilename,
@@ -1036,8 +1037,10 @@ def set_demo1_params(fractal_ctx, view_ctx):
     fractal_ctx.img_width  = 1024
     fractal_ctx.img_height = 768 
 
-    cmplx_width_str = '5.0'
-    cmplx_height_str = '3.5'
+    #cmplx_width_str = '5.0'
+    #cmplx_height_str = '3.5'
+    cmplx_width_str = '.001'
+    cmplx_height_str = '.00075'
     fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
     fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
 
@@ -1046,16 +1049,19 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #center_real_str = '-1.769383179195515018213'
     #center_imag_str = '0.00423684791873677221'
     #fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_real_str, center_imag_str)
-    center_str = '-1.769383179195515018213+0.00423684791873677221j'
+    #center_str = '-1.769383179195515018213+0.00423684791873677221j'
+    center_str = '-0.05+0.6805j'
     fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_str)
 
     fractal_ctx.project_name = 'demo1'
 
     fractal_ctx.scaling_factor = .90
 
-    fractal_ctx.max_iter       = 255
+    #fractal_ctx.max_iter       = 255
+    fractal_ctx.max_iter       = 500
 
-    fractal_ctx.escape_rad     = 2.
+    #fractal_ctx.escape_rad     = 2.
+    fractal_ctx.escape_rad     = math.sqrt(1024.0)
     #fractal_ctx.escape_rad     = 32768. 
 
     fractal_ctx.verbose = 3
@@ -1066,7 +1072,9 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #view_ctx.duration       = 0.25
 
     # FPS still isn't set quite right, but we'll get it there eventually.
-    view_ctx.fps            = 23.976 / 2.0 
+    view_ctx.fps            = 23.976 / 4.0 
+    #view_ctx.fps            = 23.976 / 8.0 
+    #view_ctx.fps            = 23.976
     #view_ctx.fps            = 29.97 / 2.0 
 
 def set_julia_walk_demo1_params(fractal_ctx, view_ctx):
@@ -1100,11 +1108,12 @@ def set_julia_walk_demo1_params(fractal_ctx, view_ctx):
     fractal_ctx.verbose = 3
     fractal_ctx.build_cache = True
 
-    view_ctx.duration       = 2.0
+    view_ctx.duration       = 4.0
     #view_ctx.duration = 0.5
 
     # FPS still isn't set quite right, but we'll get it there eventually.
-    view_ctx.fps            = 23.976 / 2.0 
+    view_ctx.fps            = 23.976 / 8.0 
+    #view_ctx.fps            = 23.976 / 2.0 
     #view_ctx.fps            = 29.97 / 2.0 
 
 def set_preview_mode(fractal_ctx, view_ctx):

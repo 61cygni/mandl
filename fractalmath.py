@@ -285,6 +285,75 @@ class DiveMathSupport:
             #return endingIter + 1 - math.log(math.log2(abs(endingZ)))
             return endingIter + 1 - math.log(math.log2(abs(endingZ)))
 
+    def mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
+# TODO: profile to make sure the exclusion is worth the extra multiplications
+#        c2 = c.real*c.real + c.imag*c.imag
+#        # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
+#        if  256.0*c2*c2 - 96.0*c2 + 32.0*c.real - 3.0 < 0.0: 
+#            return 0.0
+#        # skip computation inside M2 - http://iquilezles.org/www/articles/mset_2bulb/mset2bulb.htm
+#        if 16.0*(c2+2.0*c.real+1.0) - 1.0 < 0.0: 
+#            return 0.0
+
+        didEscape = False
+        z = complex(0,0)
+        dz = complex(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
+
+        for i in range(0, maxIter):
+            if abs(z) > escapeRadius:
+                didEscape = True
+                break
+
+            # Z' -> 2·Z·Z' + 1
+            dz = 2.0 * (z*dz) + 1
+            # Z -> Z² + c           
+            z = z*z + c
+
+        if didEscape == False:
+            return 0.0
+        else:    
+            absZ = abs(z)
+            return absZ * math.log(absZ) / abs(dz)
+  
+    def orig_mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
+        c2 = c.real*c.real + c.imag*c.imag
+        # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
+        if  256.0*c2*c2 - 96.0*c2 + 32.0*c.real - 3.0 < 0.0: 
+            return 0.0
+        # skip computation inside M2 - http://iquilezles.org/www/articles/mset_2bulb/mset2bulb.htm
+        if 16.0*(c2+2.0*c.real+1.0) - 1.0 < 0.0: 
+            return 0.0
+
+        # iterate
+        di =  1.0;
+        z  = complex(0.0);
+        m2 = 0.0;
+        dz = complex(0.0);
+        for i in range(0,maxIter): 
+            if m2>escapeRadius : 
+              di=0.0 
+              break
+
+            # Z' -> 2·Z·Z' + 1
+            dz = 2.0*complex(z.real*dz.real-z.imag*dz.imag, z.real*dz.imag + z.imag*dz.real) + complex(1.0,0.0);
+                
+            # Z -> Z² + c           
+            z = complex( z.real*z.real - z.imag*z.imag, 2.0*z.real*z.imag ) + c;
+                
+            m2 = self.squared_modulus(z) 
+
+        # distance  
+        # d(c) = |Z|·log|Z|/|Z'|
+        d = 0.5*math.sqrt(self.squared_modulus(z)/self.squared_modulus(dz))*math.log(self.squared_modulus(z));
+        if  di>0.5:
+            d=0.0
+        
+        return d             
+
+    def squared_modulus(self, z):
+        return ((z.real*z.real)+(z.imag*z.imag))
+    
+
 class DiveMathSupportFlint(DiveMathSupport):
     """
     Overrides to instantiate flint-specific complex types
@@ -431,6 +500,27 @@ class DiveMathSupportFlint(DiveMathSupport):
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
             return float(endingIter + 1 - endingZ.abs_lower().const_log2().const_log10())
+
+    def mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
+        didEscape = False
+        z = self.flint.acb(0,0)
+        dz = self.flint.acb(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
+
+        for i in range(0, maxIter):
+            if float(z.abs_lower()) > escapeRadius:
+                didEscape = True
+                break
+
+            # Z' -> 2·Z·Z' + 1
+            dz = 2.0 * (z*dz) + 1
+            # Z -> Z² + c           
+            z = z*z + c
+
+        if didEscape == False:
+            return 0.0
+        else:    
+            absZ = z.abs_lower()
+            return float(absZ * absZ.const_log2() / dz.abs_lower())
 
 class DiveMathSupportGmp(DiveMathSupport):
     """

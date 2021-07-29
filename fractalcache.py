@@ -108,7 +108,7 @@ class Frame:
         #print("Writing: %s" % str(self.frame_info))
 
         # Probably a mistake to write a no-data cache file, so panic.
-        if self.frame_info.raw_values is None or self.frame_info.raw_histogram is None:
+        if self.frame_info.raw_values is None:
             raise ValueError("Aborting cache file write of missing data to \"%s\"" % filename)
 
         with open(filename, 'wb') as fd:
