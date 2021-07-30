@@ -543,22 +543,71 @@ class DiveMathSupportFlint(DiveMathSupport):
         didEscape = False
         z = self.flint.acb(0,0)
         dz = self.flint.acb(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
-
-        for i in range(0, maxIter):
-            if float(z.abs_lower()) > escapeRadius:
-                didEscape = True
-                break
-
+        absOfZ = 0.0 # Will re-use the final result for smoothing
+        n = 0
+        while float(absOfZ) < escapeRadius and n < maxIter:
             # Z' -> 2·Z·Z' + 1
             dz = 2.0 * (z*dz) + 1
             # Z -> Z² + c           
             z = z*z + c
 
-        if didEscape == False:
-            return 0.0
+            absOfZ = z.abs_lower()
+            n += 1
+
+        dzMag = dz.abs_lower()
+        if n == maxIter or dzMag == 0.0:
+            return (n, 0.0)
         else:    
-            absZ = z.abs_lower()
-            return float(absZ * absZ.const_log2() / dz.abs_lower())
+            return (n, float(absOfZ * absOfZ.const_log2() / dzMag))
+
+#        didEscape = False
+#        z = self.flint.acb(0,0)
+#        dz = self.flint.acb(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
+#
+#        for i in range(0, maxIter):
+#            if float(z.abs_lower()) > escapeRadius:
+#                didEscape = True
+#                break
+#
+#            # Z' -> 2·Z·Z' + 1
+#            dz = 2.0 * (z*dz) + 1
+#            # Z -> Z² + c           
+#            z = z*z + c
+#
+#        if didEscape == False:
+#            return 0.0
+#        else:    
+#            absZ = z.abs_lower()
+#            return float(absZ * absZ.const_log2() / dz.abs_lower())
+
+    def rescaleForRange(self, rawValue, endingIter, maxIter, scaleRange):
+#        #print("rescale %s for range %s" % (str(rawValue), str(scaleRange)))
+        val = float(rawValue)
+        if val < 0.0:
+            val = 0.0
+        zoo = .1 
+        zoom_level = 1. / scaleRange 
+        if math.isnan(zoom_level):
+            print("NaN wtf 1")
+            return 0.0
+        if zoom_level == 0:
+            print("zoom level zero")
+            return 0.0
+
+        pow_result = pow(zoom_level * val/zoo, 0.1)
+        if math.isnan(pow_result):
+            print("NaN wtf 2: %s * %s / %s" % (str(zoom_level), str(val), str(zoo)))
+            return 0.0
+        if pow_result == 0:
+            #print("pow zero")
+            return 0.0
+
+        #d = self.clamp( pow(zoom_level * val/zoo,0.1), 0.0, 1.0 );
+        d = self.clamp(pow_result, 0.0, 1.0 );
+        return float(d)
+
+    def clamp(self, num, min_value, max_value):
+       return max(min(num, max_value), min_value)
 
 class DiveMathSupportGmp(DiveMathSupport):
     """
