@@ -22,6 +22,14 @@ Ideas:
   -- This does't seem to work. It's just too chaotic underneath. 
      should try with a bunch of random points just for kicks
 
+- It would be cool to create little creatures out of parts of the julia
+  and mandelbrot set :) Not exactly sure how to animate them. But they'd
+  sure look cool!
+
+- would be nice to have an option to overlay a grid showing the complex
+  units (so you can see where you are in the complex plane)
+
+In process: 
 - Should implement keyframes to get better fidelity. Basically just
   super high res frames you use scaling to zoom into, until you hit
   another keyframe
