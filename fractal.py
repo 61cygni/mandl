@@ -75,6 +75,9 @@ class FractalContext:
 
         self.algo = None
 
+        self.keyframe = True
+        self.cur_keyframe = None 
+
         self.palette = None
         self.burn_in = False
 
@@ -177,6 +180,28 @@ class FractalContext:
         current view, and then animate next step"""
     
         values = None
+
+        if self.keyframe and self.cur_keyframe: 
+            crop_w = self.img_width  * self.scaling_factor
+            crop_h = self.img_height * self.scaling_factor
+            diff_w = self.img_width  - crop_w
+            diff_h = self.img_height - crop_h
+            crop_x = int(diff_w / 2.) 
+            crop_y = int(diff_h / 2.)
+            crop_img   = self.cur_keyframe.crop((crop_x,crop_y,crop_x + crop_w, crop_y+crop_h))
+            resize_img = crop_img.resize((self.img_width, self.img_height), Image.LANCZOS)
+
+            self.cmplx_width   *= self.scaling_factor
+            self.cmplx_height  *= self.scaling_factor
+            self.magnification *= self.scaling_factor
+            self.num_epochs += 1
+
+            if self.num_epochs % 7 == 0:
+                self.cur_keyframe = None
+            else:
+                self.cur_keyframe = resize_img
+
+            return np.array(resize_img)
         
         if self.cache: 
             values = self.cache.read_cache()
@@ -197,6 +222,9 @@ class FractalContext:
         
         self.algo.pre_image_hook()
         im = self.draw_image_PIL(t, values)
+
+        if self.keyframe and not self.cur_keyframe:
+            self.cur_keyframe = im
 
         # -- 
         # Do next step in animation
