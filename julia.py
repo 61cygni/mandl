@@ -1,4 +1,22 @@
+# --
+# File: julia.py 
+#
+# Implementation of iteration escape for displaying julia sets. This
+# file contains two basic modes
+#
+# Julia set : given a complex number C, it will calculate the julia set
+# for that number
+#
+# Julia set walk : given a list of complex numbers, it will animate the
+# set of julia sets between those complex numbers (inclusive)
+#
+# --
+
+
 import math
+
+import fractalutil as fu
+
 from algo import Algo
 
 import fractalpalette as fp
@@ -9,6 +27,7 @@ class Julia(Algo):
     
     def __init__(self, context):
         super(Julia, self).__init__(context) 
+        self.color = (.0,.6,1.0) 
         self.palette = fp.FractalPalette(context)
 
         self.julia_c    = None
@@ -59,16 +78,23 @@ class Julia(Algo):
     # c = complex(-0.7269, 0.1889)
 
     def _calc_pixel(self, z0):
+
+        B = self.context.escape_rad 
         z = z0
-        n = 0
-        while abs(z) <= 2 and n < self.context.max_iter:
+        l = 0.0
+
+        for i in range(0, self.context.max_iter):
             z = z*z + self.julia_c 
-            n += 1
+            if fu.squared_modulus(z) > B*B:
+                break
+            l += 1.0
 
-        if n == self.context.max_iter:
-            return self.context.max_iter
+        if l >= self.context.max_iter:
+            return 1.0 
 
-        return n + 1 - math.log(math.log2(abs(z)))
+        #return n + 1 - math.log(math.log2(abs(z)))
+        sl = l - math.log2(math.log2(fu.squared_modulus(z))) + 4.0;
+        return sl 
 
     # Use Bresenham's line drawing algo for a simple walk between two
     # complex points
@@ -115,8 +141,44 @@ class Julia(Algo):
         self.palette.raw_calc_from_algo(m)
         return m 
 
+    def _map_to_color(self, val):
+        magnification = 1. / self.context.cmplx_width
+        if magnification <= 100:
+            magnification = 100 
+        denom = math.log(math.log(magnification))
+
+        c1 = 0.
+        c2 = 0.
+        c3 = 0.
+
+        # (yellow blue 0,.6,1.0)
+        c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
+        c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
+        c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
+        c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
+        c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
+        c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
+        c1int = int(255.*((c1/4.) * 3.) / denom)
+        c2int = int(255.*((c2/4.) * 3.) / denom)
+        c3int = int(255.*((c3/4.) * 3.) / denom)
+        return (c1int,c2int,c3int)
+
     def map_value_to_color(self, loc, vals):
-        return self.palette.map_value_to_color(vals[loc])
+
+        val = vals[loc]
+
+        magnification = 1. / self.context.cmplx_width
+        if magnification <= 100:
+            magnification = 100 
+        denom = math.log(math.log(magnification))
+
+        if self.color:
+            c1 = self._map_to_color(val)
+            return c1 
+        else:        
+            #magnification = 1. / self.context.cmplx_width
+            cint = int((val * 3.) / denom)
+            return (cint,cint,cint)
 
     def pre_image_hook(self):
         self.palette.calc_hues()

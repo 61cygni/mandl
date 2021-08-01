@@ -22,7 +22,6 @@ class Smooth(Algo):
     def __init__(self, context):
         super(Smooth, self).__init__(context) 
         self.color = (.0,.6,1.0) 
-        self.neighbors = {}
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
@@ -41,7 +40,7 @@ class Smooth(Algo):
         self.context.escape_rad   = 256.
         self.context.max_iter     = 512
 
-    def _calc_pixel(self, c):
+    def calc_pixel(self, c):
 
         if fu.inside_M1_or_M2(c):
             return 0.0
@@ -68,31 +67,6 @@ class Smooth(Algo):
 
         return sl 
 
-    def calc_pixel(self, c):
-        self.neighbors[c] = []
-
-        step_w = self.context.cmplx_width  / float(self.context.img_width)
-        step_h = self.context.cmplx_height / float(self.context.img_height)
-
-        step_w = step_w / 4.0
-        step_h = step_h / 4.0 # half steps :)
-
-        c
-
-        val = self._calc_pixel(c)
-
-        # sample c and 4 points around it 
-        #new_c = complex(c.real - step_w, c.imag)
-        #val = val+ self._calc_pixel(new_c)
-        #new_c = complex(c.real + step_w, c.imag)
-        #val = val + self._calc_pixel(new_c)
-        #new_c = complex(c.real, c.imag - step_h)
-        #val = val + self._calc_pixel(new_c)
-        #new_c = complex(c.real, c.imag + step_h)
-        #val = val + self._calc_pixel(new_c)
-        #return val / 5.
-
-        return val
 
     def _map_to_color(self, val):
         magnification = 1. / self.context.cmplx_width
