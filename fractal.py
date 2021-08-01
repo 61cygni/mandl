@@ -3,6 +3,12 @@
 # 
 # Driver file for playing around with fractals 
 #
+# Examples:
+#  python3 fractal.py        # take a snapshot of the mandelbrot
+#  python3 fractal.py --dive # dive into the mandelbrot 
+#  python3 fractal.py --dive --keyframe=7 # 4k dive using keyframes 
+#  python3 fractal.py --algo=julia # take a snapshot of a julia set
+#
 #
 # --
 
@@ -45,22 +51,22 @@ class FractalContext:
         if not mp:
             self.mp = math
 
-        self.img_width  = 1024 # int : Wide of Image in pixels
-        self.img_height = 768  # int
+        self.img_width  = 0  # int : Width of Image in pixels
+        self.img_height = 0  # int
 
-        self.cmplx_width  = self.ctxf(5.0) # width of visualization in complex plane
-        self.cmplx_height = self.ctxf(3.5) 
+        self.cmplx_width  = self.ctxf(0) # width of visualization in complex plane
+        self.cmplx_height = self.ctxf(0) 
 
         self.magnification = 1.0 # track how far we've zoomed in 
 
         # point we're going to dive into 
-        self.cmplx_center = None # require algo to set this 
+        self.cmplx_center = None 
 
         # should be in the algos
-        self.max_iter      = 255    # int max iterations before bailing
-        self.escape_rad    = 32768. # float radius mod Z hits before it "escapes" 
+        self.max_iter      = 0      # int max iterations before bailing
+        self.escape_rad    = 0.     # float radius mod Z hits before it "escapes" 
 
-        self.scaling_factor = .95 #  float amount to zoom each epoch
+        self.scaling_factor = .90 #  float amount to zoom each epoch
         self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
         self.advance = 0   # Call advance for this many frames prior to rendering
@@ -73,9 +79,13 @@ class FractalContext:
         self.duration  = 8  # int  duration of clip in seconds
         self.fps       = 8 # int  number of frames per second
 
-        self.algo = None
+        self.algo      = None
+        self.algo_name = None
 
-        self.keyframe = True
+        self.dive    = False # Dive into the fractal
+        self.animate = False # run algorithm-specific animation
+
+        self.keyframe = 0
         self.cur_keyframe = None 
 
         self.palette = None
@@ -111,8 +121,8 @@ class FractalContext:
 
         values = {}
 
-        if snapshot_filename:
-            print("Generating image [", end="")
+        if self.keyframe or snapshot_filename:
+            print("Generating frame [", end="")
 
         # --
         # Iterate over every point in the complex plane (1:1 mapping per
@@ -136,11 +146,11 @@ class FractalContext:
 
                 values[(x,y)] = m 
 
-            if snapshot_filename:
+            if self.keyframe or snapshot_filename:
                 print(".",end="")
                 sys.stdout.flush()
 
-        if snapshot_filename:
+        if self.keyframe or snapshot_filename:
             print("]")
 
         return values
@@ -175,6 +185,28 @@ class FractalContext:
 
         return im    
 
+    def zoom_and_crop_keyframe(self):    
+        crop_w = self.img_width  * self.scaling_factor
+        crop_h = self.img_height * self.scaling_factor
+        diff_w = self.img_width  - crop_w
+        diff_h = self.img_height - crop_h
+        crop_x = int(diff_w / 2.) 
+        crop_y = int(diff_h / 2.)
+        crop_img   = self.cur_keyframe.crop((crop_x,crop_y,crop_x + crop_w, crop_y+crop_h))
+        resize_img = crop_img.resize((self.img_width, self.img_height), Image.LANCZOS)
+
+        self.cmplx_width   *= self.scaling_factor
+        self.cmplx_height  *= self.scaling_factor
+        self.magnification *= self.scaling_factor
+        self.num_epochs += 1
+
+        if self.num_epochs % self.keyframe == 0:
+            self.cur_keyframe = None
+        else:
+            self.cur_keyframe = resize_img
+
+        return np.array(resize_img)
+
     def next_epoch(self, t, snapshot_filename = None):
         """Called for each frame of the animation. Will calculate
         current view, and then animate next step"""
@@ -182,26 +214,7 @@ class FractalContext:
         values = None
 
         if self.keyframe and self.cur_keyframe: 
-            crop_w = self.img_width  * self.scaling_factor
-            crop_h = self.img_height * self.scaling_factor
-            diff_w = self.img_width  - crop_w
-            diff_h = self.img_height - crop_h
-            crop_x = int(diff_w / 2.) 
-            crop_y = int(diff_h / 2.)
-            crop_img   = self.cur_keyframe.crop((crop_x,crop_y,crop_x + crop_w, crop_y+crop_h))
-            resize_img = crop_img.resize((self.img_width, self.img_height), Image.LANCZOS)
-
-            self.cmplx_width   *= self.scaling_factor
-            self.cmplx_height  *= self.scaling_factor
-            self.magnification *= self.scaling_factor
-            self.num_epochs += 1
-
-            if self.num_epochs % 7 == 0:
-                self.cur_keyframe = None
-            else:
-                self.cur_keyframe = resize_img
-
-            return np.array(resize_img)
+            return self.zoom_and_crop_keyframe()
         
         if self.cache: 
             values = self.cache.read_cache()
@@ -209,17 +222,13 @@ class FractalContext:
                 self.algo.cache_loaded(values)
 
         if not values:    
-            # call primary calculation function
+            # primary calculation function
             values = self.calc_cur_frame(snapshot_filename)
 
             if self.cache:
                 self.cache.write_cache(values)
 
 
-        # -- 
-        # Create image for this frame
-        # --
-        
         self.algo.pre_image_hook()
         im = self.draw_image_PIL(t, values)
 
@@ -264,7 +273,7 @@ class MediaView:
         self.fps       = fps
         self.ctx       = ctx
         self.banner    = False 
-        self.vfilename = None 
+        self.vfilename = "pyfractal.gif"
 
         self.ctx.duration = duration
         self.ctx.fps      = fps
@@ -296,6 +305,11 @@ class MediaView:
     # --
 
     def setup(self):
+
+        if not self.ctx.dive and not self.ctx.animate:
+            set_snapshot_mode()
+        elif self.ctx.dive:    
+            set_dive_mode()
 
         if not self.ctx.palette:
             print("No palette specified, using default")
@@ -384,20 +398,66 @@ def set_snapshot_mode():
 
     fractal_ctx.snapshot  = True
 
-    fractal_ctx.img_width  = 3840 
-    fractal_ctx.img_height = 2160 
+    if not fractal_ctx.img_width:
+        fractal_ctx.img_width  = 3840 
+    if not fractal_ctx.img_height:     
+        fractal_ctx.img_height = 2160 
+    if not fractal_ctx.cmplx_width:
+        fractal_ctx.cmplx_width  = 4.
+    if not fractal_ctx.cmplx_height:
+        fractal_ctx.cmplx_height = 3.5 
 
-    fractal_ctx.max_iter   = 2000
+    if not fractal_ctx.max_iter:
+        fractal_ctx.max_iter   = 2048
+    if not fractal_ctx.escape_rad:    
+        fractal_ctx.escape_rad = 32768. 
 
-    fractal_ctx.cmplx_width  = 3.
-    fractal_ctx.cmplx_height = 2.5 
+    if not fractal_ctx.cmplx_center :
+        if fractal_ctx.algo_name == "julia":
+            print(" * Warning no center specified, setting to 0+0j")
+            fractal_ctx.cmplx_center = complex(0+0j)
+        else:    
+            print(" * Warning no center specified, setting to -1+0j")
+            fractal_ctx.cmplx_center = complex(-1+0j)
 
-    fractal_ctx.scaling_factor = 1. 
-    fractal_ctx.escape_rad     = 32768. 
+    if view_ctx.duration or view_ctx.fps:
+        print(" * Warning : duration and FPS not used in snapshot mode")
 
-    view_ctx.duration       = 0
-    view_ctx.fps            = 0
+def set_dive_mode():
+    global fractal_ctx
 
+    print("+ Running in dive mode ")
+    if fractal_ctx.keyframe:
+        print("+ Generating keyframe every %d frames "%(fractal_ctx.keyframe))
+
+    assert fractal_ctx.dive
+
+    if not fractal_ctx.img_width:
+        if not fractal_ctx.keyframe:
+            fractal_ctx.img_width  = 1024 
+        else:    
+            fractal_ctx.img_width  = 3840 
+    if not fractal_ctx.img_height:     
+        if not fractal_ctx.keyframe:
+            fractal_ctx.img_height = 768 
+        else:    
+            fractal_ctx.img_height = 2160 
+    if not fractal_ctx.cmplx_width:
+        fractal_ctx.cmplx_width  = 4.
+    if not fractal_ctx.cmplx_height:
+        fractal_ctx.cmplx_height = 3.5 
+
+    if not fractal_ctx.max_iter:
+        fractal_ctx.max_iter   = 512
+    if not fractal_ctx.escape_rad:    
+        fractal_ctx.escape_rad = 32768. 
+
+    if not fractal_ctx.cmplx_center :
+        print(" * Warning, no center specific, setting to -.749706+0.0314565j")
+        fractal_ctx.cmplx_center = complex(-.749696000010025+0.031456625003j)
+
+    if view_ctx.duration or view_ctx.fps:
+        print("Warning : duration and FPS not used in snapshot mode")
 
 def parse_options():
     global fractal_ctx
@@ -405,7 +465,7 @@ def parse_options():
     argv = sys.argv[1:]
 
     
-    opts, args = getopt.getopt(argv, "pd:m:s:f:w:h:c:a:",
+    opts, args = getopt.getopt(argv, "pd:m:f:w:h:c:a:",
                                ["preview",
                                 "algo=",
                                 "duration=",
@@ -416,7 +476,6 @@ def parse_options():
                                 "cmplx-h=",
                                 "center=",
                                 "scaling-factor=",
-                                "snapshot=",
                                 "advance=",
                                 "fps=",
                                 "gif=",
@@ -427,6 +486,8 @@ def parse_options():
                                 "center=",
                                 "palette-test=",
                                 "color=",
+                                "keyframe=",
+                                "dive",
                                 "burn",
                                 "banner",
                                 "cache",
@@ -435,26 +496,22 @@ def parse_options():
     for opt,arg in opts:
         if opt in ['-p', '--preview']:
             set_preview_mode()
-        if opt in ['-s', '--snapshot']:
-            view_ctx.vfilename = arg
-            set_snapshot_mode()
         if opt in ['-a', '--algo']:
             module = importlib.import_module(arg) 
             fractal_ctx.algo = module._instance(fractal_ctx)
 
     # default to mandelbrot if nothing else is specified
     if not fractal_ctx.algo:
-        module = importlib.import_module("mandelbrot") 
+        module = importlib.import_module("smooth") 
         fractal_ctx.algo = module._instance(fractal_ctx)
 
-    print("+ Using algo %s"%(str(fractal_ctx.algo)))
+    # hacky way to pull name from object. Assumes name looks 
+    # something like  <smooth.Smooth object at 0x108e92820>
+    print("+ Using algo %s"%(str(fractal_ctx.algo)[1:].split('.')[0]))
+
+    fractal_ctx.algo_name = str(fractal_ctx.algo)[1:].split('.')[0]
     
     fractal_ctx.algo.set_default_params()    
-
-    if type(fractal_ctx.cmplx_center) == type(None):
-        print("Error: algo must set center value")
-        sys.exit(0)
-        
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
@@ -483,10 +540,14 @@ def parse_options():
             fractal_ctx.fps = int(arg)
         elif opt in ['--smooth']:
             fractal_ctx.smoothing = True 
+        elif opt in ['--keyframe']:
+            fractal_ctx.keyframe = int(arg) 
         elif opt in ['--cache']:
             fractal_ctx.cache = fc.FractalCache(fractal_ctx) 
         elif opt in ['--center']:
             fractal_ctx.cmplx_center = complex(arg) 
+        elif opt in ['--dive']:
+            fractal_ctx.dive = True
         elif opt in ['--palette-test']:
             m = fp.FractalPalette(fractal_ctx)
             if str(arg) == "gauss":
@@ -513,14 +574,8 @@ def parse_options():
                 sys.exit(0)
             fractal_ctx.verbose = verbosity
         elif opt in ['--gif']:
-            if view_ctx.vfilename != None:
-                print("Error : Already specific media type %s"%(view_ctx.vfilename))
-                sys.exit(0)
             view_ctx.vfilename = arg
         elif opt in ['--mpeg']:
-            if view_ctx.vfilename != None:
-                print("Error : Already specific media type %s"%(view_ctx.vfilename))
-                sys.exit(0)
             view_ctx.vfilename = arg
 
         

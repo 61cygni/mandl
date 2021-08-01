@@ -34,5 +34,8 @@ In process:
   super high res frames you use scaling to zoom into, until you hit
   another keyframe
 
+- Should implement a "autonomous cave diver" which swims around looking
+  for cool things, and then takes a snapshot once it finds it :)
+
 DONE
 - Set detault params that make sense per algo

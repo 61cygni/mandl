@@ -5,7 +5,6 @@ import fractalpalette as fp
 
 default_julia_c = -.8+.145j
 
-
 class Julia(Algo):
     
     def __init__(self, context):
@@ -47,7 +46,7 @@ class Julia(Algo):
         self.context.cmplx_center = self.context.ctxc(0,0)
 
         if not self.julia_c:
-            print("Error: no julia c value specified, defaulting to %s"%(str(default_julia_c)))
+            print(" * Warning no julia c value specified, defaulting to %s"%(str(default_julia_c)))
             self.julia_c = default_julia_c
 
         # needed to uniquely identify cache frame

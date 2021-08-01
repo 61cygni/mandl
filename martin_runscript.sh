@@ -34,4 +34,6 @@
 # take a snapshot of a busy section with a modest zoom into the  mandelbrought set. This is a good expose 
 # of the ability for distance estimation to show detail 
 
-/usr/local/bin/python3 fractal.py --algo=mandeldistance --cmplx-w=.001 --cmplx-h=.00075 --snapshot="dsnap.gif" --img-w=2048 --img-h=1536 --max-iter=500
+#/usr/local/bin/python3 fractal.py --algo=mandeldistance --cmplx-w=.001 --cmplx-h=.00075 --snapshot="dsnap.gif" --img-w=2048 --img-h=1536 --max-iter=500
+
+/usr/local/bin/python3 fractal.py --algo=smooth --gif="smooth.gif" --img-w=3840 --img-h=2160 --max-iter=512 --duration=16 --fps=16  --scaling=.9  --smooth --color="(.1,.2,.3)" --cache --center="-0.235125+0.827215j"

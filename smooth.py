@@ -21,18 +21,23 @@ class Smooth(Algo):
     
     def __init__(self, context):
         super(Smooth, self).__init__(context) 
-        self.color = None
+        self.color = (.0,.6,1.0) 
         self.neighbors = {}
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
-            if opt in ['--color']:
-                self.color = (.1,.2,.3)   # dark
+            if opt in ['--nocolor']:
+                self.color = None 
+            if opt in ['--setcolor']: # XXX TODO
+                pass
+                #self.color = (.1,.2,.3)   # dark
                 #self.color = (.0,.6,1.0) # blue / yellow
-                #self.color = (.0,.6,1.0)
 
     def set_default_params(self):
-        self.context.cmplx_center = self.context.ctxc(-1.769383179195515018213,0.00423684791873677221)
+
+        # set a more interesting point if we're going to be doing a dive    
+        if self.context.dive: 
+            self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
         self.context.escape_rad   = 256.
         self.context.max_iter     = 512
 
