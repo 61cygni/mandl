@@ -35,7 +35,7 @@ class Smooth(Algo):
     def set_default_params(self):
 
         # set a more interesting point if we're going to be doing a dive    
-        if self.context.dive: 
+        if self.context.dive and not self.context.cmplx_center: 
             self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
         self.context.escape_rad   = 256.
         self.context.max_iter     = 512
