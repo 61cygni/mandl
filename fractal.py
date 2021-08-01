@@ -50,6 +50,7 @@ from algo import Algo # Abstract base class import, because we rely on it.
 from julia import Julia 
 from mandelbrot import Mandelbrot
 from mandeldistance import MandelDistance
+from smooth import Smooth
 
 MANDL_VER = "0.1"
 
@@ -96,7 +97,8 @@ class FractalContext:
 
         self.algorithm_map = {'julia' : Julia, 
                 'mandelbrot' : Mandelbrot,
-                'mandeldistance' : MandelDistance}
+                'mandeldistance' : MandelDistance,
+                'smooth': Smooth}
         self.algorithm_name = None
         self.algorithm_extra_params = {} # Keeps command-line params for later use
 
@@ -1191,7 +1193,8 @@ def parse_options(fractal_ctx, view_ctx):
                                 "mpeg=",
                                 "verbose=",
                                 "palette-test=",
-                                "color=",
+                                #"color=",
+                                "color",
                                 "julia-center=", # Julia
                                 "julia-list=", # Julia
                                 "burn", # Hopefully all algorithms?
@@ -1286,19 +1289,19 @@ def parse_options(fractal_ctx, view_ctx):
                 sys.exit(0)
             palette.display()
             sys.exit(0)
-        elif opt in ['--color']:
-            if str(arg) == "gauss":
-                palette.create_gauss_gradient((255,255,255),(0,0,0))
-            elif str(arg) == "exp":    
-                palette.create_exp_gradient((255,255,255),(0,0,0))
-            elif str(arg) == "exp2":    
-                palette.create_exp2_gradient((0,0,0),(128,128,128))
-            elif str(arg) == "list":    
-                palette.create_gradient_from_list()
-            else:
-                print("Error: --palette-test arg must be one of gauss|exp|list")
-                sys.exit(0)
-            fractal_ctx.palette = palette
+#        elif opt in ['--color']:
+#            if str(arg) == "gauss":
+#                palette.create_gauss_gradient((255,255,255),(0,0,0))
+#            elif str(arg) == "exp":    
+#                palette.create_exp_gradient((255,255,255),(0,0,0))
+#            elif str(arg) == "exp2":    
+#                palette.create_exp2_gradient((0,0,0),(128,128,128))
+#            elif str(arg) == "list":    
+#                palette.create_gradient_from_list()
+#            else:
+#                print("Error: --palette-test arg must be one of gauss|exp|list")
+#                sys.exit(0)
+#            fractal_ctx.palette = palette
         elif opt in ['--project-name']:
             fractal_ctx.project_name = arg
         elif opt in ['--shared-cache-path']:

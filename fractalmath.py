@@ -272,7 +272,7 @@ class DiveMathSupport:
 
         return (n, z)
 
-    def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
+    def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
         if endingIter == maxIter:
             return float(maxIter)
         else:
@@ -283,7 +283,25 @@ class DiveMathSupport:
             #    print("iter was %d" % endingIter)
             #print("z: \"%s\" max_iter: %d iter: %d" % (endingZ, maxIter, endingIter))
             #return endingIter + 1 - math.log(math.log2(abs(endingZ)))
-            return endingIter + 1 - math.log(math.log2(abs(endingZ)))
+            #return endingIter + 1 - math.log(math.log2(abs(endingZ)) / math.log(2.0))
+            return endingIter + 1 - self.twoLogsHelper(endingZ, escapeRadius) / math.log(2.0)
+
+    def justTwoLogs(self, value):
+        return math.log(math.log(value))
+
+    def twoLogsHelper(self, value, radius):
+        """
+        The UNoptimized smoothing calculation.
+
+        sn = n - ( ln( ln(abs(value))/ln(radius) ) / ln(2.0))
+
+        Of which, we're just running the upper part here, because the ln(2.0)
+        and subtraction don't need extra precision support.
+        
+        So, this calculates:
+        ln(ln(abs(value))/ln(radius))
+        """
+        return math.log(math.log(abs(value))/math.log(radius)) 
 
     def mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
 # TODO: profile to make sure the exclusion is worth the extra multiplications
@@ -526,10 +544,12 @@ class DiveMathSupportFlint(DiveMathSupport):
 
         return (n, z)
 
-    def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
+    def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
         """
         This flint-specific implementation only really does flint-y logs in the smoothing.
         The Decimal-specific implementation needed some extra steps, but I've ditched that one.
+        Heh, now that twoLogsHelper exists, it looks like this flint version
+        is identical to the native version.  Might not need it anymore.
         """
         if endingIter == maxIter:
             return float(maxIter)
@@ -537,7 +557,19 @@ class DiveMathSupportFlint(DiveMathSupport):
             # The following code smooths out the colors so there aren't bands
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
-            return float(endingIter + 1 - endingZ.abs_lower().const_log2().const_log10())
+            return float(endingIter + 1 - self.twoLogsHelper(endingZ, escapeRadius) / math.log(2.0))
+
+    def justTwoLogs(self, value):
+        return self.flint.arb(value).log().log()
+
+    def twoLogsHelper(self, value, radius):
+        # ln(ln(abs(value))/ln(radius))
+        # Note: flint needs 'value.log()' for ln, but 'value.const_log2() for log2?!
+
+        # Also, radius is expected to be in 'normal' ranges, so just using math.log
+        return (value.abs_lower().log() / math.log(radius)).log()
+        #return math.log(math.log(abs(value))/math.log(radius)) 
+
 
     def mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
         didEscape = False
@@ -687,10 +719,13 @@ class DiveMathSupportGmp(DiveMathSupport):
             n += 1
         return (n, z)
 
-    def smoothAfterCalculation(self, endingZ, endingIter, maxIter):
+    def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
         """
         This flint-specific implementation only really does flint-y logs in the smoothing.
         The Decimal-specific implementation needed some extra steps, but I've ditched that one.
+
+        NOTE: this wasn't updated with the new smoothing calcs like
+        the 'native' and 'flint' implementations were
         """
         if endingIter == maxIter:
             return float(maxIter)
@@ -698,7 +733,7 @@ class DiveMathSupportGmp(DiveMathSupport):
             # The following code smooths out the colors so there aren't bands
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
-            return float(endingIter + 1 - self.gmp.log10(self.gmp.log2(self.gmp.norm(endingZ))))
+            return float(endingIter + 1 - self.gmp.log10(self.gmp.log2(self.gmp.norm(endingZ))) / math.log(2.0))
             #return float(endingIter + 1 - self.gmp.log10(self.gmp.log10(self.gmp.sqrt(self.gmp.square(endingZ.real) + self.gmp.square(endingZ.imag)))))
 
 

@@ -45,7 +45,7 @@ class Mandelbrot(EscapeAlgo):
         (pixel_values_2d, last_zees) = mandelbrot_function(mesh_array, self.escape_radius, self.max_escape_iterations)
 
         smoothing_function = np.vectorize(math_support.smoothAfterCalculation)
-        pixel_values_2d_smoothed = smoothing_function(last_zees, pixel_values_2d, self.max_escape_iterations)
+        pixel_values_2d_smoothed = smoothing_function(last_zees, pixel_values_2d, self.max_escape_iterations, self.escape_radius)
 
         hist = defaultdict(int) 
         hist_smoothed = defaultdict(int) 

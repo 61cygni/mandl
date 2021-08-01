@@ -5,6 +5,10 @@
 #python3 fractal.py --gif=native_distance_demo.gif --algo=mandeldistance --demo --burn --smooth
 python3 fractal.py --gif=native_distance_demo_fresh.gif --algo=mandeldistance --demo --burn --smooth --invalidate-cache
 
+#python3 fractal.py --gif=smooth_demo.gif --algo=smooth --demo --burn --color 
+#python3 fractal.py --gif=smooth_demo_fresh.gif --algo=smooth --demo --burn --color --invalidate-cache
+#python3 fractal.py --gif=flint_smooth_demo_fresh.gif --algo=smooth --flint --demo --burn --color --invalidate-cache
+
 #python3 fractal.py --gif=flint_distance_demo.gif --algo=mandeldistance --flint --demo --burn --smooth
 #python3 fractal.py --gif=flint_distance_demo_fresh.gif --algo=mandeldistance --flint --demo --burn --smooth --invalidate-cache
 
