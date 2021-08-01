@@ -10,6 +10,10 @@
 # Julia set walk : given a list of complex numbers, it will animate the
 # set of julia sets between those complex numbers (inclusive)
 #
+# Some interesting numbers:
+#
+#  -.8+.156j
+#  -.8+.145j
 # --
 
 
@@ -21,13 +25,14 @@ from algo import Algo
 
 import fractalpalette as fp
 
-default_julia_c = -.8+.145j
+default_julia_c = -.8+.156j
 
 class Julia(Algo):
     
     def __init__(self, context):
         super(Julia, self).__init__(context) 
-        self.color = (.0,.6,1.0) 
+        #self.color = (.0,.6,1.0) 
+        self.color = (.1,.2,.3) 
         self.palette = fp.FractalPalette(context)
 
         self.julia_c    = None

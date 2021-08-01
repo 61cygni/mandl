@@ -24,7 +24,6 @@ class MandelDistance(Algo):
         super(MandelDistance, self).__init__(context) 
 
     def set_default_params(self):
-        # This is close t Misiurewicz point M32,2
         # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
         self.context.cmplx_center = self.context.ctxc("-0.05+.6805j")
 
@@ -67,7 +66,7 @@ class MandelDistance(Algo):
     def map_value_to_color(self, loc, vals):
         zoo = .1 
         zoom_level = 1. / (self.context.cmplx_width)
-        d = clamp( pow(zoom_level*loc[vals]/zoo,0.1), 0.0, 1.0 );
+        d = clamp( pow(zoom_level*vals[loc]/zoo,0.1), 0.0, 1.0 );
         cint = int(d*255)
 
         return (cint,cint,cint)

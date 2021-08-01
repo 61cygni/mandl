@@ -8,6 +8,7 @@
 #  python3 fractal.py --dive # dive into the mandelbrot 
 #  python3 fractal.py --dive --keyframe=7 # 4k dive using keyframes 
 #  python3 fractal.py --algo=julia # take a snapshot of a julia set
+#  python3 fractal.py --algo=julia --julia-walk="[0.355+0.355j, 0+0.8j,0.355+0.355j]"
 #
 #
 # --
@@ -306,14 +307,16 @@ class MediaView:
 
     def setup(self):
 
+        # if we're doing a julia set walk, we need to animate. So 
+        if fractal_ctx.algo_name == "julia":
+            if fractal_ctx.algo.julia_list != None:
+                self.ctx.dive = True
+                self.ctx.cmplx_center = complex(0.)
+
         if not self.ctx.dive and not self.ctx.animate:
             set_snapshot_mode()
         elif self.ctx.dive:    
             set_dive_mode()
-
-        if not self.ctx.palette:
-            print("No palette specified, using default")
-            self.ctx.palette = fp.FractalPalette(self.ctx)
 
         print(self)
         print(self.ctx)
@@ -452,12 +455,9 @@ def set_dive_mode():
     if not fractal_ctx.escape_rad:    
         fractal_ctx.escape_rad = 32768. 
 
-    if not fractal_ctx.cmplx_center :
-        print(" * Warning, no center specific, setting to -.749706+0.0314565j")
+    if fractal_ctx.cmplx_center == None:
+        print(" * Warning, no center specified, setting to -.749706+0.0314565j")
         fractal_ctx.cmplx_center = complex(-.749696000010025+0.031456625003j)
-
-    if view_ctx.duration or view_ctx.fps:
-        print("Warning : duration and FPS not used in snapshot mode")
 
 def parse_options():
     global fractal_ctx
