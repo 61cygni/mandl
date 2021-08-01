@@ -20,6 +20,8 @@
 
 import math
 
+import fractalutil as fu
+
 from algo import Algo
 import fractalpalette as fp
 
@@ -51,20 +53,20 @@ class Mandelbrot(Algo):
     def set_default_params(self):
         # This is close t Misiurewicz point M32,2
         # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
-        self.context.cmplx_center = self.context.ctxc(-1.769383179195515018213,0.00423684791873677221)
+
+        if self.context.dive and not self.context.cmplx_center:
+            self.context.cmplx_center = self.context.ctxc(-1.769383179195515018213,0.00423684791873677221)
 
     def _calc_pixel(self, c):
+
+        if fu.inside_M1_or_M2(c):
+            return self.context.max_iter 
 
         z = self.context.ctxc(0)
         n = 0
 
         squared_escape = self.context.escape_rad * self.context.escape_rad
 
-        # fabs(z) returns the modulus of a complex number, which is the
-        # distance to 0 (on a 2x2 cartesian plane)
-        #
-        # However, instead we just square both sides of the inequality to
-        # avoid the sqrt
         while ((z.real*z.real)+(z.imag*z.imag)) <= squared_escape  and n < self.context.max_iter:
             z = z*z + c
             n += 1
@@ -72,13 +74,7 @@ class Mandelbrot(Algo):
         if n >= self.context.max_iter:
             return self.context.max_iter
         
-        # Smoothing algorithm from 
-        # https://www.iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
-        if self.context.smoothing:
-            mu = n  - math.log2(math.log2(squared_modulus(z))) + 4.0
-            return mu 
-        else:    
-            return n 
+        return n 
 
     def calc_pixel(self, c):
         m = self._calc_pixel(c)

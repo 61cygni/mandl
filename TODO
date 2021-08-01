@@ -1,8 +1,9 @@
 
-- Have distance compute color relative to distance calculated from
-  cmpl-w/cmplx-h rather than amplification
-- By default create <algoname.gif> only display if the --preview flag is
-  showing
+- get preview working again
+- wire palette up to smooth.py
+- move smooth.py to default mandel implementation, and mandel to
+  mandelbasic or something
+- add deep dive option to dive to the limits of the algo precision
 
 Major:
 - Create logging framework with multiple levels

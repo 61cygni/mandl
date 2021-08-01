@@ -9,7 +9,7 @@
 #  python3 fractal.py --dive --keyframe=7 # 4k dive using keyframes 
 #  python3 fractal.py --algo=julia # take a snapshot of a julia set
 #  python3 fractal.py --algo=julia --julia-walk="[0.355+0.355j, 0+0.8j,0.355+0.355j]"
-#
+#  python3 fractal.py --algo=mandelbrot --color=list --img-w=600 --img-h=400 --dive
 #
 # --
 
@@ -72,7 +72,6 @@ class FractalContext:
 
         self.advance = 0   # Call advance for this many frames prior to rendering
 
-        self.smoothing      = False # bool turn on color smoothing
         self.snapshot       = False # Generate a single, high res shotb
 
         self.precision = 17 # int decimal precision for calculations
@@ -256,10 +255,10 @@ class FractalContext:
     def __repr__(self):
         return """\
 [FractalContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
-Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Smoothing:{sm:b} Epochs:{e:d} Max iter:{mx:d}]\
+Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=self.cmplx_width,ch=self.cmplx_height,
-        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter,sm=self.smoothing); 
+        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
 
 class MediaView: 
     """
@@ -511,7 +510,6 @@ def parse_options():
 
     fractal_ctx.algo_name = str(fractal_ctx.algo)[1:].split('.')[0]
     
-    fractal_ctx.algo.set_default_params()    
 
     for opt, arg in opts:
         if opt in ['-d', '--duration']:
@@ -538,8 +536,6 @@ def parse_options():
         elif opt in ['-f', '--fps']:
             view_ctx.fps  = int(arg)
             fractal_ctx.fps = int(arg)
-        elif opt in ['--smooth']:
-            fractal_ctx.smoothing = True 
         elif opt in ['--keyframe']:
             fractal_ctx.keyframe = int(arg) 
         elif opt in ['--cache']:
@@ -578,7 +574,7 @@ def parse_options():
         elif opt in ['--mpeg']:
             view_ctx.vfilename = arg
 
-        
+    fractal_ctx.algo.set_default_params()    
     fractal_ctx.algo.parse_options(opts, args)
 
 if __name__ == "__main__":
