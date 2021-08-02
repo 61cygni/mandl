@@ -10,8 +10,11 @@ import math
 import numpy as np
 
 #FLINT_HIGH_PRECISION_SIZE = 16 # 53 is how many bits are in float64
-FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
-#FLINT_HIGH_PRECISION_SIZE = 200 
+#FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
+#3.32 bits per digit, on average
+#2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
+
+FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
 
 GMP_HIGH_PRECISION_SIZE=53
 
@@ -420,7 +423,7 @@ class DiveMathSupportFlint(DiveMathSupport):
         super().__init__()
 
         self.flint = __import__('flint') # Only imports if you instantiate this DiveMathSupport subclass.
-        self.flint.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
+        self.flint.ctx.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
         self.precisionType = 'flint'
 
     def createComplex(self, *args):
