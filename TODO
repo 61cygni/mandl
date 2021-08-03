@@ -4,6 +4,8 @@
 - move smooth.py to default mandel implementation, and mandel to
   mandelbasic or something
 - add deep dive option to dive to the limits of the algo precision
+- automatically set the complex height based on the ratio of the image
+  height
 
 Major:
 - Create logging framework with multiple levels

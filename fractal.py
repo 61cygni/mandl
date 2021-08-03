@@ -19,7 +19,6 @@ import math
 import importlib
 
 import numpy as  np
-import mpmath as mp
 
 import moviepy.editor as mpy
 from PIL import Image, ImageDraw, ImageFont

@@ -21,7 +21,8 @@ class Smooth(Algo):
     
     def __init__(self, context):
         super(Smooth, self).__init__(context) 
-        self.color = (.0,.6,1.0) 
+        self.color = (.1,.2,.3) 
+        #self.color = (.0,.6,1.0) 
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
@@ -37,8 +38,10 @@ class Smooth(Algo):
         # set a more interesting point if we're going to be doing a dive    
         if self.context.dive and not self.context.cmplx_center: 
             self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
-        self.context.escape_rad   = 256.
-        self.context.max_iter     = 512
+        if not self.context.escape_rad:        
+            self.context.escape_rad   = 256.
+        if not self.context.max_iter:        
+            self.context.max_iter     = 512
 
     def calc_pixel(self, c):
 
