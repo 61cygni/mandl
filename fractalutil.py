@@ -47,3 +47,5 @@ def inside_M1_or_M2(c):
     if 16.0*(c2+2.0*c.real+1.0) - 1.0 < 0.0: 
         return True 
 
+    return False    
+

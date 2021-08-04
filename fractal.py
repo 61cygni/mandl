@@ -13,6 +13,7 @@
 #
 # --
 
+import time
 import getopt
 import sys
 import math
@@ -121,57 +122,54 @@ class FractalContext:
         values = {}
 
         if self.keyframe or snapshot_filename:
+            self.pre_time = time.perf_counter()  
             print("Generating frame [", end="")
+            sys.stdout.flush()
 
-        # --
-        # Iterate over every point in the complex plane (1:1 mapping per
-        # pixel) and run the fractal calculation. We save the output in
-        # a 2x2 array, and also create the histogram of values
-        # --
+        values = self.algo.calc_cur_frame(self.img_width, self. img_height, re_start, re_end, im_start, im_end)         
 
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                # map from pixels to complex coordinates
-                Re_x = self.ctxf(re_start) + (self.ctxf(x) / self.ctxf(self.img_width))  * \
-                       self.ctxf(re_end - re_start)
-                Im_y = self.ctxf(im_start) + (self.ctxf(y) / self.ctxf(self.img_height)) * \
-                       self.ctxf(im_end - im_start)
-
-                c = self.ctxc(Re_x, Im_y)
-
-
-                # Call primary calculation function here
-                m = self.algo.calc_pixel(c)
-
-                values[(x,y)] = m 
-
-            if self.keyframe or snapshot_filename:
-                print(".",end="")
-                sys.stdout.flush()
+            #if self.keyframe or snapshot_filename:
+            #    print(".",end="")
+            #    sys.stdout.flush()
 
         if self.keyframe or snapshot_filename:
-            print("]")
+            print("%f]"%(time.perf_counter() - self.pre_time))
+            sys.stdout.flush()
 
         return values
 
-    def draw_image_PIL(self, t, values):    
+    def draw_image_PIL(self, values, snapshot_filename):    
 
         im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
         draw = ImageDraw.Draw(im)
+
+        if self.keyframe or snapshot_filename:
+            self.pre_time = time.perf_counter()  
+            print("Calculating colors [", end="")
+            sys.stdout.flush()
         
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
 
-                color = self.algo.map_value_to_color((x,y),values)
+                color = self.algo.map_value_to_color(values[(x,y)])
 
                 # Plot the point
                 draw.point([x, y], color) 
 
+        if self.keyframe or snapshot_filename:
+            print("%f]"%(time.perf_counter() - self.pre_time))
+            sys.stdout.flush()
 
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
 
         if self.burn_in == True:
+            re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
+            re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
+
+            im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
+            im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
+
             burn_in_text = u"%d re range %f %f im range %f %f center %f + %f i" %\
                 (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag)
 
@@ -229,7 +227,7 @@ class FractalContext:
 
 
         self.algo.pre_image_hook()
-        im = self.draw_image_PIL(t, values)
+        im = self.draw_image_PIL(values, snapshot_filename)
 
         if self.keyframe and not self.cur_keyframe:
             self.cur_keyframe = im
@@ -385,7 +383,7 @@ def set_preview_mode():
     fractal_ctx.img_height = 200
 
     fractal_ctx.cmplx_width  = 3.
-    fractal_ctx.cmplx_height = 2.5 
+    fractal_ctx.cmplx_height = 3. * (fractal_ctx.img_height / fractal_ctx.img_width) 
 
     fractal_ctx.scaling_factor = .75
 
@@ -406,7 +404,7 @@ def set_snapshot_mode():
     if not fractal_ctx.cmplx_width:
         fractal_ctx.cmplx_width  = 4.
     if not fractal_ctx.cmplx_height:
-        fractal_ctx.cmplx_height = 3.5 
+        fractal_ctx.cmplx_height = 4. * (fractal_ctx.img_height / fractal_ctx.img_width) 
 
     if not fractal_ctx.max_iter:
         fractal_ctx.max_iter   = 2048
@@ -446,7 +444,7 @@ def set_dive_mode():
     if not fractal_ctx.cmplx_width:
         fractal_ctx.cmplx_width  = 4.
     if not fractal_ctx.cmplx_height:
-        fractal_ctx.cmplx_height = 3.5 
+        fractal_ctx.cmplx_height = 4. * (fractal_ctx.img_height / fractal_ctx.img_width) 
 
     if not fractal_ctx.max_iter:
         fractal_ctx.max_iter   = 512
@@ -470,6 +468,7 @@ def parse_options():
                                 "max-iter=",
                                 "img-w=",
                                 "img-h=",
+                                "res=",
                                 "cmplx-w=",
                                 "cmplx-h=",
                                 "center=",
@@ -520,6 +519,26 @@ def parse_options():
             fractal_ctx.img_width = int(arg)
         elif opt in ['-h', '--img-h']:
             fractal_ctx.img_height = int(arg)
+        elif opt in ['--res']:
+            if str(arg) == "1k":
+                fractal_ctx.img_width  = 1024
+                fractal_ctx.img_height = 768
+            elif str(arg) == "4k":
+                fractal_ctx.img_width  = 3840
+                fractal_ctx.img_height = 2160
+            elif str(arg) == "8k":
+                fractal_ctx.img_width  = 7680  
+                fractal_ctx.img_height = 4320
+            elif str(arg) == "12k":
+                fractal_ctx.img_width  = 12288 
+                fractal_ctx.img_height = 6480
+            elif str(arg) == "16k":
+                fractal_ctx.img_width  = 15360 
+                fractal_ctx.img_height = 8640
+            else:
+                print("Error: unknown resolution (1k, 4k, 8k, 12k, and 16k supported)")
+                sys.exit(0)
+
         elif opt in ['--cmplx-w']:
             fractal_ctx.cmplx_width = float(arg)
         elif opt in ['--cmplx-h']:
