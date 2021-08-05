@@ -24,6 +24,50 @@ import fractalutil as fu
 
 from algo import Algo
 
+cdef long double c_width  = 0.
+cdef long double c_height = 0.
+cdef long double c_real  = 0.
+cdef long double c_imag  = 0.
+cdef float scaling_factor = 0.
+cdef long double magnification = 0.
+cdef int num_epochs     = 0
+
+cdef class cmplx_view:
+    
+    cdef long double width 
+    cdef long double height 
+    cdef long double c_real 
+    cdef long double c_imag 
+    cdef float scaling_factor
+    cdef long double magnification
+    cdef int num_epochs
+
+    def __init__(self):
+        self.width  = 0.0
+        self.height = 0.0
+        self.c_real  = 0.0
+        self.c_imag  = 0.0
+        self.scaling_factor = 0.
+        self.magnification  = 0.
+        self.num_epochs     = 0
+
+    def setup(self, long double w, long double h, long double r, long double i,  float s, long double m, int n):
+        self.width  = w
+        self.height = h
+        self.c_real = r
+        self.c_imag = i
+        self.scaling_factor = s
+        self.magnification = m
+        self.num_epochs = n
+
+    def zoom_in(self, iterations = 1):    
+        while iterations:
+            self.width   *= self.scaling_factor
+            self.height  *= self.scaling_factor
+            self.magnification *= self.scaling_factor
+            self.num_epochs += 1
+            iterations -= 1
+    
 @cython.profile(False)
 cdef inline float csquared_modulus(long double real, long double imag):
     return ((real*real)+(imag*imag))
@@ -66,7 +110,11 @@ cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, 
 
 @cython.boundscheck(False)
 cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
+    global c_width
+
+    #cdef long double magnification = 1. / c_width
     cdef long double magnification = 1. / cmplx_width
+
     if magnification <= 100:
         magnification = 100 
     denom = log(log(magnification))
@@ -104,11 +152,16 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
     cdef long double Re_x
     cdef long double Im_y
 
+    cdef long double in_x
+    cdef long double in_y
+
     for x in range(0, img_width):
         for y in range(0, img_height):
+            in_x = x
+            in_y = y
             # ap from pixels to complex coordinates
-            Re_x = (re_start) + (x / img_width)  *  (re_end - re_start)
-            Im_y = (im_start) + (y / img_height) * (im_end - im_start)
+            Re_x = (re_start) + (in_x / img_width)  *  (re_end - re_start)
+            Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
             # Call primary calculation function here
             m = ccalc_pixel(Re_x, Im_y, max_iter, escape_rad)
@@ -121,8 +174,10 @@ class CSmooth(Algo):
     
     def __init__(self, context):
         super(CSmooth, self).__init__(context) 
+        self.cv   = cmplx_view()
         self.color = (.1,.2,.3) 
         #self.color = (.0,.6,1.0) 
+
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
@@ -143,7 +198,24 @@ class CSmooth(Algo):
         if not self.context.max_iter:        
             self.context.max_iter     = 512
 
-    def calc_cur_frame(self, img_width, img_height, re_start, re_end, im_start, im_end):
+
+    def calc_cur_frame(self, img_width, img_height, x, xx, xxx, xxxx):
+        global c_width
+        global c_height
+        global c_real
+        global c_imag
+        global scaling_factor
+        global magnification
+        global num_epochs
+
+        cdef long double re_start = c_real - (c_width / 2.)
+        cdef long double re_end   = c_real + (c_width / 2.)
+
+        cdef long double im_start = c_imag - (c_height / 2.)
+        cdef long double im_end   = c_imag + (c_height / 2.)
+
+        print("XXXX %s %s %s %r"%(str(re_start), str(re_end), str(im_start), str(im_end)))
+        
         return ccalc_cur_frame(img_width, img_height, re_start, re_end, im_start, im_end, self.context.max_iter, self.context.escape_rad)
 
     def calc_pixel(self, c):
@@ -171,6 +243,49 @@ class CSmooth(Algo):
 
     def animate_step(self, t):
         self.zoom_in()
+        #self.cv.zoom_in()
+
+    def setup(self):
+        global c_width
+        global c_height
+        global c_real
+        global c_imag
+        global scaling_factor
+        global magnification
+        global num_epochs
+
+        c_width  = self.context.cmplx_width
+        c_height = self.context.cmplx_height
+        c_real = self.context.cmplx_center.real
+        c_imag = self.context.cmplx_center.imag
+        scaling_factor = self.context.scaling_factor
+        magnification = self.context.magnification
+        num_epochs = self.context.num_epochs
+
+        #self.cv.setup(self.context.cmplx_width,
+        #              self.context.cmplx_height,
+        #              self.context.cmplx_center.real,
+        #              self.context.cmplx_center.imag,
+        #              self.context.scaling_factor,
+        #              self.context.magnification,
+        #              self.context.num_epochs)
+                      
+
+    def zoom_in(self, iterations=1):
+        global c_width
+        global c_height
+        global c_real
+        global c_imag
+        global scaling_factor
+        global magnification
+        global num_epochs
+
+        while iterations > 0:
+            c_width   *= scaling_factor
+            c_height  *= scaling_factor
+            magnification *= scaling_factor
+            num_epochs += 1
+            iterations -= 1
 
 def _instance(context):
     return CSmooth(context)
