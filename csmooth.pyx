@@ -15,6 +15,9 @@ import math
 
 import cython
 import numpy  as np
+cimport numpy  as np
+
+from decimal import *
 
 from libc.math cimport log2
 from libc.math cimport log
@@ -24,12 +27,14 @@ import fractalutil as fu
 
 from algo import Algo
 
-cdef long double c_width  = 0.
-cdef long double c_height = 0.
-cdef long double c_real  = 0.
-cdef long double c_imag  = 0.
+getcontext().prec = 64
+
+c_width  = Decimal(0.)
+c_height = Decimal(0.)
+c_real   = Decimal(0.)
+c_imag   = Decimal(0.)
 cdef float scaling_factor = 0.
-cdef long double magnification = 0.
+magnification = Decimal(0.)
 cdef int num_epochs     = 0
 
 cdef class cmplx_view:
@@ -69,8 +74,12 @@ cdef class cmplx_view:
             iterations -= 1
     
 @cython.profile(False)
-cdef inline float csquared_modulus(long double real, long double imag):
+def csquared_modulus(real, imag):
     return ((real*real)+(imag*imag))
+
+#@cython.profile(False)
+#cdef inline float csquared_modulus(long double real, long double imag):
+#    return ((real*real)+(imag*imag))
 
 
 @cython.profile(False)
@@ -87,17 +96,18 @@ cdef inline bint cinside_M1_or_M2(long double real, long double imag):
     return 0 
 
 @cython.profile(False)
-cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, int escape_rad):
+def ccalc_pixel(real, imag, int max_iter, int escape_rad):
 
-    if cinside_M1_or_M2(real, imag):
-        return 0 
+    #if cinside_M1_or_M2(real, imag):
+    #    return 0 
 
     cdef float l = 0.0
-    cdef long double z_real = 0., z_imag = 0.
+    z_real = Decimal(0.) 
+    z_imag = Decimal(0.)
 
     for i in range(0, max_iter):
         z_real, z_imag = ( z_real*z_real - z_imag*z_imag + real,
-                           2*z_real*z_imag + imag )
+                           Decimal(2)*z_real*z_imag + imag )
         if csquared_modulus(z_real, z_imag) >= escape_rad * escape_rad:
             break
         l += 1.0    
@@ -105,8 +115,30 @@ cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, 
     if (l >= max_iter):
         return 1.0
 
-    sl = l - log2(log2(csquared_modulus(z_real,z_imag))) + 4.0;
+    sl = l - math.log2(math.log2(csquared_modulus(z_real,z_imag))) + 4.0;
     return sl
+
+#@cython.profile(False)
+#cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, int escape_rad):
+#
+#    if cinside_M1_or_M2(real, imag):
+#        return 0 
+#
+#    cdef float l = 0.0
+#    cdef long double z_real = 0., z_imag = 0.
+#
+#    for i in range(0, max_iter):
+#        z_real, z_imag = ( z_real*z_real - z_imag*z_imag + real,
+#                           2*z_real*z_imag + imag )
+#        if csquared_modulus(z_real, z_imag) >= escape_rad * escape_rad:
+#            break
+#        l += 1.0    
+#            
+#    if (l >= max_iter):
+#        return 1.0
+#
+#    sl = l - log2(log2(csquared_modulus(z_real,z_imag))) + 4.0;
+#    return sl
 
 @cython.boundscheck(False)
 cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
@@ -145,20 +177,16 @@ cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
     return
 
 @cython.profile(False)
-def ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
-                    long double im_start, long double im_end, int max_iter, int escape_rad):
+def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
+                    im_start, im_end, int max_iter, int escape_rad):
     values = {}
 
-    cdef long double Re_x
-    cdef long double Im_y
 
-    cdef long double in_x
-    cdef long double in_y
 
     for x in range(0, img_width):
         for y in range(0, img_height):
-            in_x = x
-            in_y = y
+            in_x = Decimal(x)
+            in_y = Decimal(y)
             # ap from pixels to complex coordinates
             Re_x = (re_start) + (in_x / img_width)  *  (re_end - re_start)
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
@@ -208,11 +236,11 @@ class CSmooth(Algo):
         global magnification
         global num_epochs
 
-        cdef long double re_start = c_real - (c_width / 2.)
-        cdef long double re_end   = c_real + (c_width / 2.)
+        re_start = Decimal(c_real - (c_width / Decimal(2.)))
+        re_end   = Decimal(c_real + (c_width / Decimal(2.)))
 
-        cdef long double im_start = c_imag - (c_height / 2.)
-        cdef long double im_end   = c_imag + (c_height / 2.)
+        im_start = Decimal(c_imag - (c_height / Decimal(2.)))
+        im_end   = Decimal(c_imag + (c_height / Decimal(2.)))
 
         print("XXXX %s %s %s %r"%(str(re_start), str(re_end), str(im_start), str(im_end)))
         
@@ -254,10 +282,11 @@ class CSmooth(Algo):
         global magnification
         global num_epochs
 
-        c_width  = self.context.cmplx_width
-        c_height = self.context.cmplx_height
-        c_real = self.context.cmplx_center.real
-        c_imag = self.context.cmplx_center.imag
+        c_width  = Decimal(self.context.cmplx_width)
+        c_height = Decimal(self.context.cmplx_height)
+        c_real = Decimal('-1.76938317919551501821384728608547378290574726365475143746552821652788819126')
+        c_imag = Decimal('0.00423684791873677221492650717136799707668267091740375727945943565011234400')
+
         scaling_factor = self.context.scaling_factor
         magnification = self.context.magnification
         num_epochs = self.context.num_epochs
@@ -281,8 +310,8 @@ class CSmooth(Algo):
         global num_epochs
 
         while iterations > 0:
-            c_width   *= scaling_factor
-            c_height  *= scaling_factor
+            c_width   *= Decimal(scaling_factor)
+            c_height  *= Decimal(scaling_factor)
             magnification *= scaling_factor
             num_epochs += 1
             iterations -= 1
