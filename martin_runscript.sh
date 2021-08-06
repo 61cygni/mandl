@@ -37,3 +37,13 @@
 #/usr/local/bin/python3 fractal.py --algo=mandeldistance --cmplx-w=.001 --cmplx-h=.00075 --snapshot="dsnap.gif" --img-w=2048 --img-h=1536 --max-iter=500
 
 /usr/local/bin/python3 fractal.py --algo=smooth --gif="smooth.gif" --img-w=3840 --img-h=2160 --max-iter=512 --duration=16 --fps=16  --scaling=.9  --smooth --color="(.1,.2,.3)" --cache --center="-0.235125+0.827215j"
+
+
+# test hpcsmooth with a deep dive ...
+python3 fractal.py --algo=hpcsmooth --dive --duration=60  --img-w=160 --img-h=120 --max-iter=3000 --scaling=.80
+
+# test csmooth with a keyframe dive 
+python3 fractal.py --algo=csmooth --dive --keyframe=7
+
+# generate a 12k snapshot with csmooth
+python3 fractal.py --algo=csmooth --res=12k

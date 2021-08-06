@@ -220,8 +220,9 @@ class HPCSmooth(Algo):
             c_width   *= hpf(scaling_factor)
             c_height  *= hpf(scaling_factor)
             magnification *= scaling_factor
-            num_epochs += 1
             iterations -= 1
+
+            self.context.num_epochs += 1
 
 def _instance(context):
     return HPCSmooth(context)
