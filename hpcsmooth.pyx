@@ -1,5 +1,5 @@
 # --
-# File: csmooth.pyx
+# File: hpcsmooth.pyx
 #
 # Implementation of the smoothing algorithm for iteration escape method
 # of drawing mandelbrot as describe and implemented by Inigo Quilez
@@ -14,77 +14,39 @@
 import math
 
 import cython
+
 import numpy  as np
-cimport numpy  as np
 
 import decimal
 
-from libc.math cimport log2
-from libc.math cimport log
-from libc.math cimport cos
-
-import fractalutil as fu
-
 from algo import Algo
 
-decimal.getcontext().prec = 64
+# Use to change the precision sensitive values. For mandelbrot, these
+# are effectively the positions in the complex plane, and c and z 
 
 #hpf = float 
 #hpf = np.longdouble
+
 hpf = decimal.Decimal
+decimal.getcontext().prec = 64
+
+# The following are the precision sensitive variables.
+#
+# They probably should be in a class, but speedy integration with cython
+# seems to work better if they're outside 
 
 c_width  = hpf(0.)
 c_height = hpf(0.)
 c_real   = hpf(0.)
 c_imag   = hpf(0.)
-cdef float scaling_factor = 0.
 magnification = hpf(0.)
+
+cdef float scaling_factor = 0.
 cdef int num_epochs     = 0
 
-cdef class cmplx_view:
-    
-    cdef long double width 
-    cdef long double height 
-    cdef long double c_real 
-    cdef long double c_imag 
-    cdef float scaling_factor
-    cdef long double magnification
-    cdef int num_epochs
-
-    def __init__(self):
-        self.width  = 0.0
-        self.height = 0.0
-        self.c_real  = 0.0
-        self.c_imag  = 0.0
-        self.scaling_factor = 0.
-        self.magnification  = 0.
-        self.num_epochs     = 0
-
-    def setup(self, long double w, long double h, long double r, long double i,  float s, long double m, int n):
-        self.width  = w
-        self.height = h
-        self.c_real = r
-        self.c_imag = i
-        self.scaling_factor = s
-        self.magnification = m
-        self.num_epochs = n
-
-    def zoom_in(self, iterations = 1):    
-        while iterations:
-            self.width   *= self.scaling_factor
-            self.height  *= self.scaling_factor
-            self.magnification *= self.scaling_factor
-            self.num_epochs += 1
-            iterations -= 1
-    
 @cython.profile(False)
 def csquared_modulus(real, imag):
     return ((real*real)+(imag*imag))
-
-#@cython.profile(False)
-#cdef inline float csquared_modulus(long double real, long double imag):
-#    return ((real*real)+(imag*imag))
-
 
 @cython.profile(False)
 cdef inline bint cinside_M1_or_M2(long double real, long double imag):
@@ -122,38 +84,10 @@ def ccalc_pixel(real, imag, int max_iter, int escape_rad):
     sl = l - math.log2(math.log2(csquared_modulus(z_real,z_imag))) + 4.0;
     return sl
 
-#@cython.profile(False)
-#cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, int escape_rad):
-#
-#    if cinside_M1_or_M2(real, imag):
-#        return 0 
-#
-#    cdef float l = 0.0
-#    cdef long double z_real = 0., z_imag = 0.
-#
-#    for i in range(0, max_iter):
-#        z_real, z_imag = ( z_real*z_real - z_imag*z_imag + real,
-#                           2*z_real*z_imag + imag )
-#        if csquared_modulus(z_real, z_imag) >= escape_rad * escape_rad:
-#            break
-#        l += 1.0    
-#            
-#    if (l >= max_iter):
-#        return 1.0
-#
-#    sl = l - log2(log2(csquared_modulus(z_real,z_imag))) + 4.0;
-#    return sl
-
 @cython.boundscheck(False)
-cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
-    global c_width
+cdef cmap_to_color(val, int[:] colors):
 
-    #cdef long double magnification = 1. / c_width
-    cdef long double magnification = 1. / cmplx_width
-
-    if magnification <= 100:
-        magnification = 100 
-    denom = log(log(magnification))
+    denom = 1.5 # math.log(math.log(magnification))
 
     cdef float sc0 = 0.1
     cdef float sc1 = 0.2
@@ -163,13 +97,9 @@ cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
     cdef float c2 = 0.
     cdef float c3 = 0.
 
-    # (yellow blue 0,.6,1.0)
-    c1 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc0);
-    c1 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc0);
-    c2 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc1);
-    c2 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc1);
-    c3 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc2);
-    c3 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc2);
+    c1 +=  1 + math.cos( 3.0 + val*0.15 + sc0);
+    c2 +=  1 + math.cos( 3.0 + val*0.15 + sc1);
+    c3 +=  1 + math.cos( 3.0 + val*0.15 + sc2);
     cdef short c1int = int(255.*((c1/4.) * 3.) / denom)
     cdef short c2int = int(255.*((c2/4.) * 3.) / denom)
     cdef short c3int = int(255.*((c3/4.) * 3.) / denom)
@@ -184,8 +114,6 @@ cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
 def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
                     im_start, im_end, int max_iter, int escape_rad):
     values = {}
-
-
 
     for x in range(0, img_width):
         for y in range(0, img_height):
@@ -202,19 +130,16 @@ def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
 
     return values
 
-class CSmooth(Algo):
+class HPCSmooth(Algo):
     
     def __init__(self, context):
-        super(CSmooth, self).__init__(context) 
-        self.cv   = cmplx_view()
+        super(HPCSmooth, self).__init__(context) 
         self.color = (.1,.2,.3) 
         #self.color = (.0,.6,1.0) 
 
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
-            if opt in ['--nocolor']:
-                self.color = None 
             if opt in ['--setcolor']: # XXX TODO
                 pass
                 #self.color = (.1,.2,.3)   # dark
@@ -246,7 +171,7 @@ class CSmooth(Algo):
         im_start = hpf(c_imag - (c_height / hpf(2.)))
         im_end   = hpf(c_imag + (c_height / hpf(2.)))
 
-        print("XXXX %s %s %s %r"%(str(re_start), str(re_end), str(im_start), str(im_end)))
+        print(" Calculating frame at complex width %s"%(re_start - re_end))
         
         return ccalc_cur_frame(img_width, img_height, re_start, re_end, im_start, im_end, self.context.max_iter, self.context.escape_rad)
 
@@ -256,26 +181,16 @@ class CSmooth(Algo):
 
     def _map_to_color(self, val):
         c = np.zeros((3), dtype=np.int32)
-        cmap_to_color(val, self.context.cmplx_width, c)
+        cmap_to_color(val, c)
         return (c[0], c[1], c[2]) 
-
 
     def map_value_to_color(self, val):
 
-        if self.color:
-            c1 = self._map_to_color(val)
-            return c1 
-        else:        
-            magnification = 1. / self.context.cmplx_width
-            if magnification <= 100:
-                magnification = 100 
-            denom = math.log(math.log(magnification))
-            cint = int((val * 3.) / denom)
-            return (cint,cint,cint)
+        c1 = self._map_to_color(val)
+        return c1 
 
     def animate_step(self, t):
         self.zoom_in()
-        #self.cv.zoom_in()
 
     def setup(self):
         global c_width
@@ -295,20 +210,10 @@ class CSmooth(Algo):
         magnification = self.context.magnification
         num_epochs = self.context.num_epochs
 
-        #self.cv.setup(self.context.cmplx_width,
-        #              self.context.cmplx_height,
-        #              self.context.cmplx_center.real,
-        #              self.context.cmplx_center.imag,
-        #              self.context.scaling_factor,
-        #              self.context.magnification,
-        #              self.context.num_epochs)
-                      
 
     def zoom_in(self, iterations=1):
         global c_width
         global c_height
-        global c_real
-        global c_imag
         global scaling_factor
         global magnification
         global num_epochs
@@ -321,4 +226,4 @@ class CSmooth(Algo):
             iterations -= 1
 
 def _instance(context):
-    return CSmooth(context)
+    return HPCSmooth(context)

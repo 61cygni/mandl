@@ -1,4 +1,9 @@
 
+- allow specification of smooth color on command line
+- Recover the fast csmooth implementation
+
+------
+
 - get preview working again
 - wire palette up to smooth.py
 - move smooth.py to default mandel implementation, and mandel to
@@ -42,3 +47,5 @@ In process:
 
 DONE
 - Set detault params that make sense per algo
+- move the decimal implementation to an hpcsmooth
+- print out depth
