@@ -15,9 +15,6 @@ import math
 
 import cython
 import numpy  as np
-cimport numpy  as np
-
-import decimal
 
 from libc.math cimport log2
 from libc.math cimport log
@@ -27,63 +24,16 @@ import fractalutil as fu
 
 from algo import Algo
 
-decimal.getcontext().prec = 64
-
-#hpf = float 
-#hpf = np.longdouble
-hpf = decimal.Decimal
-
-c_width  = hpf(0.)
-c_height = hpf(0.)
-c_real   = hpf(0.)
-c_imag   = hpf(0.)
+cdef long double c_width  = 0.
+cdef long double c_height = 0.
+cdef long double c_real  = 0.
+cdef long double c_imag  = 0.
 cdef float scaling_factor = 0.
-magnification = hpf(0.)
-cdef int num_epochs     = 0
+cdef long double magnification = 0.
 
-cdef class cmplx_view:
-    
-    cdef long double width 
-    cdef long double height 
-    cdef long double c_real 
-    cdef long double c_imag 
-    cdef float scaling_factor
-    cdef long double magnification
-    cdef int num_epochs
-
-    def __init__(self):
-        self.width  = 0.0
-        self.height = 0.0
-        self.c_real  = 0.0
-        self.c_imag  = 0.0
-        self.scaling_factor = 0.
-        self.magnification  = 0.
-        self.num_epochs     = 0
-
-    def setup(self, long double w, long double h, long double r, long double i,  float s, long double m, int n):
-        self.width  = w
-        self.height = h
-        self.c_real = r
-        self.c_imag = i
-        self.scaling_factor = s
-        self.magnification = m
-        self.num_epochs = n
-
-    def zoom_in(self, iterations = 1):    
-        while iterations:
-            self.width   *= self.scaling_factor
-            self.height  *= self.scaling_factor
-            self.magnification *= self.scaling_factor
-            self.num_epochs += 1
-            iterations -= 1
-    
 @cython.profile(False)
-def csquared_modulus(real, imag):
+cdef inline float csquared_modulus(long double real, long double imag):
     return ((real*real)+(imag*imag))
-
-#@cython.profile(False)
-#cdef inline float csquared_modulus(long double real, long double imag):
-#    return ((real*real)+(imag*imag))
 
 
 @cython.profile(False)
@@ -100,18 +50,17 @@ cdef inline bint cinside_M1_or_M2(long double real, long double imag):
     return 0 
 
 @cython.profile(False)
-def ccalc_pixel(real, imag, int max_iter, int escape_rad):
+cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, int escape_rad):
 
-    #if cinside_M1_or_M2(real, imag):
-    #    return 0 
+    if cinside_M1_or_M2(real, imag):
+        return 0 
 
     cdef float l = 0.0
-    z_real = hpf(0.) 
-    z_imag = hpf(0.)
+    cdef long double z_real = 0., z_imag = 0.
 
     for i in range(0, max_iter):
         z_real, z_imag = ( z_real*z_real - z_imag*z_imag + real,
-                           hpf(2)*z_real*z_imag + imag )
+                           2*z_real*z_imag + imag )
         if csquared_modulus(z_real, z_imag) >= escape_rad * escape_rad:
             break
         l += 1.0    
@@ -119,41 +68,11 @@ def ccalc_pixel(real, imag, int max_iter, int escape_rad):
     if (l >= max_iter):
         return 1.0
 
-    sl = l - math.log2(math.log2(csquared_modulus(z_real,z_imag))) + 4.0;
+    sl = l - log2(log2(csquared_modulus(z_real,z_imag))) + 4.0;
     return sl
-
-#@cython.profile(False)
-#cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, int escape_rad):
-#
-#    if cinside_M1_or_M2(real, imag):
-#        return 0 
-#
-#    cdef float l = 0.0
-#    cdef long double z_real = 0., z_imag = 0.
-#
-#    for i in range(0, max_iter):
-#        z_real, z_imag = ( z_real*z_real - z_imag*z_imag + real,
-#                           2*z_real*z_imag + imag )
-#        if csquared_modulus(z_real, z_imag) >= escape_rad * escape_rad:
-#            break
-#        l += 1.0    
-#            
-#    if (l >= max_iter):
-#        return 1.0
-#
-#    sl = l - log2(log2(csquared_modulus(z_real,z_imag))) + 4.0;
-#    return sl
 
 @cython.boundscheck(False)
 cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
-    global c_width
-
-    #cdef long double magnification = 1. / c_width
-    cdef long double magnification = 1. / cmplx_width
-
-    if magnification <= 100:
-        magnification = 100 
-    denom = log(log(magnification))
 
     cdef float sc0 = 0.1
     cdef float sc1 = 0.2
@@ -163,16 +82,12 @@ cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
     cdef float c2 = 0.
     cdef float c3 = 0.
 
-    # (yellow blue 0,.6,1.0)
-    c1 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc0);
-    c1 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc0);
-    c2 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc1);
-    c2 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc1);
-    c3 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc2);
-    c3 +=  0.5 + 0.5*cos( 3.0 + val*0.15 + sc2);
-    cdef short c1int = int(255.*((c1/4.) * 3.) / denom)
-    cdef short c2int = int(255.*((c2/4.) * 3.) / denom)
-    cdef short c3int = int(255.*((c3/4.) * 3.) / denom)
+    c1 +=  1 + math.cos( 3.0 + val*0.15 + sc0);
+    c2 +=  1 + math.cos( 3.0 + val*0.15 + sc1);
+    c3 +=  1 + math.cos( 3.0 + val*0.15 + sc2);
+    cdef short c1int = int(255.*((c1/4.) * 3.) / 1.5)
+    cdef short c2int = int(255.*((c2/4.) * 3.) / 1.5)
+    cdef short c3int = int(255.*((c3/4.) * 3.) / 1.5)
 
     colors[0] = c1int
     colors[1] = c2int
@@ -181,16 +96,20 @@ cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
     return
 
 @cython.profile(False)
-def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
-                    im_start, im_end, int max_iter, int escape_rad):
+def ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
+                    long double im_start, long double im_end, int max_iter, int escape_rad):
     values = {}
 
+    cdef long double Re_x
+    cdef long double Im_y
 
+    cdef long double in_x
+    cdef long double in_y
 
     for x in range(0, img_width):
         for y in range(0, img_height):
-            in_x = hpf(x)
-            in_y = hpf(y)
+            in_x = x
+            in_y = y
             # ap from pixels to complex coordinates
             Re_x = (re_start) + (in_x / img_width)  *  (re_end - re_start)
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
@@ -206,15 +125,12 @@ class CSmooth(Algo):
     
     def __init__(self, context):
         super(CSmooth, self).__init__(context) 
-        self.cv   = cmplx_view()
         self.color = (.1,.2,.3) 
         #self.color = (.0,.6,1.0) 
 
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
-            if opt in ['--nocolor']:
-                self.color = None 
             if opt in ['--setcolor']: # XXX TODO
                 pass
                 #self.color = (.1,.2,.3)   # dark
@@ -240,14 +156,12 @@ class CSmooth(Algo):
         global magnification
         global num_epochs
 
-        re_start = hpf(c_real - (c_width / hpf(2.)))
-        re_end   = hpf(c_real + (c_width / hpf(2.)))
+        cdef long double re_start = c_real - (c_width / 2.)
+        cdef long double re_end   = c_real + (c_width / 2.)
 
-        im_start = hpf(c_imag - (c_height / hpf(2.)))
-        im_end   = hpf(c_imag + (c_height / hpf(2.)))
+        cdef long double im_start = c_imag - (c_height / 2.)
+        cdef long double im_end   = c_imag + (c_height / 2.)
 
-        print("XXXX %s %s %s %r"%(str(re_start), str(re_end), str(im_start), str(im_end)))
-        
         return ccalc_cur_frame(img_width, img_height, re_start, re_end, im_start, im_end, self.context.max_iter, self.context.escape_rad)
 
     def calc_pixel(self, c):
@@ -275,7 +189,6 @@ class CSmooth(Algo):
 
     def animate_step(self, t):
         self.zoom_in()
-        #self.cv.zoom_in()
 
     def setup(self):
         global c_width
@@ -286,23 +199,13 @@ class CSmooth(Algo):
         global magnification
         global num_epochs
 
-        c_width  = hpf(self.context.cmplx_width)
-        c_height = hpf(self.context.cmplx_height)
-        c_real = hpf('-1.76938317919551501821384728608547378290574726365475143746552821652788819126')
-        c_imag = hpf('0.00423684791873677221492650717136799707668267091740375727945943565011234400')
-
+        c_width  = self.context.cmplx_width
+        c_height = self.context.cmplx_height
+        c_real = self.context.cmplx_center.real
+        c_imag = self.context.cmplx_center.imag
         scaling_factor = self.context.scaling_factor
         magnification = self.context.magnification
         num_epochs = self.context.num_epochs
-
-        #self.cv.setup(self.context.cmplx_width,
-        #              self.context.cmplx_height,
-        #              self.context.cmplx_center.real,
-        #              self.context.cmplx_center.imag,
-        #              self.context.scaling_factor,
-        #              self.context.magnification,
-        #              self.context.num_epochs)
-                      
 
     def zoom_in(self, iterations=1):
         global c_width
@@ -314,11 +217,12 @@ class CSmooth(Algo):
         global num_epochs
 
         while iterations > 0:
-            c_width   *= hpf(scaling_factor)
-            c_height  *= hpf(scaling_factor)
+            c_width   *= scaling_factor
+            c_height  *= scaling_factor
             magnification *= scaling_factor
-            num_epochs += 1
             iterations -= 1
+
+            self.context.num_epochs += 1
 
 def _instance(context):
     return CSmooth(context)

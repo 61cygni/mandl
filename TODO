@@ -1,6 +1,5 @@
 
 - allow specification of smooth color on command line
-- Recover the fast csmooth implementation
 
 ------
 
@@ -49,3 +48,4 @@ DONE
 - Set detault params that make sense per algo
 - move the decimal implementation to an hpcsmooth
 - print out depth
+- Recover the fast csmooth implementation

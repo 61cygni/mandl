@@ -87,8 +87,6 @@ def ccalc_pixel(real, imag, int max_iter, int escape_rad):
 @cython.boundscheck(False)
 cdef cmap_to_color(val, int[:] colors):
 
-    denom = 1.5 # math.log(math.log(magnification))
-
     cdef float sc0 = 0.1
     cdef float sc1 = 0.2
     cdef float sc2 = 0.3
@@ -100,9 +98,9 @@ cdef cmap_to_color(val, int[:] colors):
     c1 +=  1 + math.cos( 3.0 + val*0.15 + sc0);
     c2 +=  1 + math.cos( 3.0 + val*0.15 + sc1);
     c3 +=  1 + math.cos( 3.0 + val*0.15 + sc2);
-    cdef short c1int = int(255.*((c1/4.) * 3.) / denom)
-    cdef short c2int = int(255.*((c2/4.) * 3.) / denom)
-    cdef short c3int = int(255.*((c3/4.) * 3.) / denom)
+    cdef short c1int = int(255.*((c1/4.) * 3.) / 1.5)
+    cdef short c2int = int(255.*((c2/4.) * 3.) / 1.5)
+    cdef short c3int = int(255.*((c3/4.) * 3.) / 1.5)
 
     colors[0] = c1int
     colors[1] = c2int

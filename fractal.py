@@ -192,10 +192,7 @@ class FractalContext:
         crop_img   = self.cur_keyframe.crop((crop_x,crop_y,crop_x + crop_w, crop_y+crop_h))
         resize_img = crop_img.resize((self.img_width, self.img_height), Image.LANCZOS)
 
-        self.cmplx_width   *= self.scaling_factor
-        self.cmplx_height  *= self.scaling_factor
-        self.magnification *= self.scaling_factor
-        self.num_epochs += 1
+        self.algo.zoom_in() # will update num_epochs
 
         if self.num_epochs % self.keyframe == 0:
             self.cur_keyframe = None
