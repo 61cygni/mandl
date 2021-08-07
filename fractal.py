@@ -123,8 +123,6 @@ class FractalContext:
 
         if self.keyframe or snapshot_filename:
             self.pre_time = time.perf_counter()  
-            print("Generating frame [", end="")
-            sys.stdout.flush()
 
         values = self.algo.calc_cur_frame(self.img_width, self. img_height, re_start, re_end, im_start, im_end)         
 
@@ -133,7 +131,7 @@ class FractalContext:
             #    sys.stdout.flush()
 
         if self.keyframe or snapshot_filename:
-            print("%f]"%(time.perf_counter() - self.pre_time))
+            print("+ frame generation time : %f"%(time.perf_counter() - self.pre_time))
             sys.stdout.flush()
 
         return values
@@ -520,6 +518,9 @@ def parse_options():
             if str(arg) == "1k":
                 fractal_ctx.img_width  = 1024
                 fractal_ctx.img_height = 768
+            elif str(arg) == "2k":
+                fractal_ctx.img_width  = 2048
+                fractal_ctx.img_height = 1536 
             elif str(arg) == "4k":
                 fractal_ctx.img_width  = 3840
                 fractal_ctx.img_height = 2160

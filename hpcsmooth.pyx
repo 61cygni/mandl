@@ -15,6 +15,10 @@ import math
 
 import cython
 
+from libc.stdio cimport printf
+from libc.stdio cimport fflush
+from libc.stdio cimport stdout
+
 import numpy  as np
 
 import decimal
@@ -113,18 +117,24 @@ def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
                     im_start, im_end, int max_iter, int escape_rad):
     values = {}
 
+    printf("[")
+    fflush(stdout)
     for x in range(0, img_width):
         for y in range(0, img_height):
             in_x = hpf(x)
             in_y = hpf(y)
             # ap from pixels to complex coordinates
-            Re_x = (re_start) + (in_x / img_width)  *  (re_end - re_start)
+            Re_x = (re_start) + (in_x / img_width)  * (re_end - re_start)
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
             # Call primary calculation function here
             m = ccalc_pixel(Re_x, Im_y, max_iter, escape_rad)
 
             values[(x,y)] = m 
+        printf(".")
+        fflush(stdout)
+    printf("]")
+    fflush(stdout)
 
     return values
 
@@ -169,7 +179,7 @@ class HPCSmooth(Algo):
         im_start = hpf(c_imag - (c_height / hpf(2.)))
         im_end   = hpf(c_imag + (c_height / hpf(2.)))
 
-        print(" Calculating frame at complex width %s"%(re_start - re_end))
+        print(" + calculating frame at complex width %s"%(re_start - re_end))
         
         return ccalc_cur_frame(img_width, img_height, re_start, re_end, im_start, im_end, self.context.max_iter, self.context.escape_rad)
 

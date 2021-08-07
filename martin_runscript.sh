@@ -49,4 +49,4 @@ python3 fractal.py --algo=csmooth --dive --keyframe=7
 python3 fractal.py --algo=csmooth --res=12k
 
 # minibrot at e-64
-python3 fractal.py --algo=hpcsmooth --dive --duration=60  --img-w=1024 --img-h=768 --max-iter=3000 --scaling=.80 --keyframe=5 --advance=630
+python3 fractal.py --algo=hpcsmooth --dive --duration=60  --img-w=400 --img-h=300 --max-iter=15000 --scaling=.80 --keyframe=3 --advance=700
