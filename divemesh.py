@@ -126,9 +126,13 @@ class MeshGeneratorUniform(MeshGenerator):
         if self.varyingAxis == 'width':
             #calculate start/end...  Probably need to be subtype aware for this...
             discretizedValues = self.mathSupport.createLinspaceAroundValuesCenter(self.valuesCenter, self.baseWidth, diveMesh.meshWidth)
+            #print("W baseWidth: %s meshWidth: %s" % (str(self.baseWidth), str(diveMesh.meshWidth)))
+            #print("W: %s" % discretizedValues)
             mesh[0:] = discretizedValues # Assign the one-row discretization to every row of the mesh
         else: # self.varyingAxis == 'height'
             discretizedValues = self.mathSupport.createLinspaceAroundValuesCenter(self.valuesCenter, self.baseWidth, diveMesh.meshHeight)
+            #print("H baseWidth: %s meshHeight: %s" % (str(self.baseWidth), str(diveMesh.meshHeight)))
+            #print("H: %s" % discretizedValues)
             # Assign the one-row discretization (as a column) to every column of the mesh
             mesh[0:] = discretizedValues[:,np.newaxis] 
 

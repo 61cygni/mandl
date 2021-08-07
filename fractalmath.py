@@ -14,7 +14,16 @@ import numpy as np
 #3.32 bits per digit, on average
 #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
 
-FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
+#FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
+FLINT_HIGH_PRECISION_SIZE = int(120 * 3.32) 
+
+# For debugging, looks like we're bottoming out somewhere around e-11
+# So, only really need ~20 digits for this test
+# Blowing out frame 30, which is ~28?
+#FLINT_HIGH_PRECISION_SIZE = int(50 * 3.32) 
+# Native blew out somewhere e-13 to e-15
+#FLINT_HIGH_PRECISION_SIZE = int(200 * 3.32) 
+
 
 GMP_HIGH_PRECISION_SIZE=53
 
@@ -43,7 +52,12 @@ class DiveMathSupport:
 
         Native complex type just passes on all params to complex()
         """
-        return complex(*args) 
+        # Can't make a native complex from 2 strings though, so when we
+        # detect that, jam them into floats
+        if len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
+            return complex(float(args[0]), float(args[1]))
+        else:
+            return complex(*args) 
 
     def createFloat(self, floatValue):
         return float(floatValue)
@@ -141,9 +155,9 @@ class DiveMathSupport:
 
     def interpolateRootTo(self, startX, startY, endX, endY, targetX):
         """ 
-        Iterative multiplications of window sizes for zooming means we want to be able to
-        interpolate between two points using the root if the frame count between them as
-        the scale factor
+        Iterative multiplications of window sizes for zooming means 
+        we want to be able to interpolate between two points using
+        the frame count as the root.
         """
         if targetX == endX:
             return endY
@@ -566,13 +580,13 @@ class DiveMathSupportFlint(DiveMathSupport):
         return self.flint.arb(value).log().log()
 
     def twoLogsHelper(self, value, radius):
+        #print("trying two logs...")
         # ln(ln(abs(value))/ln(radius))
         # Note: flint needs 'value.log()' for ln, but 'value.const_log2() for log2?!
 
         # Also, radius is expected to be in 'normal' ranges, so just using math.log
         return (value.abs_lower().log() / math.log(radius)).log()
         #return math.log(math.log(abs(value))/math.log(radius)) 
-
 
     def mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
         didEscape = False
@@ -643,6 +657,23 @@ class DiveMathSupportFlint(DiveMathSupport):
 
     def clamp(self, num, min_value, max_value):
        return max(min(num, max_value), min_value)
+
+class DiveMathSupportFlintCustom(DiveMathSupportFlint):
+    def mandelbrot(self, c, escapeRadius, maxIter):
+        #radiusArb = self.flint.arb(escapeRadius)
+        #return c.libmandelbrot(radiusArb, maxIter)
+        return c.libmandelbrot(escapeRadius, maxIter)
+        #return c.libmandelbrot_full(escapeRadius, maxIter)
+        #print("Calling library, radius: %s, iter: %s" % (str(escapeRadius), str(maxIter)))
+        #(tmpRes, tmpZ) = c.libmandelbrot_full(escapeRadius, maxIter)
+        #print("%d" % (tmpRes))
+        #print("%d - %s" % (tmpRes, str(tmpZ)))
+        #print("%d - %s" % (tmpRes, str(abs(tmpZ))))
+        #return (tmpRes, tmpZ)
+
+    def libMandelbrotFull(self, c, escapeRadius, maxIter):
+        """ Reference implementation, just for error check? """
+        return c.libmandelbrot_full(escapeRadius, maxIter)
 
 class DiveMathSupportGmp(DiveMathSupport):
     """

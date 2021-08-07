@@ -49,6 +49,7 @@ import divemesh       as mesh
 from algo import Algo # Abstract base class import, because we rely on it.
 from julia import Julia 
 from mandelbrot import Mandelbrot
+from mandelbrot_solo import MandelbrotSolo
 from mandeldistance import MandelDistance
 from smooth import Smooth
 
@@ -76,7 +77,8 @@ class FractalContext:
 
         self.set_zoom_level = 0   # Zoom in prior to the dive
         self.clip_start_frame = -1
-        self.clip_total_frames = 1 
+        self.clip_frame_count = 1 
+        self.write_video = True
 
         self.smoothing      = False # bool turn on color smoothing
         self.snapshot       = False # Generate a single, high res shotb
@@ -97,6 +99,7 @@ class FractalContext:
 
         self.algorithm_map = {'julia' : Julia, 
                 'mandelbrot' : Mandelbrot,
+                'mandelbrot_solo' : MandelbrotSolo,
                 'mandeldistance' : MandelDistance,
                 'smooth': Smooth}
         self.algorithm_name = None
@@ -119,8 +122,13 @@ class FractalContext:
         #print("extra params from mesh: %s" % str(dive_mesh.extraParams))
         extra_params.update(dive_mesh.extraParams) # Allow per-frame info to overwrite algorithm info?
 
+        display_frame_number = frame_number
+        if self.clip_start_frame != -1:
+            display_frame_number += self.clip_start_frame
+
         print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
-        frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh, frame_number, self.project_name, self.shared_cache_path, self.build_cache, self.invalidate_cache, extra_params)
+        #print(".") # Just to keep the time-per-frame calculations from being overwritten in the terminal
+        frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh=dive_mesh, frame_number=display_frame_number, project_folder_name=self.project_name, shared_cache_path=self.shared_cache_path, build_cache=self.build_cache, invalidate_cache=self.invalidate_cache, extra_params=extra_params)
 
         frame_algorithm.beginning_hook()
         
@@ -130,9 +138,11 @@ class FractalContext:
 
         frame_image = frame_algorithm.generate_image()
 
+        image_file_name = frame_algorithm.write_image_to_file(frame_image)
+
         frame_algorithm.ending_hook()
 
-        return frame_image
+        return image_file_name
 
     def __repr__(self):
         return """\
@@ -209,27 +219,35 @@ class MediaView:
         self.ctx.timeline =  self.construct_simple_timeline()
         # Duration may be less than overall, if this is a sub-clip, so
         # figure out what our REAL duration is.
+        frame_file_names = []
         timeline_frame_count = self.ctx.timeline.getTotalSpanFrameCount()
+        for curr_frame_number in range(timeline_frame_count):
+            frame_file_names.append(self.ctx.render_frame_number(curr_frame_number))
+
         timeline_duration = self.time_from_frame_number(timeline_frame_count)
 
-        self.clip = mpy.VideoClip(self.make_frame, duration=timeline_duration)
+        self.clip = mpy.ImageSequenceClip(frame_file_names, fps = self.ctx.timeline.framerate)
 
-        if self.banner:
-            self.clip = self.intro_banner()
+        if self.ctx.write_video == True:
+            if self.banner:
+                self.clip = self.intro_banner()
+    
+    #        if not self.vfilename:
+    #            self.clip.preview(fps=1) #fps 1 is really all that works
+            if self.vfilename.endswith(".gif"):
+                #print("fps: %s" % str(self.fps))
+                #self.clip.write_gif(self.vfilename, fps=self.fps)
+                print("fps: %s" % str(self.ctx.timeline.framerate))
+                self.clip.write_gif(self.vfilename, fps=self.ctx.timeline.framerate)
+            elif self.vfilename.endswith(".mp4"):
+                self.clip.write_videofile(self.vfilename,
+                                      fps=self.fps, 
+                                      audio=False, 
+                                      codec="mpeg4")
+            else:
+                print("Error: file extension not supported, must be gif or mp4")
+                sys.exit(0)
 
-        if not self.vfilename:
-            self.clip.preview(fps=1) #fps 1 is really all that works
-        elif self.vfilename.endswith(".gif"):
-            print("fps: %s" % str(self.fps))
-            self.clip.write_gif(self.vfilename, fps=self.fps)
-        elif self.vfilename.endswith(".mp4"):
-            self.clip.write_videofile(self.vfilename,
-                                  fps=self.fps, 
-                                  audio=False, 
-                                  codec="mpeg4")
-        else:
-            print("Error: file extension not supported, must be gif or mp4")
-            sys.exit(0)
 
     def construct_simple_timeline(self):
         """
@@ -238,32 +256,37 @@ class MediaView:
         Basically, let's construct a timeline from one set of start/end points,
         as defined by the current context.
         """
+        overall_zoom_factor = self.ctx.scaling_factor
         overall_frame_count = self.duration * self.fps  
+        # Integers only, but be generous and round up?
         if math.floor(overall_frame_count) != overall_frame_count:
             overall_frame_count = math.floor(overall_frame_count) + 1
 
         clip_start_frame = 0
-        rendered_frame_count = overall_frame_count
-        last_frame_number = overall_frame_count
+        last_frame_number = overall_frame_count - 1
+        if self.ctx.clip_start_frame != -1:
+            # if start frame is defined, then rely on frame count
+            # also being valid
+            clip_start_frame = self.ctx.clip_start_frame;
+            last_frame_number = clip_start_frame + self.ctx.clip_frame_count - 1  
 
-        overall_zoom_factor = self.ctx.scaling_factor
-    
-        if self.ctx.clip_start_frame == -1: # Whole clip is the span 
+        # So we know the overall trajectory of window zoom, and we know
+        # the frames we're actually trying to render.
+        rendered_frame_count = last_frame_number - clip_start_frame + 1
+
+        print("clip_start_frame: %d rendered_frame_count: %d" % (clip_start_frame, rendered_frame_count))
+
+        if last_frame_number > overall_frame_count:
+            raise ValueError("Can't construct timeline of %d frames, starting at frame %d, for a sequence of only %d frames (%f seconds at %f fps) (%d)" % (rendered_frame_count, clip_start_frame, overall_frame_count, self.duration, self.fps, last_frame_number))
+
+        if clip_start_frame == 0:
             start_width_real = self.ctx.cmplx_width
             start_width_imag = self.ctx.cmplx_height
         else:
-            if self.ctx.clip_start_frame + self.ctx.clip_total_frames > overall_frame_count:
-                raise ValueError("Can't construct timeline of %d frames for a sequence of only %d frames (%f seconds at %f fps)" % (self.ctx.clip_total_frames, overall_frame_count, self.duration, self.fps))
-
-            clip_start_frame = self.ctx.clip_start_frame
-            last_frame_number = clip_start_frame + self.ctx.clip_total_frames - 1
-            rendered_frame_count = last_frame_number - clip_start_frame + 1
-
-            # Start frame is 1 or greater (hopefully), so subtracting 1 from the exponent here should be okay.
+            # Start frame is 1 or greater, the exponent here should be okay.
             start_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, clip_start_frame)
             start_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, clip_start_frame)
 
-        # Sub-section the frames, if needed
         end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, last_frame_number)
         end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, last_frame_number)
 
@@ -272,7 +295,6 @@ class MediaView:
         timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm_name=self.ctx.algorithm_name, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
          
         if timeline.algorithm_name == 'julia':
-            #timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='julia', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
             # Just evenly divide the waypoints across the time for a simple timeline
             keyframeCount = len(self.ctx.julia_list)
             # 2 keyframes over 10 frames = 10 frames per keyframe
@@ -295,15 +317,12 @@ class MediaView:
                 if currKeyframeFrameNumber + keyframeSpacing > rendered_frame_count - 1:
                     currKeyframeNumber = rendered_frame_count - 1
                 
-                #span.addNewCenterKeyframe(currKeyframeFrameNumber, currJuliaCenter, transitionIn='linear', transitionOut='linear')
                 span.addNewComplexParameterKeyframe(currKeyframeFrameNumber, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
                 currKeyframeFrameNumber += keyframeSpacing
 
             timeline.timelineSpans.append(span)
 
         else:
-            #timeline = DiveTimeline(projectFolderName=self.ctx.project_name, fractal='mandelbrot', framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
-            #timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm=self.ctx.algorithm, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
             #print("Trying to make span of %d frames" % frame_count)
             span = timeline.addNewSpanAtEnd(rendered_frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag)
     
@@ -1041,8 +1060,14 @@ def set_demo1_params(fractal_ctx, view_ctx):
     print("+ Running in demo mode - loading default mandelbrot dive params")
     #fractal_ctx.img_width  = 1024
     #fractal_ctx.img_height = 768 
-    fractal_ctx.img_width  = 320
-    fractal_ctx.img_height = 240 
+    #fractal_ctx.img_width  = 320
+    #fractal_ctx.img_height = 240 
+    fractal_ctx.img_width  = 160 
+    fractal_ctx.img_height = 120 
+    #fractal_ctx.img_width  = 80 
+    #fractal_ctx.img_height = 60 
+    #fractal_ctx.img_width  = 16 
+    #fractal_ctx.img_height = 12 
 
     cmplx_width_str = '5.0'
     cmplx_height_str = '3.5'
@@ -1050,8 +1075,14 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #cmplx_height_str = '.00075'
     #cmplx_width_str = '2.0'
     #cmplx_height_str = str(1024*2/768) 
+
+    # For debugging, this window (and a couple zooms after) is where things
+    # tend to go wrong when precision is getting clipped off
+    #cmplx_width_str = '6.736977389253725e-08'
+    #cmplx_height_str = '4.7158841724776074e-08'
     fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
     fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
+
 
     # This is close t Misiurewicz point M32,2
     # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
@@ -1064,7 +1095,9 @@ def set_demo1_params(fractal_ctx, view_ctx):
     center_real_str = '-1.7693831791955150182138472860854737829057472636547514374655282165278881912647564588361634463895296673044858257818203031574874912384217194031282461951137475212550848062085787454772803303225167998662391124184542743017129214423639793169296754394181656831301342622793541423768572435783910849972056869527305207508191441734781061794290699753174911133714351734166117456520272756159178932042908932465102671790878414664628213755990650460738372283470777870306458882898202604001744348908388844962887074505853707095832039410323454920540534378406083202543002080240776000604510883136400112955848408048692373051275999457470473671317598770623174665886582323619043055508383245744667325990917947929662025877792679499645660786033978548337553694613673529685268652251959453874971983533677423356377699336623705491817104771909424891461757868378026419765129606526769522898056684520572284028039883286225342392455089357242793475261134567912757009627599451744942893765395578578179137375672787942139328379364197492987307203001409779081030965660422490200242892023288520510396495370720268688377880981691988243756770625044756604957687314689241825216171368155083773536285069411856763404065046728379696513318216144607821920824027797857625921782413101273331959639628043420017995090636222818019324038366814798438238540927811909247543259203596399903790614916969910733455656494065224399357601105072841234072044886928478250600986666987837467585182504661923879353345164721140166670708133939341595205900643816399988710049682525423837465035288755437535332464750001934325685009025423642056347757530380946799290663403877442547063918905505118152350633031870270153292586262005851702999524577716844595335385805548908126325397736860678083754587744508953038826602270140731059161305854135393230132058326419325267890909463907657787245924319849651660028931472549400310808097453589135197164989941931054546261747594558823583006437970585216728326439804654662779987947232731036794099604937358361568561860539962449610052967074013449293876425609214167615079422980743121960127425155223407999875999884'
     center_imag_str = '0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805538736306127524814939292355930892834392050796724887904921986666045576626946900666103494014904714323725586979789908520656683202658064024115300378826789786394641622035341055102900456305723718684527210377325846307917512628774672005693326232806953822796755832517188873479124361430989485495501124096329421682827330693532171505367455526637382706988583456915684673202462211937384523487065290004627037270912806345336469007546411109669407622004367957958476890043040953462048335322273359167297049252960438077167010004209439515213189081508634843224000870136889065895088138204552309352430462782158649681507477960551795646930149740918234645225076516652086716320503880420325704104486903747569874284714830068830518642293591138468762031036739665945023607640585036218668993884533558262144356760232561099772965480869237201581493393664645179292489229735815054564819560512372223360478737722905493126886183195223860999679112529868068569066269441982065315045621648665342365985555395338571505660132833205426100878993922388367450899066133115360740011553934369094891871075717765803345451791394082587084902236263067329239601457074910340800624575627557843183429032397590197231701822237810014080715216554518295907984283453243435079846068568753674073705720148851912173075170531293303461334037951893251390031841730968751744420455098473808572196768667200405919237414872570568499964117282073597147065847005207507464373602310697663458722994227826891841411512573589860255142210602837087031792012000966856067648730369466249241454455795058209627003734747970517231654418272974375968391462696901395430614200747446035851467531667672250261488790789606038203516466311672579186528473826173569678887596534006782882871835938615860588356076208162301201143845805878804278970005959539875585918686455482194364808816650829446335905975254727342258614604501418057192598810476108766922935775177687770187001388743012888530139038318783958771247007926690'
 
-    #center_str = '-1.76938317919551501821384728608547378290574726365475143746552821652788819126475645883616344638952966730448582578182030315748749123842171940312824619511374752125508480620857874547728033032251679986623911241845427430171292144236397931692967543941816568313013426227935414237685724357839108499720568695273052075081914417347810617942906997531749111337143517341661174565202727561591789320429089324651026717908784146646282137559906504607383722834707778703064588828982026040017443489083888449628870745058537+0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559308928343920507967248879049219866660455766269469006661034940149047143237255869797899085206566832026580640241153003788267897863946416220353410551029004563057237186845272103773258463079175126287746720056933262328069538227967558325171888734791243614309894854955011240963294216828273306935321715053674555266373827069885834569156846732024622119j'
+# Shorter, for debugging
+#    center_real_str = '-1.76938317919551501821384728608547378290574726365475143746552821652788819126475645883616344638952966730448582578182030315748749123842171940312824619511374752125508480620857874547728033032251679986623911241845427430171292144236397931692967543941816568313013426227935414237685724357839108499720568695273052075081914417347810617942906997531749111337143517341661174565202727561591789320429089324651026717908784146646282137559906504607383722834707778703064588828982026040017443489083888449628870745058537'
+#    center_imag_str = '0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559308928343920507967248879049219866660455766269469006661034940149047143237255869797899085206566832026580640241153003788267897863946416220353410551029004563057237186845272103773258463079175126287746720056933262328069538227967558325171888734791243614309894854955011240963294216828273306935321715053674555266373827069885834569156846732024622119'
 
 
     #center_str = '-0.05+0.6805j'
@@ -1072,30 +1105,46 @@ def set_demo1_params(fractal_ctx, view_ctx):
     fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_real_str, center_imag_str)
 
     fractal_ctx.project_name = 'demo1'
+    #fractal_ctx.scaling_factor = .8
+    fractal_ctx.scaling_factor = .5
 
-    fractal_ctx.scaling_factor = .50
+    fractal_ctx.write_video = False
 
-    fractal_ctx.max_iter       = 255
-    #fractal_ctx.max_iter       = 500
+    #fractal_ctx.max_iter       = 128 
+    #fractal_ctx.max_iter       = 255 
+    #fractal_ctx.max_iter       = 512 # covers ~e-34 or so 
+    #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
+    #fractal_ctx.max_iter       = 2048 
+    fractal_ctx.max_iter       = 4096 
 
-    #fractal_ctx.escape_rad     = 2.
-    fractal_ctx.escape_rad     = 1024 
+    fractal_ctx.escape_rad     = 2
+    #fractal_ctx.escape_rad     = 4 
+    #fractal_ctx.escape_rad     = 8 
+    #fractal_ctx.escape_rad     = 512 
     #fractal_ctx.escape_rad     = math.sqrt(1024.0)
-    #fractal_ctx.escape_rad     = 32768. 
+    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]['escape_radius'] = fractal_ctx.escape_rad 
+    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]['max_escape_iterations'] = fractal_ctx.max_iter 
+
+    # Basically make this command-line, not demo?
+    #fractal_ctx.clip_start_frame = 7 
+    #fractal_ctx.clip_frame_count = 3 
 
     fractal_ctx.verbose = 3
-    fractal_ctx.build_cache=True
-
-    #view_ctx.duration       = 4.0
-    view_ctx.duration       = 60.0
-    #view_ctx.duration       = 1.0
-    #view_ctx.duration       = 0.25
+    fractal_ctx.build_cache=False
 
     # FPS still isn't set quite right, but we'll get it there eventually.
-    #view_ctx.fps            = 23.976 / 4.0 
     view_ctx.fps            = 23.976 / 8.0 
+    #view_ctx.fps            = 23.976 / 4.0 
+    #view_ctx.fps            = 23.976 / 2.0
     #view_ctx.fps            = 23.976
     #view_ctx.fps            = 29.97 / 2.0 
+
+    #view_ctx.duration = math.ceil(6.0 / view_ctx.fps)
+    #view_ctx.duration       = 4.0
+    view_ctx.duration       = 60.0
+    #view_ctx.duration       = 30.0
+    #view_ctx.duration       = 2.0
+    #view_ctx.duration       = 0.25
 
 def set_julia_walk_demo1_params(fractal_ctx, view_ctx):
     print("+ Running in demo mode - loading default julia walk params")
@@ -1184,14 +1233,16 @@ def parse_options(fractal_ctx, view_ctx):
                                ["preview",
                                 "algo=",
                                 "flint",
+                                "flintcustom",
                                 "gmp",
                                 "demo",
                                 "demo-julia-walk",
                                 "duration=",
                                 "fps=",
                                 "clip-start-frame=",
-                                "clip-total-frames=",
+                                "clip-frame-count=",
                                 "project-name=",
+                                "image-frame-path=",
                                 "shared-cache-path=",
                                 "build-cache",
                                 "invalidate-cache",
@@ -1227,6 +1278,8 @@ def parse_options(fractal_ctx, view_ctx):
             fractal_ctx.math_support = fm.DiveMathSupportGmp()
         elif opt in ['--flint']:
             fractal_ctx.math_support = fm.DiveMathSupportFlint()
+        elif opt in ['--flintcustom']:
+            fractal_ctx.math_support = fm.DiveMathSupportFlintCustom()
         elif opt in ['-a', '--algo']:
             if str(arg) in fractal_ctx.algorithm_map:
                 fractal_ctx.algorithm_name = str(arg)
@@ -1259,9 +1312,11 @@ def parse_options(fractal_ctx, view_ctx):
         elif opt in ['-f', '--fps']:
             view_ctx.fps  = float(arg)
         elif opt in ['--clip-start-frame']:
+            # For construct_simple_timeline, use of --clip-start-frame
+            # makes --clip-frame-count kinda required
             fractal_ctx.clip_start_frame = int(arg)
-        elif opt in ['--clip-total-frames']:
-            fractal_ctx.clip_total_frames = int(arg)
+        elif opt in ['--clip-frame-count']:
+            fractal_ctx.clip_frame_count = int(arg)
         elif opt in ['-m', '--max-iter']:
             fractal_ctx.max_iter = int(arg)
         elif opt in ['-w', '--img-w']:

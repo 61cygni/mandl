@@ -3,6 +3,8 @@ import fractalcache as fc
 import fractalpalette as fp
 import divemesh as mesh
 
+from PIL import Image, ImageDraw, ImageFont # EscapeAlgo uses for burn-in
+
 # Should probably import Timeline, but not technically needed, since
 # it's cyclic?
 
@@ -31,7 +33,7 @@ class Algo(object):
         """
         return {}
 
-    def __init__(self, dive_mesh, frame_number, project_folder_name, shared_cache_path, build_cache, invalidate_cache):
+    def __init__(self, dive_mesh, frame_number, project_folder_name, shared_cache_path, build_cache, invalidate_cache, extra_params={}):
         self.algorithm_name = None 
 
         self.dive_mesh = dive_mesh
@@ -39,6 +41,7 @@ class Algo(object):
 
         self.project_folder_name = project_folder_name
         self.shared_cache_path = shared_cache_path
+
         self.build_cache = build_cache
         self.invalidate_cache = invalidate_cache
 
@@ -94,6 +97,9 @@ class Algo(object):
     def generate_image(self):
         pass
 
+    def write_image_to_file(self, image):
+        return self.cache_frame.write_image_to_file(image)
+
     def ending_hook(self):
         pass
 
@@ -133,7 +139,7 @@ class EscapeAlgo(Algo):
         return options
 
     def __init__(self, dive_mesh, frame_number, project_folder_name, shared_cache_path, build_cache, invalidate_cache, extra_params={}):
-        super().__init__(dive_mesh, frame_number, project_folder_name, shared_cache_path, build_cache, invalidate_cache)
+        super().__init__(dive_mesh, frame_number, project_folder_name, shared_cache_path, build_cache, invalidate_cache, extra_params)
 
         # Load, with optional default values
         self.escape_radius = extra_params.get('escape_radius', 2.0)
@@ -144,7 +150,7 @@ class EscapeAlgo(Algo):
 
     def build_cache_frame(self):
         frame_info = EscapeFrameInfo(self.dive_mesh.meshWidth, self.dive_mesh.meshHeight, self.dive_mesh.center, self.dive_mesh.realMeshGenerator.baseWidth, self.dive_mesh.imagMeshGenerator.baseWidth, self.escape_radius, self.max_escape_iterations)
-        return fc.Frame(self.project_folder_name, self.shared_cache_path, self.algorithm_name, self.dive_mesh, frame_info, self.frame_number)
+        return fc.Frame(project_folder_name=self.project_folder_name, shared_cache_path=self.shared_cache_path, algorithm_name=self.algorithm_name, dive_mesh=self.dive_mesh, frame_info=frame_info, frame_number=self.frame_number)
 
     def get_frame_metadata(self):
         metadata = super().get_frame_metadata()
@@ -152,6 +158,14 @@ class EscapeAlgo(Algo):
         metadata['max_escape_iterations'] = self.max_escape_iterations
         return metadata
 
+    def burn_text_to_drawing(self, burn_in_text, drawing):
+        burn_in_location = (10,10)
+        burn_in_margin = 5 
+        burn_in_font = ImageFont.truetype('fonts/cour.ttf', 12)
+        burn_in_size = burn_in_font.getsize_multiline(burn_in_text)
+        drawing.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
+        drawing.text((burn_in_location[0]-2, burn_in_location[1] - 2), burn_in_text, 'white', burn_in_font)
+        
 class JuliaFrameInfo(EscapeFrameInfo):
     def __init__(self, mesh_width, mesh_height, center, complex_real_width, complex_imag_width, escape_r, max_escape_iter,  julia_center, raw_values=None, raw_histogram=None, smooth_values=None, smooth_histogram=None):
         super().__init__(mesh_width, mesh_height, center, complex_real_width, complex_imag_width, escape_r, max_escape_iter, raw_values, raw_histogram, smooth_values, smooth_histogram)
@@ -189,7 +203,7 @@ class JuliaAlgo(EscapeAlgo):
 
     def build_cache_frame(self):
         frame_info = JuliaFrameInfo(self.dive_mesh.meshWidth, self.dive_mesh.meshHeight, self.dive_mesh.center, self.dive_mesh.realMeshGenerator.baseWidth, self.dive_mesh.imagMeshGenerator.baseWidth, self.escape_radius, self.max_escape_iterations, self.julia_center)
-        return fc.Frame(self.project_folder_name, self.shared_cache_path, self.algorithm_name, self.dive_mesh, frame_info, self.frame_number)
+        return fc.Frame(project_folder_name=self.project_folder_name, shared_cache_path=self.shared_cache_path, algorithm_name=self.algorithm_name, dive_mesh=self.dive_mesh, frame_info=frame_info, frame_number=self.frame_number)
 
     def get_frame_metadata(self):
         metadata = super().get_frame_metadata()

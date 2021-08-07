@@ -75,14 +75,8 @@ class MandelDistance(EscapeAlgo):
         if self.burn_in == True:
             meta = self.get_frame_metadata()
             if meta:
-                burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (meta['frame_number'], meta['mesh_center'], meta['complex_real_width'], meta['complex_imag_width'])
-
-                burn_in_location = (10,10)
-                burn_in_margin = 5 
-                burn_in_font = ImageFont.truetype('fonts/cour.ttf', 12)
-                burn_in_size = burn_in_font.getsize_multiline(burn_in_text)
-                draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
-                draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
+                burn_in_text = u"%d" % (meta['frame_number'])
+                self.burn_text_to_drawing(burn_in_text, draw)
 
         return im    
 

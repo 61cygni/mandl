@@ -47,6 +47,10 @@ class Smooth(EscapeAlgo):
         mandelbrot_function = np.vectorize(math_support.mandelbrot)
         (pixel_values_2d, last_zees) = mandelbrot_function(mesh_array, self.escape_radius, self.max_escape_iterations)
 
+        #import sys
+        #np.set_printoptions(threshold=sys.maxsize)
+        #print(pixel_values_2d)
+
         smoothing_function = np.vectorize(math_support.smoothAfterCalculation)
         pixel_values_2d_smoothed = smoothing_function(last_zees, pixel_values_2d, self.max_escape_iterations, self.escape_radius)
 
@@ -80,13 +84,7 @@ class Smooth(EscapeAlgo):
             meta = self.get_frame_metadata()
             if meta:
                 burn_in_text = u"%d" % (meta['frame_number'])
-
-                burn_in_location = (10,10)
-                burn_in_margin = 5 
-                burn_in_font = ImageFont.truetype('fonts/cour.ttf', 8)
-                burn_in_size = burn_in_font.getsize_multiline(burn_in_text)
-                draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
-                draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
+                self.burn_text_to_drawing(burn_in_text, draw)
 
         return im    
 
@@ -97,22 +95,27 @@ class Smooth(EscapeAlgo):
             magnification = 100 
 
         denom = float(self.dive_mesh.mathSupport.justTwoLogs(magnification))
-
-        if self.color:
-            c1 = 0.
-            c2 = 0.
-            c3 = 0.
-    
+        if denom <= 0.0 or math.isnan(denom):
+            return (0,0,0)
+        elif self.color:
             # (yellow blue 0,.6,1.0)
-            c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
-            c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
-            c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
-            c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
-            c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
-            c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
-            c1int = int(255.*((c1/4.) * 3.) / denom)
-            c2int = int(255.*((c2/4.) * 3.) / denom)
-            c3int = int(255.*((c3/4.) * 3.) / denom)
+            c1 = 1 + math.cos(3.0 + val*0.15 + self.color[0])
+            c2 = 1 + math.cos(3.0 + val*0.15 + self.color[1])
+            c3 = 1 + math.cos(3.0 + val*0.15 + self.color[2])
+            
+            if c1 <= 0 or math.isnan(c1):
+                c1int = 0
+            else:
+                c1int = int(255.*((c1/4.) * 3.) / denom)
+            if c2 <= 0 or math.isnan(c2):
+                c2int = 0
+            else:
+                c2int = int(255.*((c2/4.) * 3.) / denom)
+            if c3 <= 0 or math.isnan(c3):
+                c3int = 0
+            else:
+                c3int = int(255.*((c3/4.) * 3.) / denom)
+
             return (c1int,c2int,c3int)
         else:        
             #magnification = 1. / self.context.cmplx_width

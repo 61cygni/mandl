@@ -71,6 +71,7 @@ class Frame:
 
         self.project_folder_name = project_folder_name
         self.shared_cache_path = shared_cache_path
+
         self.algorithm_name = algorithm_name
         self.dive_mesh     = dive_mesh
         self.frame_info = frame_info
@@ -151,4 +152,35 @@ class Frame:
             self.raw_histogram = None
             self.smooth_values = None
             self.smooth_histogram = None
+
+    def create_image_subpath(self, mkdir_if_needed=False):
+        root_cache_path = u"%s_cache" % self.project_folder_name
+        results_subpath = os.path.join(root_cache_path, "image_frames", self.dive_mesh.mathSupport.precisionType, self.algorithm_name) 
+        if mkdir_if_needed and not os.path.exists(results_subpath):
+            os.makedirs(results_subpath)
+        return results_subpath
+
+    def create_image_file_identifier(self):
+        return u"%d.tiff" % self.frame_number
+
+    def create_image_file_name(self):
+        return os.path.join(self.create_image_subpath(), self.create_image_file_identifier())
+
+    def create_image_metadata_file_name(self):
+        return u"%s.pik" % self.create_image_file_name()
+
+    def write_image_to_file(self, image):
+        self.create_image_subpath(mkdir_if_needed=True) # Just for side-effect folder creation
+
+        filename = self.create_image_file_name()
+        metadata_filename = self.create_image_metadata_file_name()
+
+        image.save(filename)
+        with open(metadata_filename, 'wb') as fd:
+            frame_meta = self.frame_info.empty_copy()
+            frame_meta.raw_histogram = self.frame_info.raw_histogram
+            pickle.dump(frame_meta,fd)
+
+        return filename
+
 

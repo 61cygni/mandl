@@ -1,6 +1,21 @@
 
-python3 fractal.py --gif=low_res_demo.gif --algo=smooth --demo --burn --color --invalidate-cache --flint
+#python3.9 fractal.py --gif=low_res_02-04.gif --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=2 --clip-frame-count=3
+#python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=0 --clip-frame-count=10&
+#python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=10 --clip-frame-count=10&
+#python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=20 --clip-frame-count=10&
+#python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=30 --clip-frame-count=10&
+#
 
+#python3.9 fractal.py --gif=low_res_demo.gif --algo=smooth --demo --burn --color --invalidate-cache 
+python3.9 fractal.py --gif=low_res_demo.gif --algo=smooth --demo --burn --color --invalidate-cache --flint
+
+#python3.9 fractal.py --gif=low_res_demo.gif --algo=mandelbrot --demo --burn --invalidate-cache --flintcustom --clip-start-frame=10 --clip-frame-count=10
+#python3.9 fractal.py --gif=low_res_demo.gif --algo=mandelbrot --demo --burn --invalidate-cache --flintcustom
+#python3.9 fractal.py --gif=low_res_demo_e60.gif --algo=mandelbrot --demo --burn --invalidate-cache --flintcustom
+
+#python3.9 fractal.py --gif=low_res_demo.gif --algo=mandelbrot --demo --burn --color --invalidate-cache --flintcustom --clip-start-frame=25 --clip-frame-count=5
+
+#python3 -m cProfile fractal.py --gif=low_res_demo.gif --flint --algo=smooth --demo --burn --color --invalidate-cache
 
 #python3 fractal.py --gif=native_demo.gif --color=exp2 --demo --burn
 #python3 fractal.py --gif=native_demo_fresh.gif --color=exp2 --demo --burn --invalidate-cache
