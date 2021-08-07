@@ -72,7 +72,7 @@ cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, 
     return sl
 
 @cython.boundscheck(False)
-cdef cmap_to_color(val, long double cmplx_width, int[:] colors):
+cdef cmap_to_color(val, int[:] colors):
 
     cdef float sc0 = 0.1
     cdef float sc1 = 0.2
@@ -170,22 +170,13 @@ class CSmooth(Algo):
 
     def _map_to_color(self, val):
         c = np.zeros((3), dtype=np.int32)
-        cmap_to_color(val, self.context.cmplx_width, c)
+        cmap_to_color(val, c)
         return (c[0], c[1], c[2]) 
 
 
     def map_value_to_color(self, val):
-
-        if self.color:
-            c1 = self._map_to_color(val)
-            return c1 
-        else:        
-            magnification = 1. / self.context.cmplx_width
-            if magnification <= 100:
-                magnification = 100 
-            denom = math.log(math.log(magnification))
-            cint = int((val * 3.) / denom)
-            return (cint,cint,cint)
+        return self._map_to_color(val)
+        
 
     def animate_step(self, t):
         self.zoom_in()

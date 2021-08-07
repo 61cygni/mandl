@@ -28,7 +28,7 @@ from algo import Algo
 #hpf = np.longdouble
 
 hpf = decimal.Decimal
-decimal.getcontext().prec = 64
+decimal.getcontext().prec = 128 
 
 # The following are the precision sensitive variables.
 #
@@ -183,9 +183,7 @@ class HPCSmooth(Algo):
         return (c[0], c[1], c[2]) 
 
     def map_value_to_color(self, val):
-
-        c1 = self._map_to_color(val)
-        return c1 
+        return self._map_to_color(val)
 
     def animate_step(self, t):
         self.zoom_in()
