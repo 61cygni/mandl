@@ -126,7 +126,7 @@ class FractalContext:
         if self.clip_start_frame != -1:
             display_frame_number += self.clip_start_frame
 
-        print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
+        #print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
         #print(".") # Just to keep the time-per-frame calculations from being overwritten in the terminal
         frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh=dive_mesh, frame_number=display_frame_number, project_folder_name=self.project_name, shared_cache_path=self.shared_cache_path, build_cache=self.build_cache, invalidate_cache=self.invalidate_cache, extra_params=extra_params)
 
@@ -204,7 +204,7 @@ class MediaView:
     def setup(self):
 
         print(self)
-        print(self.ctx)
+        #print(self.ctx)
 
 
 #    def runTimeline(self, timeline):
@@ -290,7 +290,7 @@ class MediaView:
         end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, last_frame_number)
         end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, last_frame_number)
 
-        print("Timeline ranges: {%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
+        #print("Timeline ranges: {%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
 
         timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm_name=self.ctx.algorithm_name, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
          
@@ -1110,12 +1110,85 @@ def set_demo1_params(fractal_ctx, view_ctx):
 
     fractal_ctx.write_video = False
 
+
+    # Looks like 23.976/8 fps (almost 3fps), duration=60 (which could be 180 frames) 
+    # max-iter=4096 
+    # Bit depth was only ~400
+    # Ended up reaching e-51
+    # Most iteration answers were around 1200-1300?
+
+
+    # Trying to double that... Basically, can just double duration?
+    # And then, can start off at frame 175?
+    #
+    # Looks like 23.976/8 fps (almost 3fps), duration=120 (which could be 360 frames) 
+    # Which is 45 frames per process, for 8 processes.
+    # max-iter=4096 
+    # Let's stack bit depth to accommodate max_iter?
+    # Lower bound I'm going with is: .4438
+    # So bits = 1817? Let's make it a round 1800?
+    # Ended up reaching... 
+    # Most iteration answers were around ?
+
+    # Think I forgot to set bits deep enough?
+    # Blew out at e-57?
+    # Looks like iters were around 1500
+    # Precision was (accidentally?) 400
+   
+    # 550 * 3.32 = 1826
+    # max-iter=4096
+    # Looks like 23.976/8 fps (almost 3fps), 
+    # duration=90 (which could be 270 frames) 
+    # lost all detail at ~227?
+    # iters were hitting 4000
+    # Looks like it hit e-68
+
+    # Ok.
+    # 8192 iter
+    # ~3621 bits => 1125 digits
+    # duration=180 (~540 frames defined, just giving myself runway)
+    # Gonna run frames 200+?
+
+    # Frame 240 is hitting e-72 widths, 4400 iters
+    # Looks like window definition has ~953 digits of unused precision?
+    # Lol.
+
+    # Hit ~e-91 at frame 303
+    # iters sitting around 5300
+
+
+    # Shaving off 400 digits of precision... (to 725 digits = 2407 bits)
+    # Also trying only 6 simultaneous, frames 300-350
+
+    # frame 350 hit ~e-107
+    # Iters around 6300
+
+    # Shaving more precision off - 625 digits
+
+    # Blew out around 385?
+    # Hitting 7900 iters
+    # Hitting e-114, so is using something like 300 positions total?
+
+    # K, for frames 375+, gonna go with...
+    # doubling iters again,
+    # Adding another 100 positions? (went to 825 positions)
+
+    # Finally timed that run
+    # 50 frames (375-425)
+    # 2048*8 max iter
+    # 825 digits (2739 bits)
+    # 
+    
+
+
+
+
     #fractal_ctx.max_iter       = 128 
     #fractal_ctx.max_iter       = 255 
     #fractal_ctx.max_iter       = 512 # covers ~e-34 or so 
     #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
     #fractal_ctx.max_iter       = 2048 
-    fractal_ctx.max_iter       = 4096 
+    fractal_ctx.max_iter       = 2048 * 8
 
     fractal_ctx.escape_rad     = 2
     #fractal_ctx.escape_rad     = 4 
@@ -1141,7 +1214,7 @@ def set_demo1_params(fractal_ctx, view_ctx):
 
     #view_ctx.duration = math.ceil(6.0 / view_ctx.fps)
     #view_ctx.duration       = 4.0
-    view_ctx.duration       = 60.0
+    view_ctx.duration       = 180.0
     #view_ctx.duration       = 30.0
     #view_ctx.duration       = 2.0
     #view_ctx.duration       = 0.25

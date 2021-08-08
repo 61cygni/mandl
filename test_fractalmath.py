@@ -50,7 +50,7 @@ class TestMathSupport(unittest.TestCase):
         radius = 2.0
 
         # The answer for this particular point, is supposed to be 133, but we're
-        # capping iterations to 128 here.
+        # capping iterations to 100 here.
         center = self.mathSupport.createComplex('-1.7693831791+0.0042368479j')
         (iterations, lastZee) = self.mathSupport.mandelbrot(center, radius, maxIterations)
         #print(str(iterations))

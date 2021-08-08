@@ -15,7 +15,8 @@ import numpy as np
 #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
 
 #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
-FLINT_HIGH_PRECISION_SIZE = int(120 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
+FLINT_HIGH_PRECISION_SIZE = int(825 * 3.32) 
 
 # For debugging, looks like we're bottoming out somewhere around e-11
 # So, only really need ~20 digits for this test
