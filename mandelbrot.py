@@ -81,8 +81,8 @@ class Mandelbrot(Algo):
         self.palette.raw_calc_from_algo(m)
         return m 
 
-    def map_value_to_color(self, loc, values):
-        return self.palette.map_value_to_color(values[loc])
+    def map_value_to_color(self, val):
+        return self.palette.map_value_to_color(val)
         
     def pre_image_hook(self):
         self.palette.calc_hues()
