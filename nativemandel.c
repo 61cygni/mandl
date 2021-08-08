@@ -96,9 +96,8 @@ void squared_modulus(bf_t* result, bf_t* real, bf_t* imag, int precision){
 }
 
 float calc_pixel(bf_t* re_x, bf_t* im_y, int precision) {
-    float l = 0.0;
     int squared_rad = 256 * 256;
-    int max_iter = 256;
+    int max_iter = 10000;
 
     bf_t z_real;
     bf_t z_imag;
@@ -141,6 +140,72 @@ float calc_pixel(bf_t* re_x, bf_t* im_y, int precision) {
         }
     }
     return max_iter;
+}
+
+float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int precision) {
+    int squared_rad = 256 * 256;
+    int max_iter = 10000;
+
+    bf_t z_real;
+    bf_t z_imag;
+
+    bf_t tmp;
+    bf_t tmp2;
+    bf_t two;
+    bf_t sm;
+    bf_t rad;
+
+    bf_init(&bf_ctx, &z_real);
+    bf_init(&bf_ctx, &z_imag);
+    bf_init(&bf_ctx, &tmp);
+    bf_init(&bf_ctx, &tmp2);
+    bf_init(&bf_ctx, &two);
+    bf_init(&bf_ctx, &sm);
+    bf_init(&bf_ctx, &rad);
+
+    bf_set_ui(&z_real, 0);
+    bf_set_ui(&z_imag, 0);
+    bf_set_ui(&two,    2);
+    bf_set_ui(&rad,    squared_rad);
+
+    float l = 0.0;
+
+    for(int i = 0; i < max_iter; ++i) {
+        // z_real =  (z_real*z_real - z_imag*z_imag) + re_x
+        bf_mul(&tmp,   &z_real, &z_real, precision, BF_RNDU);  
+        bf_mul(&tmp2,  &z_imag, &z_imag, precision, BF_RNDU);  
+        bf_sub(&tmp,    &tmp,   &tmp2,   precision, BF_RNDU);  
+        bf_add(&z_real, &tmp, re_x, precision, BF_RNDU); 
+
+        // z_imag = hpf(2)*z_real*z_imag + imag )
+        bf_mul(&tmp, &two, &z_real, precision, BF_RNDU);
+        bf_mul(&tmp, &tmp, &z_imag, precision, BF_RNDU);
+        bf_add(&z_imag, &tmp, im_y, precision, BF_RNDU);
+
+        //if csquared_modulus(z_real, z_imag) >= squared_er: 
+        squared_modulus(&sm, &z_real, &z_imag, precision);
+        if(! bf_cmp_lt(&sm, &rad)) {
+            break; 
+        }
+        l += 1.0;
+    }
+    if(l>= max_iter) {
+        return 1.0;
+    }
+
+    // sl = (l - math.log2(math.log2(csquared_modulus(z_real,z_imag)))) + 4.0;
+    // sm should alrady contain sqaure_mod of z_real and z_imag
+    bf_const_log2(&sm, precision, BF_RNDU);
+    bf_const_log2(&sm, precision, BF_RNDU);
+
+    bf_set_float64(&tmp, l);
+    bf_sub(&tmp, &tmp, &sm, precision, BF_RNDU);
+    bf_set_float64(&tmp2, 4.0);
+    bf_add(&tmp, &tmp, &tmp2, precision, BF_RNDU);
+
+    double ret;
+    bf_get_float64(&tmp, &ret, BF_RNDU);
+    return ret;
 }
 
 

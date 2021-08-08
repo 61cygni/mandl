@@ -85,7 +85,7 @@ def ccalc_pixel(real, imag, int max_iter, int escape_rad):
     if (l >= max_iter):
         return 1.0
 
-    sl = l - math.log2(math.log2(csquared_modulus(z_real,z_imag))) + 4.0;
+    sl = (l - math.log2(math.log2(csquared_modulus(z_real,z_imag)))) + 4.0;
     return sl
 
 @cython.boundscheck(False)
