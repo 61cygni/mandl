@@ -44,10 +44,10 @@ class TestMathSupport(unittest.TestCase):
     def test_mandelbrot(self):
         # Native python isn't accurate past ~120 iterations. 
         # So, we either reduce iterations, and require fewer decimal places to match.
+        radius = 2.0
+
         maxIterations = 100 
         placesToMatch = 9 
-
-        radius = 2.0
 
         # The answer for this particular point, is supposed to be 133, but we're
         # capping iterations to 100 here.
@@ -56,8 +56,8 @@ class TestMathSupport(unittest.TestCase):
         #print(str(iterations))
         #print(str(lastZee))
         self.assertEqual(100, iterations)
-        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch)
-        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch)
+        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
 
         # Slightly adjusted center, just to get a different answer
         center = self.mathSupport.createComplex('-1.7693831791-0.5042368479j')
@@ -67,6 +67,23 @@ class TestMathSupport(unittest.TestCase):
         self.assertEqual(3, iterations)
         self.assertAlmostEqual(-2.182516841632256, float(lastZee.real), placesToMatch)
         self.assertAlmostEqual(2.3301940018826137, float(lastZee.imag), placesToMatch)
+
+
+        # More iterations, fewer decimal places required to match for comparison
+        # 3 digits seems to be near the low-end for correctness of the iteration count?
+        maxIterations = 110 
+        placesToMatch = 3 
+
+        # The answer for this particular point, is supposed to be 133, but we're
+        # capping iterations to 110 here.
+        center = self.mathSupport.createComplex('-1.7693831791+0.0042368479j')
+        (iterations, lastZee) = self.mathSupport.mandelbrot(center, radius, maxIterations)
+        #print(str(iterations))
+        #print(str(lastZee))
+        self.assertEqual(110, iterations)
+        self.assertAlmostEqual(0.04427332710633869, float(lastZee.real), placesToMatch) # when maxIterations == 110
+        self.assertAlmostEqual(0.053034798128938195, float(lastZee.imag), placesToMatch) # when maxIterations == 110
+
 
 class TestMathSupportFlint(TestMathSupport):
     @classmethod
@@ -86,6 +103,61 @@ class TestMathSupportFlintCustom(TestMathSupport):
         # prec value *should* be 53 to match precision.
         cls.mathSupport.flint.ctx.prec = 53 
 
+    def testDifferentMandelbrots(self):
+        """ 
+        This checks results between different mandelbrot implementations.
+
+        Currently there are 4 implementations of varying speeds,
+        1.) A pure python version (in DiveMathSupport.mandelbrot())
+        2.) A python-flint version (in DiveMathSupportFlint.mandelbrot())
+        3.) A 'normal' cython version (in DiveMathSupportFlintCustom.mandelbrot_beginning())
+        4.) A 'step-wise' cython version (in DiveMathSupportFlintCustom.mandelbrot())
+
+        Kinda hacky to explicitly instantiate other mathSupports here, but it's
+        probably sufficient for checking sanity, unless and until all the matn supports
+        implement all of the options?
+        """
+        placesToMatch = 9 
+        radius = 2.0
+
+        maxIterations = 100 
+
+        center = self.mathSupport.createComplex('-1.7693831791+0.0042368479j')
+
+
+        localMathSupport = fm.DiveMathSupport()
+        # Native python basically good for ~120 iterations, using 53 bits of depth in a float 64
+        (iterations, lastZee) = localMathSupport.mandelbrot(center, radius, maxIterations)
+        #print(str(iterations))
+        #print(str(lastZee))
+        self.assertEqual(100, iterations)
+        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
+
+        localMathSupport = fm.DiveMathSupportFlint()
+        localMathSupport.flint.ctx.prec = 53 
+        (iterations, lastZee) = localMathSupport.mandelbrot(center, radius, maxIterations)
+        #print(str(iterations))
+        #print(str(lastZee))
+        self.assertEqual(100, iterations)
+        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
+
+        localMathSupport = fm.DiveMathSupportFlintCustom()
+        localMathSupport.flint.ctx.prec = 53 
+        (iterations, lastZee) = localMathSupport.mandelbrot_beginning(center, radius, maxIterations)
+        #print(str(iterations))
+        #print(str(lastZee))
+        self.assertEqual(100, iterations)
+        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
+
+        (iterations, lastZee) = localMathSupport.mandelbrot(center, radius, maxIterations)
+        #print(str(iterations))
+        #print(str(lastZee))
+        self.assertEqual(100, iterations)
+        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
 
 if __name__ == '__main__':
     unittest.main()

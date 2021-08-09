@@ -290,7 +290,7 @@ class MediaView:
         end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, last_frame_number)
         end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, last_frame_number)
 
-        #print("Timeline ranges: {%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
+        print("Timeline ranges: {%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
 
         timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm_name=self.ctx.algorithm_name, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
          
@@ -1062,8 +1062,10 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.img_height = 768 
     #fractal_ctx.img_width  = 320
     #fractal_ctx.img_height = 240 
+
     fractal_ctx.img_width  = 160 
     fractal_ctx.img_height = 120 
+
     #fractal_ctx.img_width  = 80 
     #fractal_ctx.img_height = 60 
     #fractal_ctx.img_width  = 16 
@@ -1218,7 +1220,10 @@ def set_demo1_params(fractal_ctx, view_ctx):
     # 25 frames hit ~109 minutes (~4.5 minutes per frame)
     # (1308 minutes user time) = 52 minutes per frame.
     # Iters hit ~24k
-    
+   
+    # real    142m25.250s
+    # user    1797m10.031s
+    # sys     0m11.922s
 
 
     #fractal_ctx.max_iter       = 128 
@@ -1226,7 +1231,9 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.max_iter       = 512 # covers ~e-34 or so 
     #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
     #fractal_ctx.max_iter       = 2048 
-    fractal_ctx.max_iter       = 2048 * 20
+    #fractal_ctx.max_iter       = 2048 * 16
+    fractal_ctx.max_iter       = 2048 * 71 # About half way up EoI's dive
+    #fractal_ctx.max_iter       = 2048 * 142 # Near the end of EoI's dive, maybe
 
     fractal_ctx.escape_rad     = 2
     #fractal_ctx.escape_rad     = 4 
@@ -1252,7 +1259,9 @@ def set_demo1_params(fractal_ctx, view_ctx):
 
     #view_ctx.duration = math.ceil(6.0 / view_ctx.fps)
     #view_ctx.duration       = 4.0
-    view_ctx.duration       = 540.0
+    #view_ctx.duration       = 540.0
+    view_ctx.duration       = 2200.0 # A bit more than EoI's dive, if a .5 zoom factor at 23,976/8 fps.
+    #view_ctx.duration       = 1500.0
     #view_ctx.duration       = 30.0
     #view_ctx.duration       = 2.0
     #view_ctx.duration       = 0.25

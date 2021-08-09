@@ -31,8 +31,8 @@ processCount=9
 echo "Batch 2"
 date
 
-startFrame=500
-lastNumber=525
+startFrame=525
+lastNumber=550
 
 stride=$(((lastNumber-startFrame)/processCount))
 
@@ -54,28 +54,6 @@ for currPID in ${pidList[*]}; do
     echo "Done"
 done
 
-#startFrame=525
-#lastNumber=550
-#
-#stride=$(((lastNumber-startFrame)/processCount))
-#
-#batchCount=0
-#pidList=()
-#
-#until [ $startFrame -ge $lastNumber ]
-#do
-#    echo startFrame: $startFrame &
-#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
-#    pidList[${batchCount}]=$!
-#    ((startFrame=startFrame+stride))
-#    ((batchCount=batchCount+1))
-#done
-#
-## wait for all pids
-#for currPID in ${pidList[*]}; do
-#    wait $currPID
-#    echo "Done"
-#done
 #startFrame=550
 #lastNumber=600
 #

@@ -15,8 +15,9 @@ import numpy as np
 #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
 
 #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
+FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
 #FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
-FLINT_HIGH_PRECISION_SIZE = int(1500 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(1500 * 3.32) 
 
 # For debugging, looks like we're bottoming out somewhere around e-11
 # So, only really need ~20 digits for this test
@@ -73,7 +74,8 @@ class DiveMathSupport:
         because if any keyframes are added, the best we can do is measure an
         effective zoom factor between any 2 frames.
 
-        Somehow, this seems to be ok for flint too?!
+        Note: Flint's __pow__ needs TWO arb types as args, or else it drops 
+        to default python bit depths
         """
         return startValue * (overallZoomFactor ** iterations)
 
@@ -531,6 +533,21 @@ class DiveMathSupportFlint(DiveMathSupport):
     def floor(self, value):
         return self.flint.arb(value).floor()
 
+    def scaleValueByFactorForIterations(self, startValue, overallZoomFactor, iterations):
+        """
+        Shortcut calculate the starting point for the last frame's properties, 
+        which we'll use for instantiation with specific widths.  This is
+        because if any keyframes are added, the best we can do is measure an
+        effective zoom factor between any 2 frames.
+
+        Note: Flint's __pow__ needs TWO arb types as args, or else it drops 
+        to default python bit depths
+        """
+        zoomAsArb = self.flint.arb(overallZoomFactor)
+        iterationsAsArb = self.flint.arb(iterations)
+        return startValue * pow(zoomAsArb, iterationsAsArb)
+       
+
     def interpolateLogTo(self, startX, startY, endX, endY, targetX):
         """
         Probably want additional log-defining params, but for now, let's just bake in one equation
@@ -542,6 +559,56 @@ class DiveMathSupportFlint(DiveMathSupport):
         else:
             aVal = (endY - startY) / (self.flint.arb(endX - startX + 1).log())
             return aVal * (self.flint.arb(targetX - startX + 1).log()) + startY 
+
+    def interpolateRootTo(self, paramStartX, paramStartY, paramEndX, paramEndY, paramTargetX):
+        """ 
+        Iterative multiplications of window sizes for zooming means 
+        we want to be able to interpolate between two points using
+        the frame count as the root.
+        """
+        startX = self.flint.arb(paramStartX)
+        startY = self.flint.arb(paramStartY)
+        endX = self.flint.arb(paramEndX)
+        endY = self.flint.arb(paramEndY)
+        targetX = self.flint.arb(paramTargetX)
+
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            root  = endX - startX
+            scaleFactor = (endY / startY) ** (1 / root)
+            return startY * (scaleFactor ** targetX)
+
+    def interpolateQuadraticEaseOut(self, paramStartX, paramStartY, paramEndX, paramEndY, paramTargetX):
+        """
+        QuadraticEaseOut leaves the majority of changes to the end of the X range.
+
+        Probably want additional quadratic params, but for now, let's just bake in one equation
+        which uses the first point as the vertex, and passes through the second point.
+        """
+        startX = self.flint.arb(paramStartX)
+        startY = self.flint.arb(paramStartY)
+        endX = self.flint.arb(paramEndX)
+        endY = self.flint.arb(paramEndY)
+        targetX = self.flint.arb(paramTargetX)
+
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            # Find a, given that the start point is the vertex, and the parabola passes 
+            # through the other point
+            # y = a * (x - h)**2 + k
+            # y = a * (x - startX)**2 + startY
+            # endY = a * (endX - startX)**2 + startY
+            # a = ((endY-startY)/((endX-startX)**2)
+            #
+            # answer = a * (targetX - startX)**2 + startY
+            # answer = ((endY-startY)/((endX-startX)**2) * ((targetX-startX)**2) + startY
+            return (endY-startY)/((endX-startX)**self.flint.arb(2.0)) * ((targetX-startX)**self.flint.arb(2.0)) + startY
 
     def mandelbrot(self, c, escapeRadius, maxIter):
         """ 
@@ -661,16 +728,12 @@ class DiveMathSupportFlint(DiveMathSupport):
 
 class DiveMathSupportFlintCustom(DiveMathSupportFlint):
     def mandelbrot(self, c, escapeRadius, maxIter):
-        return c.our_mandelbrot(escapeRadius, maxIter)
-#        return c.libmandelbrot(escapeRadius, maxIter)
+        """ Slightly more efficient for HIGH maxIter values """
+        return c.our_steps_mandelbrot(escapeRadius, maxIter)
 
-#    def libMandelbrotFull(self, c, escapeRadius, maxIter):
-#        """ Reference implementation, just for error check? """
-#        return c.libmandelbrot_full(escapeRadius, maxIter)
-#
-#    def ourMandelbrot(self, c, escapeRadius, maxIter):
-#        #return c.libmandelbrot(escapeRadius, maxIter)
-#        return c.our_mandelbrot(escapeRadius, maxIter)
+    def mandelbrot_beginning(self, c, escapeRadius, maxIter):
+        """ Slightly more efficient for LOW maxIter values """
+        return c.our_mandelbrot(escapeRadius, maxIter)
 
 class DiveMathSupportGmp(DiveMathSupport):
     """
