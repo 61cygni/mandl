@@ -126,8 +126,7 @@ class FractalContext:
         if self.keyframe or snapshot_filename:
             self.pre_time = time.perf_counter()  
 
-        values = out.d
-        #values = self.algo.calc_cur_frame(self.img_width, self. img_height, re_start, re_end, im_start, im_end)         
+        values = self.algo.calc_cur_frame(self.img_width, self. img_height, re_start, re_end, im_start, im_end)         
 
             #if self.keyframe or snapshot_filename:
             #    print(".",end="")
@@ -152,9 +151,7 @@ class FractalContext:
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
 
-                #color = self.algo.map_value_to_color(values[(x,y)])
-                c =  values[(x,y)]
-                color = (c,c,c)
+                color = self.algo.map_value_to_color(values[(x,y)])
 
                 # Plot the point
                 draw.point([x, y], color) 

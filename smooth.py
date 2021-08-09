@@ -70,6 +70,9 @@ class Smooth(Algo):
 
         return sl 
 
+    def calc_cur_frame(self, img_width, img_height, x, xx, xxx, xxxx):
+        import out
+        return out.d
 
     def _map_to_color(self, val):
         magnification = 1. / self.context.cmplx_width
@@ -93,9 +96,7 @@ class Smooth(Algo):
         c3int = int(255.*((c3/4.) * 3.) / denom)
         return (c1int,c2int,c3int)
 
-    def map_value_to_color(self, loc, vals):
-
-        val = vals[loc]
+    def map_value_to_color(self, val):
 
         magnification = 1. / self.context.cmplx_width
         if magnification <= 100:

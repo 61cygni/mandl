@@ -5,6 +5,10 @@
  *
  * Description:
  *
+ *
+ * TODO : pull all declaration and initialization out of the type loop
+ * to speed things up
+ *
  *---------------------------------------------------------------------------*/
 
 
@@ -16,6 +20,14 @@
 #include <sys/time.h>
 
 #include "libbf.h"
+
+static int img_w = 320, img_h = 240;
+static limb_t precision  = 512; 
+static int max_iter      = 2000;
+static char *str_real    = "-1.769383179195515018213847286085473782905747263654751437465528216527888191264756458836163446389529667304485825781820303157487491238421719403128246195113";
+static char *str_imag    = "0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149"; 
+static char *str_cmplx_w = ".000000000000000000001";
+//static char *str_cmplx_w = ".0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
 
 static bf_context_t bf_ctx;
 
@@ -34,10 +46,29 @@ static void print_bf(const bf_t *ptr){
 
 }
 
+static int bf_log2(bf_t* ret, const bf_t* in, limb_t prec,
+        bf_flags_t flags){
+
+    bf_t logofin;
+    bf_t logoftwo;
+    bf_t two;
+
+    bf_init(&bf_ctx, &logofin);
+    bf_init(&bf_ctx, &logoftwo);
+    bf_init(&bf_ctx, &two);
+
+    bf_set_ui(&two, 2);
+
+    // log2(x) = log10(x) / log10(x)
+    bf_log(&logofin,  in,   prec, BF_RNDU);
+    bf_log(&logoftwo, &two, prec, BF_RNDU);
+    return bf_div(ret, &logofin, &logoftwo, prec, BF_RNDU);
+}
+
 //--
 //Take a null terminated string and convert to a bf_t
 //--
-static int str_to_bf_t(bf_t* result,char* str, int precision){
+static int str_to_bf_t(bf_t* result,char* str, int prec){
     bf_t digit;
     bf_t position;
     
@@ -63,7 +94,7 @@ static int str_to_bf_t(bf_t* result,char* str, int precision){
     while (str[index] && str[index++] != '.') { ;
     }
     if(! str[index]){
-        bf_mul_si(result, result, neg, precision, BF_RNDU); 
+        bf_mul_si(result, result, neg, prec, BF_RNDU); 
         return 0;
     }
     // Should be just past the decimal point here ...
@@ -74,30 +105,29 @@ static int str_to_bf_t(bf_t* result,char* str, int precision){
 
         num = str[index] - '0'; // convert char to int
         bf_set_ui(&digit, num);
-        bf_mul_ui(&position, &position, 10, precision, BF_RNDU); 
-        bf_div(&digit, &digit, &position, precision, BF_RNDU);  
-        bf_add(result, result, &digit, precision, BF_RNDU);
+        bf_mul_ui(&position, &position, 10, prec, BF_RNDU); 
+        bf_div(&digit, &digit, &position, prec, BF_RNDU);  
+        bf_add(result, result, &digit, prec, BF_RNDU);
         val++;
         index++;
     }
-    bf_mul_si(result, result, neg, precision, BF_RNDU); 
+    bf_mul_si(result, result, neg, prec, BF_RNDU); 
     return val; // number of digits after decimal point
 }
 
-void squared_modulus(bf_t* result, bf_t* real, bf_t* imag, int precision){
+void squared_modulus(bf_t* result, bf_t* real, bf_t* imag, int prec){
     bf_t tmp;
     bf_t tmp2;
     bf_init(&bf_ctx, &tmp);
     bf_init(&bf_ctx, &tmp2);
 
-    bf_mul(&tmp,  real, real, precision, BF_RNDU);
-    bf_mul(&tmp2, imag, imag, precision, BF_RNDU);
-    bf_add(result, &tmp, &tmp2, precision, BF_RNDU);
+    bf_mul(&tmp,  real, real, prec, BF_RNDU);
+    bf_mul(&tmp2, imag, imag, prec, BF_RNDU);
+    bf_add(result, &tmp, &tmp2, prec, BF_RNDU);
 }
 
-float calc_pixel(bf_t* re_x, bf_t* im_y, int precision) {
+float calc_pixel(bf_t* re_x, bf_t* im_y, int prec) {
     int squared_rad = 256 * 256;
-    int max_iter = 10000;
 
     bf_t z_real;
     bf_t z_imag;
@@ -123,18 +153,18 @@ float calc_pixel(bf_t* re_x, bf_t* im_y, int precision) {
 
     for(int i = 0; i < max_iter; ++i) {
         // z_real =  (z_real*z_real - z_imag*z_imag) + re_x
-        bf_mul(&tmp,   &z_real, &z_real, precision, BF_RNDU);  
-        bf_mul(&tmp2,  &z_imag, &z_imag, precision, BF_RNDU);  
-        bf_sub(&tmp,    &tmp,   &tmp2,   precision, BF_RNDU);  
-        bf_add(&z_real, &tmp, re_x, precision, BF_RNDU); 
+        bf_mul(&tmp,   &z_real, &z_real, prec, BF_RNDU);  
+        bf_mul(&tmp2,  &z_imag, &z_imag, prec, BF_RNDU);  
+        bf_sub(&tmp,    &tmp,   &tmp2,   prec, BF_RNDU);  
+        bf_add(&z_real, &tmp, re_x, prec, BF_RNDU); 
 
         // z_imag = hpf(2)*z_real*z_imag + imag )
-        bf_mul(&tmp, &two, &z_real, precision, BF_RNDU);
-        bf_mul(&tmp, &tmp, &z_imag, precision, BF_RNDU);
-        bf_add(&z_imag, &tmp, im_y, precision, BF_RNDU);
+        bf_mul(&tmp, &two, &z_real, prec, BF_RNDU);
+        bf_mul(&tmp, &tmp, &z_imag, prec, BF_RNDU);
+        bf_add(&z_imag, &tmp, im_y, prec, BF_RNDU);
 
         //if csquared_modulus(z_real, z_imag) >= squared_er: 
-        squared_modulus(&sm, &z_real, &z_imag, precision);
+        squared_modulus(&sm, &z_real, &z_imag, prec);
         if(! bf_cmp_lt(&sm, &rad)) {
             return i;
         }
@@ -142,15 +172,16 @@ float calc_pixel(bf_t* re_x, bf_t* im_y, int precision) {
     return max_iter;
 }
 
-float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int precision) {
+float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int prec) {
     int squared_rad = 256 * 256;
-    int max_iter = 10000;
 
     bf_t z_real;
     bf_t z_imag;
 
     bf_t tmp;
     bf_t tmp2;
+    bf_t log2;
+    bf_t loglog2;
     bf_t two;
     bf_t sm;
     bf_t rad;
@@ -162,6 +193,8 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int precision) {
     bf_init(&bf_ctx, &two);
     bf_init(&bf_ctx, &sm);
     bf_init(&bf_ctx, &rad);
+    bf_init(&bf_ctx, &log2);
+    bf_init(&bf_ctx, &loglog2);
 
     bf_set_ui(&z_real, 0);
     bf_set_ui(&z_imag, 0);
@@ -172,18 +205,20 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int precision) {
 
     for(int i = 0; i < max_iter; ++i) {
         // z_real =  (z_real*z_real - z_imag*z_imag) + re_x
-        bf_mul(&tmp,   &z_real, &z_real, precision, BF_RNDU);  
-        bf_mul(&tmp2,  &z_imag, &z_imag, precision, BF_RNDU);  
-        bf_sub(&tmp,    &tmp,   &tmp2,   precision, BF_RNDU);  
-        bf_add(&z_real, &tmp, re_x, precision, BF_RNDU); 
+        bf_mul(&tmp,   &z_real, &z_real, prec, BF_RNDU);  
+        bf_mul(&tmp2,  &z_imag, &z_imag, prec, BF_RNDU);  
+        bf_sub(&tmp,    &tmp,   &tmp2,   prec, BF_RNDU);  
+        bf_add(&tmp2, &tmp, re_x, prec, BF_RNDU);  // save while we calc second portion
 
         // z_imag = hpf(2)*z_real*z_imag + imag )
-        bf_mul(&tmp, &two, &z_real, precision, BF_RNDU);
-        bf_mul(&tmp, &tmp, &z_imag, precision, BF_RNDU);
-        bf_add(&z_imag, &tmp, im_y, precision, BF_RNDU);
+        bf_mul(&tmp, &two, &z_real, prec, BF_RNDU);
+        bf_mul(&tmp, &tmp, &z_imag, prec, BF_RNDU);
+        bf_add(&z_imag, &tmp, im_y, prec, BF_RNDU);
+
+        bf_set(&z_real, &tmp2);
 
         //if csquared_modulus(z_real, z_imag) >= squared_er: 
-        squared_modulus(&sm, &z_real, &z_imag, precision);
+        squared_modulus(&sm, &z_real, &z_imag, prec);
         if(! bf_cmp_lt(&sm, &rad)) {
             break; 
         }
@@ -195,13 +230,14 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int precision) {
 
     // sl = (l - math.log2(math.log2(csquared_modulus(z_real,z_imag)))) + 4.0;
     // sm should alrady contain sqaure_mod of z_real and z_imag
-    bf_const_log2(&sm, precision, BF_RNDU);
-    bf_const_log2(&sm, precision, BF_RNDU);
+    bf_log2(&log2,    &sm,   prec, BF_RNDU);
+    bf_log2(&loglog2, &log2, prec, BF_RNDU);
 
     bf_set_float64(&tmp, l);
-    bf_sub(&tmp, &tmp, &sm, precision, BF_RNDU);
+    // l - log2(log2(sqaured_mod()))
+    bf_sub(&tmp, &tmp, &loglog2, prec, BF_RNDU);
     bf_set_float64(&tmp2, 4.0);
-    bf_add(&tmp, &tmp, &tmp2, precision, BF_RNDU);
+    bf_add(&tmp, &tmp, &tmp2, prec, BF_RNDU);
 
     double ret;
     bf_get_float64(&tmp, &ret, BF_RNDU);
@@ -211,10 +247,7 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int precision) {
 
 int main(int argc, char **argv)
 {
-    int precision = 128; 
 
-    char *str_real = "-1.76938317919551501821384728608547378290574726365475143746552821652788819126";
-    char *str_imag = "0.00423684791873677221492650717136799707668267091740375727945943565011234400"; 
     //char *str_real = "-1.";
     //char *str_imag = "0.";
 
@@ -232,23 +265,22 @@ int main(int argc, char **argv)
     // print_bf(&c_imag);
 
     // Fractal variables start here 
-    int img_w = 400, img_h = 300;
     bf_t cmplx_w;  
     bf_t cmplx_h;  
-
-    float COMPLEX_WIDTH = .09;
 
 
     bf_init(&bf_ctx, &cmplx_w);
     bf_init(&bf_ctx, &cmplx_h);
 
-    bf_set_float64(&cmplx_w, COMPLEX_WIDTH); 
-    bf_set_float64(&cmplx_h, COMPLEX_WIDTH * ((float)img_h / (float)img_w) ); 
+    str_to_bf_t(&cmplx_w, str_cmplx_w, precision);
 
-    printf("Complex width :");
-    print_bf(&cmplx_w);
-    printf("Complex height :");
-    print_bf(&cmplx_h);
+    bf_set_float64(&cmplx_h, ((float)img_h / (float)img_w) ); 
+    bf_mul(&cmplx_h, &cmplx_h, &cmplx_w, precision, BF_RNDU); 
+
+    // printf("Complex width :");
+    // print_bf(&cmplx_w);
+    // printf("Complex height :");
+    // print_bf(&cmplx_h);
 
     // Calc Current Frame
     bf_t re_start;
@@ -278,10 +310,10 @@ int main(int argc, char **argv)
     bf_sub(&re_start, &c_real, &tmp, precision, BF_RNDU); 
     bf_add(&re_end, &c_real,   &tmp, precision, BF_RNDU); 
 
-    printf("re_start: ");
-    print_bf(&re_start);
-    printf("re_end: ");
-    print_bf(&re_end);
+    // printf("re_start: ");
+    // print_bf(&re_start);
+    // printf("re_end: ");
+    // print_bf(&re_end);
 
     // im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
     // im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
@@ -289,10 +321,10 @@ int main(int argc, char **argv)
     bf_sub(&im_start, &c_imag, &tmp, precision, BF_RNDU); 
     bf_add(&im_end,   &c_imag, &tmp, precision, BF_RNDU); 
 
-    printf("im_start: ");
-    print_bf(&im_start);
-    printf("im_end: ");
-    print_bf(&im_end);
+    // printf("im_start: ");
+    // print_bf(&im_start);
+    // printf("im_end: ");
+    // print_bf(&im_end);
 
     // main loop here!!
     bf_t re_x;
@@ -301,7 +333,8 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &im_y);
 
     float prog; // fraction of progress
-    int res;
+    float res;
+    //int res;
     printf("d = {};\n");
     for(int y = 0; y < img_h; ++y){
         for(int x = 0; x < img_w; ++x){
@@ -320,17 +353,9 @@ int main(int argc, char **argv)
             bf_mul(&tmp, &tmp2, &tmp, precision, BF_RNDU);
             bf_add(&im_y, &im_start, &tmp, precision, BF_RNDU);
 
-            // printf("re_x: ");
-            // print_bf(&re_x);
-            // printf("im_y: ");
-            // print_bf(&im_y);
-
-            res = calc_pixel(&re_x, &im_y, precision); // main calculation!
-            //printf("d[(%d,%d)] = %d; ",x,y,res);
-             if(res == 256)
-                 printf("*");
-             else
-                 printf(".");
+            // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
+            res = calc_pixel_smooth(&re_x, &im_y, precision); // main calculation!
+            printf("d[(%d,%d)] = %f; ",x,y,res);
         } // y
         printf("\n");
         fflush(stdout);

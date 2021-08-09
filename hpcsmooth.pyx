@@ -127,8 +127,14 @@ def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
             Re_x = (re_start) + (in_x / img_width)  * (re_end - re_start)
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
+            if x == 0 and y == 0:
+                print("Re/Im %s %s"%(Re_x,Im_y))
+
             # Call primary calculation function here
             m = ccalc_pixel(Re_x, Im_y, max_iter, escape_rad)
+
+            if x == 0 and y == 0:
+                print("%d %d %f"%(x,y,m))
 
             values[(x,y)] = m 
         printf(".")
@@ -173,11 +179,17 @@ class HPCSmooth(Algo):
         global magnification
         global num_epochs
 
+        print("c_real: %s"%(c_real))
+        print("c_imag: %s"%(c_imag))
+
         re_start = hpf(c_real - (c_width / hpf(2.)))
         re_end   = hpf(c_real + (c_width / hpf(2.)))
 
         im_start = hpf(c_imag - (c_height / hpf(2.)))
         im_end   = hpf(c_imag + (c_height / hpf(2.)))
+        
+        print("re_start: %s"%(re_start))
+        print("re_end: %s"%(re_end))
 
         print(" + calculating frame at complex width %s"%(re_start - re_end))
         
@@ -209,8 +221,10 @@ class HPCSmooth(Algo):
 
         c_width  = hpf(self.context.cmplx_width)
         c_height = hpf(self.context.cmplx_height)
-        c_real = hpf('-1.76938317919551501821384728608547378290574726365475143746552821652788819126')
-        c_imag = hpf('0.00423684791873677221492650717136799707668267091740375727945943565011234400')
+        #c_real = hpf('-1.76938317919551501821384728608547378290574726365475143746552821652788819126')
+        #c_imag = hpf('0.00423684791873677221492650717136799707668267091740375727945943565011234400')
+        c_real = hpf('-1')
+        c_imag = hpf('0')
 
         scaling_factor = self.context.scaling_factor
         magnification = self.context.magnification
