@@ -16,7 +16,7 @@ import numpy as np
 
 #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
 #FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
-FLINT_HIGH_PRECISION_SIZE = int(825 * 3.32) 
+FLINT_HIGH_PRECISION_SIZE = int(1500 * 3.32) 
 
 # For debugging, looks like we're bottoming out somewhere around e-11
 # So, only really need ~20 digits for this test
@@ -661,20 +661,16 @@ class DiveMathSupportFlint(DiveMathSupport):
 
 class DiveMathSupportFlintCustom(DiveMathSupportFlint):
     def mandelbrot(self, c, escapeRadius, maxIter):
-        #radiusArb = self.flint.arb(escapeRadius)
-        #return c.libmandelbrot(radiusArb, maxIter)
-        return c.libmandelbrot(escapeRadius, maxIter)
-        #return c.libmandelbrot_full(escapeRadius, maxIter)
-        #print("Calling library, radius: %s, iter: %s" % (str(escapeRadius), str(maxIter)))
-        #(tmpRes, tmpZ) = c.libmandelbrot_full(escapeRadius, maxIter)
-        #print("%d" % (tmpRes))
-        #print("%d - %s" % (tmpRes, str(tmpZ)))
-        #print("%d - %s" % (tmpRes, str(abs(tmpZ))))
-        #return (tmpRes, tmpZ)
+        return c.our_mandelbrot(escapeRadius, maxIter)
+#        return c.libmandelbrot(escapeRadius, maxIter)
 
-    def libMandelbrotFull(self, c, escapeRadius, maxIter):
-        """ Reference implementation, just for error check? """
-        return c.libmandelbrot_full(escapeRadius, maxIter)
+#    def libMandelbrotFull(self, c, escapeRadius, maxIter):
+#        """ Reference implementation, just for error check? """
+#        return c.libmandelbrot_full(escapeRadius, maxIter)
+#
+#    def ourMandelbrot(self, c, escapeRadius, maxIter):
+#        #return c.libmandelbrot(escapeRadius, maxIter)
+#        return c.our_mandelbrot(escapeRadius, maxIter)
 
 class DiveMathSupportGmp(DiveMathSupport):
     """

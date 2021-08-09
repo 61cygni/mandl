@@ -1175,12 +1175,50 @@ def set_demo1_params(fractal_ctx, view_ctx):
 
     # Finally timed that run
     # 50 frames (375-425)
-    # 2048*8 max iter
+    # 2048*8 max iter (== 16384 iters)
     # 825 digits (2739 bits)
-    # 
+    # real    61m38.026s
+    # user    514m30.844s
+    # sys     0m9.203s
+    # Which is ~74 seconds per frame.
+    # ~10,400 iters used
+    # ~e-129 widths
+
+    # Moving endpoint to 320 seconds? (~957 frames?)
+    # Going up to 2048 * 10 (= 20,480 iters)
+    # Looks like the last increment used 15 more digits... 
+    # So, Maybe add 100 positions?
+    # That'll be 925 digits (3071 bits)
+    # real    30m22.199s
+    # user    381m58.938s
+    # sys     0m12.344s
+    # hit e-135 at 450
+    # using 11,000 iters
+
+
+    # Frames 450-475 (no big changes for this segment)
+    # real    38m16.362s
+    # user    445m59.469s
+    # sys     0m12.938s
+    # hit e-143 at 475
+    # using ~14,800 itersA
+    # Looks like this gets to ~10:30 in the edge of infinity dive.
+    # So, out of 2:29:04, that's about 6% of the dive?
+    #
+    # Gonna raise to 41k iterations (2048 * 20)
+    # Gonna bump up to 1500 digits? (4830 bits?)
+    # Trying to take a bigger bite, 475-900?
+
+    # Attempt at batching to 599 failed the first time, 
+    # BUT resulted in:
+    # used 27k iter
+    # e-180 widths
+    # Looks like this was gonna work just fine...
     
-
-
+    # 25 frames hit ~109 minutes (~4.5 minutes per frame)
+    # (1308 minutes user time) = 52 minutes per frame.
+    # Iters hit ~24k
+    
 
 
     #fractal_ctx.max_iter       = 128 
@@ -1188,7 +1226,7 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.max_iter       = 512 # covers ~e-34 or so 
     #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
     #fractal_ctx.max_iter       = 2048 
-    fractal_ctx.max_iter       = 2048 * 8
+    fractal_ctx.max_iter       = 2048 * 20
 
     fractal_ctx.escape_rad     = 2
     #fractal_ctx.escape_rad     = 4 
@@ -1214,7 +1252,7 @@ def set_demo1_params(fractal_ctx, view_ctx):
 
     #view_ctx.duration = math.ceil(6.0 / view_ctx.fps)
     #view_ctx.duration       = 4.0
-    view_ctx.duration       = 180.0
+    view_ctx.duration       = 540.0
     #view_ctx.duration       = 30.0
     #view_ctx.duration       = 2.0
     #view_ctx.duration       = 0.25

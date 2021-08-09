@@ -24,16 +24,18 @@
 # Honestly, I can't imagine cache is doing anything but thrashing at higher bit depths...
 # So let's run 6 processes next attempt? (Seems like it sped up at the end, so probably right).
 #processCount=12
-
 # Tried 12 again, think it's very slow.
-processCount=8
-startFrame=375
-lastNumber=425
+
+processCount=9
+
+echo "Batch 2"
+date
+
+startFrame=500
+lastNumber=525
 
 stride=$(((lastNumber-startFrame)/processCount))
 
-#stride=45
-#lastNumber=359
 batchCount=0
 pidList=()
 
@@ -52,9 +54,139 @@ for currPID in ${pidList[*]}; do
     echo "Done"
 done
 
-# AFTER all the processes finish
-python3.9 compile_video.py --dir='demo1_cache/image_frames/flint/mandelbrot_solo' --out='compiled.gif'
-
+#startFrame=525
+#lastNumber=550
+#
+#stride=$(((lastNumber-startFrame)/processCount))
+#
+#batchCount=0
+#pidList=()
+#
+#until [ $startFrame -ge $lastNumber ]
+#do
+#    echo startFrame: $startFrame &
+#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
+#    pidList[${batchCount}]=$!
+#    ((startFrame=startFrame+stride))
+#    ((batchCount=batchCount+1))
+#done
+#
+## wait for all pids
+#for currPID in ${pidList[*]}; do
+#    wait $currPID
+#    echo "Done"
+#done
+#startFrame=550
+#lastNumber=600
+#
+#stride=$(((lastNumber-startFrame)/processCount))
+#
+#batchCount=0
+#pidList=()
+#
+#until [ $startFrame -ge $lastNumber ]
+#do
+#    echo startFrame: $startFrame &
+#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
+#    pidList[${batchCount}]=$!
+#    ((startFrame=startFrame+stride))
+#    ((batchCount=batchCount+1))
+#done
+#
+## wait for all pids
+#for currPID in ${pidList[*]}; do
+#    wait $currPID
+#    echo "Done"
+#done
+#
+#
+#echo "Batch 3"
+#date
+#
+#
+#startFrame=600
+#lastNumber=700
+#
+#stride=$(((lastNumber-startFrame)/processCount))
+#
+#batchCount=0
+#pidList=()
+#
+#until [ $startFrame -ge $lastNumber ]
+#do
+#    echo startFrame: $startFrame &
+#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
+#    pidList[${batchCount}]=$!
+#    ((startFrame=startFrame+stride))
+#    ((batchCount=batchCount+1))
+#done
+#
+## wait for all pids
+#for currPID in ${pidList[*]}; do
+#    wait $currPID
+#    echo "Done"
+#done
+#
+#
+#echo "Batch 4"
+#date
+#
+#startFrame=700
+#lastNumber=800
+#
+#stride=$(((lastNumber-startFrame)/processCount))
+#
+##stride=45
+##lastNumber=359
+#batchCount=0
+#pidList=()
+#
+#until [ $startFrame -ge $lastNumber ]
+#do
+#    echo startFrame: $startFrame &
+#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
+#    pidList[${batchCount}]=$!
+#    ((startFrame=startFrame+stride))
+#    ((batchCount=batchCount+1))
+#done
+#
+## wait for all pids
+#for currPID in ${pidList[*]}; do
+#    wait $currPID
+#    echo "Done"
+#done
+#
+#
+#echo "Batch 5"
+#date
+#
+#startFrame=800
+#lastNumber=900
+#
+#stride=$(((lastNumber-startFrame)/processCount))
+#
+#batchCount=0
+#pidList=()
+#
+#until [ $startFrame -ge $lastNumber ]
+#do
+#    echo startFrame: $startFrame &
+#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
+#    pidList[${batchCount}]=$!
+#    ((startFrame=startFrame+stride))
+#    ((batchCount=batchCount+1))
+#done
+#
+## wait for all pids
+#for currPID in ${pidList[*]}; do
+#    wait $currPID
+#    echo "Done"
+#done
+#
+#
+## AFTER all the processes finish
+#python3.9 compile_video.py --dir='demo1_cache/image_frames/flint/mandelbrot_solo' --out='compiled.gif'
+#
 
 
 
