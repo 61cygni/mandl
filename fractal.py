@@ -150,8 +150,10 @@ class FractalContext:
         
         for x in range(0, self.img_width):
             for y in range(0, self.img_height):
-
-                color = self.algo.map_value_to_color(values[(x,y)])
+                
+                color = (128,128,128)
+                if (x,y) in values: 
+                    color = self.algo.map_value_to_color(values[(x,y)])
 
                 # Plot the point
                 draw.point([x, y], color) 
