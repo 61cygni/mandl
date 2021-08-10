@@ -5,9 +5,22 @@
  *
  * Description:
  *
+ * c kernel for high precision mandelbrot calculations. This is not meant
+ * as a standalone program, but expected to be driven by a python harness
+ * which handles the output.
  *
- * TODO : pull all declaration and initialization out of the type loop
- * to speed things up
+ * Smoothing implementation based on :
+ *
+ * https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
+ * https://www.shadertoy.com/view/4df3Rn coloring and smoothing working
+ *
+ * TODO:
+ * - move initializations out of calc_pixel_smooth
+ * - test with lower escape rad (4?)
+ * - test with infinite precision? BF_PREC_INF 
+ * - have debugging output go to stderr
+ * - print timing for frames and output
+ *
  *
  *---------------------------------------------------------------------------*/
 
@@ -21,33 +34,34 @@
 
 #include "libbf.h"
 
-static int img_w = 320, img_h = 240;
-static limb_t precision  = 512; 
-static int max_iter      = 2000;
-static char *str_real    = "-1.769383179195515018213847286085473782905747263654751437465528216527888191264756458836163446389529667304485825781820303157487491238421719403128246195113";
-static char *str_imag    = "0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149"; 
-static char *str_cmplx_w = ".000000000000000000001";
+static int img_w = 80, img_h = 60;
+static limb_t precision  = 1600; 
+static int max_iter      = 40000;
+//char *str_real = "-1.";
+//char *str_imag = "0.";
+static char *str_real    = "-1.7693831791955150182138472860854737829057472636547514374655282165278881912647564588361634463895296673044858257818203031574874912384217194031282461951137475212550848062085787454772803303225167998662391124184542743017129214423639793169296754394181656831301342622793541423768572435783910849972056869527305207508191441734781061794290699753174911133714351734166117456520272756159178932042908932465102671790878414664628213755990650460738372283470777870306458882";
+static char *str_imag    = "0.0042368479187367722149265071713679970766826709174037572794594356501123440008055451573024309950236365063135326833596525718230049480553873630612752481493929235593089283439205079672488790492198666604557662694690066610349401490471432372558697978990852065668320265806402411530037882678978639464162203534105510290045630572371868452721037732584630791751262877467200569332623280695382279675583251718887347912436143098948549550112409632942168282733069353217150536"; 
+//static char *str_cmplx_w = ".000000000000000000001";
 //static char *str_cmplx_w = ".0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+static char *str_cmplx_w = ".000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
 
 static bf_context_t bf_ctx;
 
-static void *my_bf_realloc(void *opaque, void *ptr, size_t size)
-{
+static void *my_bf_realloc(void *opaque, void *ptr, size_t size) {
     return realloc(ptr, size);
 }
 
-static void print_bf(const bf_t *ptr){
+static void print_bf(const bf_t *ptr, limb_t precision) {
     char *digits;
     size_t digits_len;
-    digits = bf_ftoa(&digits_len, ptr, 10, 128,
+    digits = bf_ftoa(&digits_len, ptr, 10, precision,
                          BF_FTOA_FORMAT_FIXED | BF_RNDZ);
-    printf("%s\n",digits);
+    printf("%s",digits);
     free(digits);
-
 }
 
 static int bf_log2(bf_t* ret, const bf_t* in, limb_t prec,
-        bf_flags_t flags){
+        bf_flags_t flags) {
 
     bf_t logofin;
     bf_t logoftwo;
@@ -205,20 +219,24 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int prec) {
 
     for(int i = 0; i < max_iter; ++i) {
         // z_real =  (z_real*z_real - z_imag*z_imag) + re_x
-        bf_mul(&tmp,   &z_real, &z_real, prec, BF_RNDU);  
-        bf_mul(&tmp2,  &z_imag, &z_imag, prec, BF_RNDU);  
-        bf_sub(&tmp,    &tmp,   &tmp2,   prec, BF_RNDU);  
-        bf_add(&tmp2, &tmp, re_x, prec, BF_RNDU);  // save while we calc second portion
+        bf_mul(&tmp,  &z_real, &z_real, prec, BF_RNDU);  
+        bf_mul(&tmp2, &z_imag, &z_imag, prec, BF_RNDU);  
+        bf_sub(&tmp,  &tmp,    &tmp2,   prec, BF_RNDU);  
+        bf_add(&tmp2, &tmp,     re_x,   prec, BF_RNDU);  // save z_real result while we calc second portion
 
-        // z_imag = hpf(2)*z_real*z_imag + imag )
-        bf_mul(&tmp, &two, &z_real, prec, BF_RNDU);
-        bf_mul(&tmp, &tmp, &z_imag, prec, BF_RNDU);
-        bf_add(&z_imag, &tmp, im_y, prec, BF_RNDU);
+        // z_imag = 2.0 *z_real*z_imag + imag 
+        bf_mul(&tmp,    &two, &z_real, prec, BF_RNDU);
+        bf_mul(&tmp,    &tmp, &z_imag, prec, BF_RNDU);
+        bf_add(&z_imag, &tmp,  im_y,   prec, BF_RNDU);
 
         bf_set(&z_real, &tmp2);
 
         //if csquared_modulus(z_real, z_imag) >= squared_er: 
-        squared_modulus(&sm, &z_real, &z_imag, prec);
+        // squared_modulus(&sm, &z_real, &z_imag, prec);
+        bf_mul(&tmp,  &z_real, &z_real, prec, BF_RNDU);
+        bf_mul(&tmp2, &z_imag, &z_imag, prec, BF_RNDU);
+        bf_add(&sm,   &tmp,    &tmp2,   prec, BF_RNDU);
+
         if(! bf_cmp_lt(&sm, &rad)) {
             break; 
         }
@@ -244,12 +262,25 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int prec) {
     return ret;
 }
 
+void print_header() {
+    printf(" # -- \n");
+    printf(" #\n");
+    printf(" # Image w: %d", img_w);
+    printf(" # Image h: %d", img_h);
+    printf(" #\n");
+    printf(" # Center: \n");
+    printf(" #     Re %s: \n", str_real);
+    printf(" #     Im %s: \n", str_imag);
+    printf(" #\n");
+    printf(" #     Max iter %d: \n",  max_iter);
+    printf(" #     Precision %d: \n", (int)precision);
+    printf(" #\n");
+    printf(" # -- \n");
+    printf(" #\n");
+}
 
 int main(int argc, char **argv)
 {
-
-    //char *str_real = "-1.";
-    //char *str_imag = "0.";
 
     bf_context_init(&bf_ctx, my_bf_realloc, NULL);
 
@@ -263,11 +294,12 @@ int main(int argc, char **argv)
     //print_bf(&c_real);
     str_to_bf_t(&c_imag, str_imag, precision);
     // print_bf(&c_imag);
+    
+    print_header();
 
     // Fractal variables start here 
     bf_t cmplx_w;  
     bf_t cmplx_h;  
-
 
     bf_init(&bf_ctx, &cmplx_w);
     bf_init(&bf_ctx, &cmplx_h);
@@ -305,15 +337,13 @@ int main(int argc, char **argv)
     bf_set_ui(&two, 2);
     bf_div(&tmp, &cmplx_w, &two, precision, BF_RNDU);
 
-    // print_bf(&tmp);
-
     bf_sub(&re_start, &c_real, &tmp, precision, BF_RNDU); 
     bf_add(&re_end, &c_real,   &tmp, precision, BF_RNDU); 
 
-    // printf("re_start: ");
-    // print_bf(&re_start);
-    // printf("re_end: ");
-    // print_bf(&re_end);
+    printf("re_start = \"");
+    print_bf(&re_start, precision); printf("\"\n");
+    printf("re_end =  \"");
+    print_bf(&re_end, precision);  printf("\"\n");
 
     // im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
     // im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
@@ -321,10 +351,10 @@ int main(int argc, char **argv)
     bf_sub(&im_start, &c_imag, &tmp, precision, BF_RNDU); 
     bf_add(&im_end,   &c_imag, &tmp, precision, BF_RNDU); 
 
-    // printf("im_start: ");
-    // print_bf(&im_start);
-    // printf("im_end: ");
-    // print_bf(&im_end);
+    printf("im_start = \"");
+    print_bf(&im_start, precision); printf("\"\n");
+    printf("im_end = \"");
+    print_bf(&im_end, precision); printf("\"\n");
 
     // main loop here!!
     bf_t re_x;
