@@ -16,19 +16,21 @@
  * https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
  * https://www.shadertoy.com/view/4df3Rn coloring and smoothing working
  *
+ *
+ * usage : nativemandel 
+ *              -i generate a PNG image (for debugging
+ *              -v dump debugging output to stderr
+ *
  * TODO:
  * - move initializations out of calc_pixel_smooth
- * - test with lower escape rad (4?)
- * - test with infinite precision? BF_PREC_INF 
- * - have debugging output go to stderr
  * - print timing for frames and output
- *
  *
  *---------------------------------------------------------------------------*/
 
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <inttypes.h>
 #include <math.h>
 #include <string.h>
@@ -39,7 +41,7 @@
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 
-static int img_w = 1024, img_h = 768;
+static int img_w = 256, img_h = 192;
 static limb_t precision  = 100; 
 static int max_iter      = 5000;
 
@@ -67,13 +69,18 @@ static void *my_bf_realloc(void *opaque, void *ptr, size_t size) {
     return realloc(ptr, size);
 }
 
-static void print_bf(const bf_t *ptr, limb_t precision) {
+
+static void fprint_bf(FILE* fp, const bf_t *ptr, limb_t precision) {
     char *digits;
     size_t digits_len;
     digits = bf_ftoa(&digits_len, ptr, 10, precision,
                          BF_FTOA_FORMAT_FIXED | BF_RNDZ);
-    printf("%s",digits);
+    fprintf(fp, "%s",digits);
     free(digits);
+}
+
+static void print_bf(const bf_t *ptr, limb_t precision) {
+    fprint_bf(stdout, ptr, precision);
 }
 
 static int bf_log2(bf_t* ret, const bf_t* in, limb_t prec,
@@ -297,8 +304,30 @@ void print_header() {
     printf(" #\n");
 }
 
+void usage() {
+    printf("Usage: nativemandel [-i] [-v]\n");
+    printf(" -i dump to image for debugging\n");
+    printf(" -v debug output to stderr\n");
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
+    int ch, iflag = 0, vflag = 0;
+
+    while ((ch = getopt(argc, argv, "iv")) != -1) {
+        switch (ch) {
+            case 'i':
+                iflag = 1;
+                break;
+            case 'v':
+                vflag = 1;
+                break;
+            case '?':
+            default:
+                usage();
+        }
+    }
 
     bf_context_init(&bf_ctx, my_bf_realloc, NULL);
 
@@ -312,8 +341,7 @@ int main(int argc, char **argv)
     //print_bf(&c_real);
     str_to_bf_t(&c_imag, str_imag, precision);
     // print_bf(&c_imag);
-    
-    print_header();
+
 
     // Fractal variables start here 
     bf_t cmplx_w;  
@@ -327,10 +355,6 @@ int main(int argc, char **argv)
     bf_set_float64(&cmplx_h, ((float)img_h / (float)img_w) ); 
     bf_mul(&cmplx_h, &cmplx_h, &cmplx_w, precision, BF_RNDU); 
 
-    // fprintf(stderr, "Complex width :");
-    // print_bf(&cmplx_w, precision);
-    // fprintf(stderr, "Complex height :");
-    // print_bf(&cmplx_h, precision);
 
     // Calc Current Frame
     bf_t re_start;
@@ -351,17 +375,12 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &tmp);
     bf_t tmp2;
     bf_init(&bf_ctx, &tmp2);
-    
+
     bf_set_ui(&two, 2);
     bf_div(&tmp, &cmplx_w, &two, precision, BF_RNDU);
 
     bf_sub(&re_start, &c_real, &tmp, precision, BF_RNDU); 
     bf_add(&re_end, &c_real,   &tmp, precision, BF_RNDU); 
-
-    printf("re_start = \"");
-    print_bf(&re_start, precision); printf("\"\n");
-    printf("re_end =  \"");
-    print_bf(&re_end, precision);  printf("\"\n");
 
     // im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
     // im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
@@ -369,10 +388,34 @@ int main(int argc, char **argv)
     bf_sub(&im_start, &c_imag, &tmp, precision, BF_RNDU); 
     bf_add(&im_end,   &c_imag, &tmp, precision, BF_RNDU); 
 
-    printf("im_start = \"");
-    print_bf(&im_start, precision); printf("\"\n");
-    printf("im_end = \"");
-    print_bf(&im_end, precision); printf("\"\n");
+    if(! iflag){
+        print_header();
+        printf("re_start = \"");
+        print_bf(&re_start, precision); printf("\"\n");
+        printf("re_end =  \"");
+        print_bf(&re_end, precision);  printf("\"\n");
+        printf("im_start = \"");
+        print_bf(&im_start, precision); printf("\"\n");
+        printf("im_end = \"");
+        print_bf(&im_end, precision); printf("\"\n");
+    }
+
+    if(vflag){
+        fprintf(stderr, "re_start ");
+        fprint_bf(stderr, &re_start, precision); fprintf(stderr,"\n");
+        fprintf(stderr, "re_end =  ");
+        fprint_bf(stderr, &re_end, precision);  fprintf(stderr, "\n");
+        fprintf(stderr, "im_start ");
+        fprint_bf(stderr, &im_start, precision); fprintf(stderr, "\n");
+        fprintf(stderr, "im_end ");
+        fprint_bf(stderr, &im_end, precision); fprintf(stderr, "\n");
+        fprintf(stderr, "Complex width :");
+        fprint_bf(stderr, &cmplx_w, precision);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "Complex height :");
+        fprint_bf(stderr, &cmplx_h, precision);
+        fprintf(stderr, "\n");
+    }
 
     // main loop here!!
     bf_t re_x;
@@ -380,14 +423,20 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &re_x);
     bf_init(&bf_ctx, &im_y);
 
-    libattopng_t* png = libattopng_new(img_w, img_h, PNG_RGB);
 
     float prog; // fraction of progress
     float res;
     //int res;
-    
+
     int red,green,blue;
-    printf("d = {};\n");
+    libattopng_t* png = 0;
+
+    if(iflag) {
+        png = libattopng_new(img_w, img_h, PNG_RGB);
+    }else{
+        printf("d = {};\n");
+    }
+
     for(int y = 0; y < img_h; ++y){
         for(int x = 0; x < img_w; ++x){
             // map from pixels to complex coordinates 
@@ -407,20 +456,28 @@ int main(int argc, char **argv)
 
             // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
             res = calc_pixel_smooth(&re_x, &im_y, precision); // main calculation!
-            // printf("d[(%d,%d)] = %f; ",x,y,res);
-            // fflush(stdout);
-            map_to_color(res,&red,&green,&blue);
-            // printf("(%d %d %d)",r,g,b);
-            libattopng_set_pixel(png, x, y, RGBA(red,green,blue)); 
+            if(iflag) {
+                map_to_color(res,&red,&green,&blue);
+                libattopng_set_pixel(png, x, y, RGBA(red,green,blue)); 
+            }else{
+                printf("d[(%d,%d)] = %f; ",x,y,res);
+                fflush(stdout);
+            }
         } // y
-        fprintf(stderr,".");
-        // printf("\n");
-        // fflush(stdout);
+        if(vflag){
+            fprintf(stderr,".");
+        }
+        if(! iflag){
+            printf("\n");
+            fflush(stdout);
+        }
     } // x
     fprintf(stderr,"\n");
 
-    libattopng_save(png, "nativemandel.png");
-    libattopng_destroy(png);
+    if(iflag){
+        libattopng_save(png, "nativemandel.png");
+        libattopng_destroy(png);
+    }
 
     return 0;
 }
