@@ -4,7 +4,7 @@ CFLAGS=-Wall -I libbf/ -g $(PROFILE) -MMD
 
 all: $(PROGS)
 
-nativemandel: nativemandel.o libbf.o cutils.o
+nativemandel: nativemandel.o libbf.o cutils.o libattopng.o
 	$(CC) $(LDFLAGS) -I libbf/ -o $@ $^ $(LIBS)
 
 %.o: %.c

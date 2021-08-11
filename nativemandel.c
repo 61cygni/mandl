@@ -7,7 +7,9 @@
  *
  * c kernel for high precision mandelbrot calculations. This is not meant
  * as a standalone program, but expected to be driven by a python harness
- * which handles the output.
+ * which handles the output. It's also specifically not meant for anything
+ * but deep dives. So it doesn't use any optimizations such as skipping M1, M2
+ * or native floats at low zoom levels. 
  *
  * Smoothing implementation based on :
  *
@@ -33,19 +35,32 @@
 #include <sys/time.h>
 
 #include "libbf.h"
+#include "libattopng.h"
 
-static int img_w = 80, img_h = 60;
-static limb_t precision  = 2000; 
-static int max_iter      = 80000;
-//char *str_real = "-1.";
-//char *str_imag = "0.";
-static char *str_real    = "-1.76938317919551501821384728608547378290574726365475143746552821652788819126475645883616344638952966730448582578182030315748749123842171940312824619511374752125508480620857874547728033032251679986623911241845427430171292144236397931692967543941816568313013426227935414237685724357839108499720568695273052075081914417347810617942906997531749111337143517341661174565202727561591789320429089324651026717908784146646282137559906504607383722834707778703064588828982026040017443489083888449628870745058537070958320394103234549205405343784";
-static char *str_imag    = "0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805538736306127524814939292355930892834392050796724887904921986666045576626946900666103494014904714323725586979789908520656683202658064024115300378826789786394641622035341055102900456305723718684527210377325846307917512628774672005693326232806953822796755832517188873479124361430989485495501124096329421682827330693532171505367455526637382706988583456915684673202462211937384523487065290004627037270912"; 
-//static char *str_cmplx_w = ".000000000000000000001";
-//static char *str_cmplx_w = ".0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+#define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 
-// Max out string literal for gcc on a mac (one more zero and it explodes)
-static char *str_cmplx_w = ".00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+static int img_w = 512, img_h = 384;
+static limb_t precision  = 100; 
+static int max_iter      = 3000;
+
+static char *str_real = "-.749696000010025";
+static char *str_imag = "0.031456625003";
+static char *str_cmplx_w = ".0000000001";
+
+
+
+// Full mandelbrot set
+// static char *str_real = "-1.";
+// static char *str_imag = "0.";
+// static char *str_cmplx_w = "4.";
+
+// The following values are used to max out the system. This is a snapshot at 10^-512 (should be the 8-fold circle)
+// static int img_w = 160, img_h = 120;
+// static limb_t precision  = 2000; 
+// static int max_iter      = 80000;
+// static char *str_real    = "-1.76938317919551501821384728608547378290574726365475143746552821652788819126475645883616344638952966730448582578182030315748749123842171940312824619511374752125508480620857874547728033032251679986623911241845427430171292144236397931692967543941816568313013426227935414237685724357839108499720568695273052075081914417347810617942906997531749111337143517341661174565202727561591789320429089324651026717908784146646282137559906504607383722834707778703064588828982026040017443489083888449628870745058537070958320394103234549205405343784";
+// static char *str_imag    = "0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805538736306127524814939292355930892834392050796724887904921986666045576626946900666103494014904714323725586979789908520656683202658064024115300378826789786394641622035341055102900456305723718684527210377325846307917512628774672005693326232806953822796755832517188873479124361430989485495501124096329421682827330693532171505367455526637382706988583456915684673202462211937384523487065290004627037270912"; 
+// static char *str_cmplx_w = ".00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
 
 static bf_context_t bf_ctx;
 
@@ -98,7 +113,7 @@ static int str_to_bf_t(bf_t* result,char* str, int prec){
 
     int top = atoi(str); // pull off int before the decimal
     int neg = 1;
-    if(top < 0){
+    if(str[0] == '-' || top < 0){
         neg = -1; 
         top *= neg; // turn positive while we add digits
     }
@@ -264,6 +279,8 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int prec) {
     return ret;
 }
 
+void map_to_color(float value, int* red, int* blue, int* green);
+
 void print_header() {
     printf(" # -- \n");
     printf(" #\n");
@@ -311,10 +328,10 @@ int main(int argc, char **argv)
     bf_set_float64(&cmplx_h, ((float)img_h / (float)img_w) ); 
     bf_mul(&cmplx_h, &cmplx_h, &cmplx_w, precision, BF_RNDU); 
 
-    // printf("Complex width :");
-    // print_bf(&cmplx_w);
-    // printf("Complex height :");
-    // print_bf(&cmplx_h);
+    // fprintf(stderr, "Complex width :");
+    // print_bf(&cmplx_w, precision);
+    // fprintf(stderr, "Complex height :");
+    // print_bf(&cmplx_h, precision);
 
     // Calc Current Frame
     bf_t re_start;
@@ -364,9 +381,13 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &re_x);
     bf_init(&bf_ctx, &im_y);
 
+    libattopng_t* png = libattopng_new(img_w, img_h, PNG_RGB);
+
     float prog; // fraction of progress
     float res;
     //int res;
+    
+    int red,green,blue;
     printf("d = {};\n");
     for(int y = 0; y < img_h; ++y){
         for(int x = 0; x < img_w; ++x){
@@ -387,12 +408,38 @@ int main(int argc, char **argv)
 
             // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
             res = calc_pixel_smooth(&re_x, &im_y, precision); // main calculation!
-            printf("d[(%d,%d)] = %f; ",x,y,res);
-            fflush(stdout);
+            // printf("d[(%d,%d)] = %f; ",x,y,res);
+            // fflush(stdout);
+            map_to_color(res,&red,&green,&blue);
+            // printf("(%d %d %d)",r,g,b);
+            libattopng_set_pixel(png, x, y, RGBA(red,green,blue)); 
         } // y
-        printf("\n");
-        fflush(stdout);
+        fprintf(stderr,".");
+        // printf("\n");
+        // fflush(stdout);
     } // x
+    fprintf(stderr,"\n");
+
+    libattopng_save(png, "nativemandel.png");
+    libattopng_destroy(png);
 
     return 0;
+}
+
+void map_to_color(float val, int* red, int* green, int* blue) {
+    float sc0 = 0.1;
+    float sc1 = 0.2;
+    float sc2 = 0.3;
+
+    float c1 = 0.;
+    float c2 = 0.;
+    float c3 = 0.;
+
+    c1 +=  1 + cos( 3.0 + val*0.15 + sc0);
+    c2 +=  1 + cos( 3.0 + val*0.15 + sc1);
+    c3 +=  1 + cos( 3.0 + val*0.15 + sc2);
+
+    *red    = (int)(255.*((c1/4.) * 3.) / 1.5);
+    *green  = (int)(255.*((c2/4.) * 3.) / 1.5);
+    *blue   = (int)(255.*((c3/4.) * 3.) / 1.5);
 }
