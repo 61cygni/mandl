@@ -41,13 +41,13 @@
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 
-static int img_w = 256, img_h = 192;
+static int img_w = 2048, img_h = 1536;
 static limb_t precision  = 100; 
 static int max_iter      = 5000;
 
 static char *str_real = "-.749696000010025";
 static char *str_imag = "0.031456625003";
-static char *str_cmplx_w = ".00000000001";
+static char *str_cmplx_w = ".0000000000001";
 
 
 // Full mandelbrot set
