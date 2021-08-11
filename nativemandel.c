@@ -39,14 +39,13 @@
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 
-static int img_w = 512, img_h = 384;
+static int img_w = 1024, img_h = 768;
 static limb_t precision  = 100; 
-static int max_iter      = 3000;
+static int max_iter      = 5000;
 
 static char *str_real = "-.749696000010025";
 static char *str_imag = "0.031456625003";
-static char *str_cmplx_w = ".0000000001";
-
+static char *str_cmplx_w = ".00000000001";
 
 
 // Full mandelbrot set
@@ -427,9 +426,10 @@ int main(int argc, char **argv)
 }
 
 void map_to_color(float val, int* red, int* green, int* blue) {
-    float sc0 = 0.1;
-    float sc1 = 0.2;
-    float sc2 = 0.3;
+    // change these values to change color
+    float sc0 = 0.7;
+    float sc1 = 0.0;
+    float sc2 = 0.2;
 
     float c1 = 0.;
     float c2 = 0.;
