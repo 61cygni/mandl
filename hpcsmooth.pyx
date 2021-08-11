@@ -127,14 +127,8 @@ def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
             Re_x = (re_start) + (in_x / img_width)  * (re_end - re_start)
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
-            if x == 0 and y == 0:
-                print("Re/Im %s %s"%(Re_x,Im_y))
-
             # Call primary calculation function here
             m = ccalc_pixel(Re_x, Im_y, max_iter, escape_rad)
-
-            if x == 80 and y == 60:
-                print("%d %d %f"%(x,y,m))
 
             values[(x,y)] = m 
         printf(".")
