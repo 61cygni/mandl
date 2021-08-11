@@ -729,11 +729,32 @@ class DiveMathSupportFlint(DiveMathSupport):
 class DiveMathSupportFlintCustom(DiveMathSupportFlint):
     def mandelbrot(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for HIGH maxIter values """
-        return c.our_steps_mandelbrot(escapeRadius, maxIter)
+        #print("mandelbrot center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
+        (answer, lastZ, remainingPrecision) = c.our_steps_mandelbrot(escapeRadius, maxIter)
+        #print("answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
+        return(answer, lastZ)
+
+    def mandelbrot_check_precision(self, c, escapeRadius, maxIter):
+        """ Slightly more efficient for HIGH maxIter values """
+        #print("mandelbrot center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
+        (answer, lastZ, remainingPrecision) = c.our_steps_mandelbrot(escapeRadius, maxIter)
+        #print("answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
+        return(answer, lastZ, remainingPrecision)
 
     def mandelbrot_beginning(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for LOW maxIter values """
-        return c.our_mandelbrot(escapeRadius, maxIter)
+        #print("mandelbrot_beginning center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
+        (answer, lastZ, remainingPrecision) = c.our_mandelbrot(escapeRadius, maxIter)
+        #print("beginning answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
+        return(answer, lastZ)
+
+    def mandelbrot_beginning_check_precision(self, c, escapeRadius, maxIter):
+        """ Slightly more efficient for LOW maxIter values """
+        #print("mandelbrot_beginning center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
+        (answer, lastZ, remainingPrecision) = c.our_mandelbrot(escapeRadius, maxIter)
+        #print("beginning answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
+        return(answer, lastZ, remainingPrecision)
+
 
 class DiveMathSupportGmp(DiveMathSupport):
     """

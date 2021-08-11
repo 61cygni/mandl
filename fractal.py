@@ -1063,13 +1063,16 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.img_width  = 320
     #fractal_ctx.img_height = 240 
 
-    fractal_ctx.img_width  = 160 
-    fractal_ctx.img_height = 120 
+#    fractal_ctx.img_width  = 160 
+#    fractal_ctx.img_height = 120 
 
     #fractal_ctx.img_width  = 80 
     #fractal_ctx.img_height = 60 
     #fractal_ctx.img_width  = 16 
     #fractal_ctx.img_height = 12 
+
+    fractal_ctx.img_width  = 8
+    fractal_ctx.img_height =  4
 
     cmplx_width_str = '5.0'
     cmplx_height_str = '3.5'
