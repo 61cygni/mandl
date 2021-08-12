@@ -38,7 +38,8 @@ class Smooth(EscapeAlgo):
         super().__init__(dive_mesh, frame_number, project_folder_name, shared_cache_path, build_cache, invalidate_cache, extra_params)
 
         self.algorithm_name = 'smooth'
-        self.color = extra_params.get('color', None)
+        #self.color = extra_params.get('color', None)
+        self.color = extra_params.get('color', (.1,.2,.3))
 
     def calculate_results(self):
         mesh_array = self.dive_mesh.generateMesh()
@@ -57,6 +58,10 @@ class Smooth(EscapeAlgo):
         self.cache_frame.frame_info.raw_values = pixel_values_2d
         self.cache_frame.frame_info.smooth_values = pixel_values_2d_smoothed
 
+        #print(pixel_values_2d)
+        #print("\n\n")
+        #print(pixel_values_2d_smoothed)
+        #print("\n\n")
         return
 
     def generate_image(self):
@@ -76,6 +81,7 @@ class Smooth(EscapeAlgo):
                 # NOTE: This is the difference - not using palette, but
                 # instead, a (kinda locally) calculated range
                 color = self.map_value_to_color(pixel_values_2d[x,y])
+                #print("will print color: (%d,%d,%d)" % (color[0], color[1], color[2]))
 
                 # Plot the point
                 draw.point([x, y], color) 
@@ -89,15 +95,10 @@ class Smooth(EscapeAlgo):
         return im    
 
     def map_value_to_color(self, val):
-
-        magnification = 1. / self.dive_mesh.imagMeshGenerator.baseWidth
-        if magnification <= 100:
-            magnification = 100 
-
-        denom = float(self.dive_mesh.mathSupport.justTwoLogs(magnification))
-        if denom <= 0.0 or math.isnan(denom):
+        if math.isnan(val):
             return (0,0,0)
-        elif self.color:
+
+        if self.color:
             # (yellow blue 0,.6,1.0)
             c1 = 1 + math.cos(3.0 + val*0.15 + self.color[0])
             c2 = 1 + math.cos(3.0 + val*0.15 + self.color[1])
@@ -106,20 +107,20 @@ class Smooth(EscapeAlgo):
             if c1 <= 0 or math.isnan(c1):
                 c1int = 0
             else:
-                c1int = int(255.*((c1/4.) * 3.) / denom)
+                c1int = int(255.*((c1/4.) * 3.) / 1.5)
             if c2 <= 0 or math.isnan(c2):
                 c2int = 0
             else:
-                c2int = int(255.*((c2/4.) * 3.) / denom)
+                c2int = int(255.*((c2/4.) * 3.) / 1.5)
             if c3 <= 0 or math.isnan(c3):
                 c3int = 0
             else:
-                c3int = int(255.*((c3/4.) * 3.) / denom)
+                c3int = int(255.*((c3/4.) * 3.) / 1.5)
 
             return (c1int,c2int,c3int)
         else:        
-            #magnification = 1. / self.context.cmplx_width
-            cint = int((val * 3.) / denom)
+            c1 = 1 + math.cos(3.0 + val*0.15)
+            cint = int(255.*((c1/4.) * 3.) / 1.5)
             return (cint,cint,cint)
         
 

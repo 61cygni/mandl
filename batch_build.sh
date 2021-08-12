@@ -26,13 +26,10 @@
 #processCount=12
 # Tried 12 again, think it's very slow.
 
-processCount=9
+processCount=4
 
-echo "Batch 2"
-date
-
-startFrame=525
-lastNumber=550
+startFrame=610
+lastNumber=646
 
 stride=$(((lastNumber-startFrame)/processCount))
 
@@ -54,58 +51,7 @@ for currPID in ${pidList[*]}; do
     echo "Done"
 done
 
-#startFrame=550
-#lastNumber=600
-#
-#stride=$(((lastNumber-startFrame)/processCount))
-#
-#batchCount=0
-#pidList=()
-#
-#until [ $startFrame -ge $lastNumber ]
-#do
-#    echo startFrame: $startFrame &
-#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
-#    pidList[${batchCount}]=$!
-#    ((startFrame=startFrame+stride))
-#    ((batchCount=batchCount+1))
-#done
-#
-## wait for all pids
-#for currPID in ${pidList[*]}; do
-#    wait $currPID
-#    echo "Done"
-#done
-#
-#
-#echo "Batch 3"
-#date
-#
-#
-#startFrame=600
-#lastNumber=700
-#
-#stride=$(((lastNumber-startFrame)/processCount))
-#
-#batchCount=0
-#pidList=()
-#
-#until [ $startFrame -ge $lastNumber ]
-#do
-#    echo startFrame: $startFrame &
-#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
-#    pidList[${batchCount}]=$!
-#    ((startFrame=startFrame+stride))
-#    ((batchCount=batchCount+1))
-#done
-#
-## wait for all pids
-#for currPID in ${pidList[*]}; do
-#    wait $currPID
-#    echo "Done"
-#done
-#
-#
+
 #echo "Batch 4"
 #date
 #
@@ -160,11 +106,10 @@ done
 #    wait $currPID
 #    echo "Done"
 #done
-#
-#
-## AFTER all the processes finish
-#python3.9 compile_video.py --dir='demo1_cache/image_frames/flint/mandelbrot_solo' --out='compiled.gif'
-#
+
+
+# AFTER all the processes finish
+python3.9 compile_video.py --dir='demo1_cache/image_frames/flint/mandelbrot_solo' --out='compiled.mp4'
 
 
 

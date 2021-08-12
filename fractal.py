@@ -1063,16 +1063,16 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.img_width  = 320
     #fractal_ctx.img_height = 240 
 
-#    fractal_ctx.img_width  = 160 
-#    fractal_ctx.img_height = 120 
+    fractal_ctx.img_width  = 160 
+    fractal_ctx.img_height = 120 
 
     #fractal_ctx.img_width  = 80 
     #fractal_ctx.img_height = 60 
     #fractal_ctx.img_width  = 16 
     #fractal_ctx.img_height = 12 
 
-    fractal_ctx.img_width  = 8
-    fractal_ctx.img_height =  4
+    #fractal_ctx.img_width  = 4
+    #fractal_ctx.img_height =  3
 
     cmplx_width_str = '5.0'
     cmplx_height_str = '3.5'
@@ -1234,15 +1234,17 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.max_iter       = 512 # covers ~e-34 or so 
     #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
     #fractal_ctx.max_iter       = 2048 
-    #fractal_ctx.max_iter       = 2048 * 16
-    fractal_ctx.max_iter       = 2048 * 71 # About half way up EoI's dive
-    #fractal_ctx.max_iter       = 2048 * 142 # Near the end of EoI's dive, maybe
+    #fractal_ctx.max_iter       = 2048 * 15 # ~30k, ok at e-180?
+    #fractal_ctx.max_iter       = 2048 * 20 # ~41k, ok at e-391
+    #fractal_ctx.max_iter       = 2048 * 40 # ~82k, ok at e-497
+    fractal_ctx.max_iter       = 2048 * 34 # ~70k, ok at e-504
+    #fractal_ctx.max_iter       = 2048 * 71 # ~145k, ok at e-752
+    #fractal_ctx.max_iter       = 2048 * 140 # ~286k iter, ok at e-1204
+    #fractal_ctx.max_iter       = 2048 * 300 # ~614k iter, ok at e-1505
+    #fractal_ctx.max_iter       = 2048 * 400 # ~819k iter, ok at e-1806
+    #fractal_ctx.max_iter       = 2048 * 1300 # ~2,662k iter, ok at e-2011
 
     fractal_ctx.escape_rad     = 2
-    #fractal_ctx.escape_rad     = 4 
-    #fractal_ctx.escape_rad     = 8 
-    #fractal_ctx.escape_rad     = 512 
-    #fractal_ctx.escape_rad     = math.sqrt(1024.0)
     fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]['escape_radius'] = fractal_ctx.escape_rad 
     fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]['max_escape_iterations'] = fractal_ctx.max_iter 
 
@@ -1263,7 +1265,7 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #view_ctx.duration = math.ceil(6.0 / view_ctx.fps)
     #view_ctx.duration       = 4.0
     #view_ctx.duration       = 540.0
-    view_ctx.duration       = 2200.0 # A bit more than EoI's dive, if a .5 zoom factor at 23,976/8 fps.
+    view_ctx.duration       = 2300.0 # A bit more than EoI's dive (6682), this is ~6890 frames, if a .5 zoom factor at 23,976/8 fps.
     #view_ctx.duration       = 1500.0
     #view_ctx.duration       = 30.0
     #view_ctx.duration       = 2.0

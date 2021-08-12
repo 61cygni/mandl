@@ -14,10 +14,12 @@ import numpy as np
 #3.32 bits per digit, on average
 #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
 
+#FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) # 2200*3.32 = 7304, lol
 #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
-FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
-#FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
-#FLINT_HIGH_PRECISION_SIZE = int(1500 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
+FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(400 * 3.32) 
 
 # For debugging, looks like we're bottoming out somewhere around e-11
 # So, only really need ~20 digits for this test
@@ -642,7 +644,8 @@ class DiveMathSupportFlint(DiveMathSupport):
             # The following code smooths out the colors so there aren't bands
             # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
             # Note: Results in a float. We think.
-            return float(endingIter + 1 - self.twoLogsHelper(endingZ, escapeRadius) / math.log(2.0))
+            #return float(endingIter - self.twoLogsHelper(endingZ, escapeRadius) / math.log(2.0))
+            return float(endingIter - self.justTwoLogs(self.squared_modulus(endingZ)) + 4.0)
 
     def justTwoLogs(self, value):
         return self.flint.arb(value).log().log()
@@ -730,8 +733,10 @@ class DiveMathSupportFlintCustom(DiveMathSupportFlint):
     def mandelbrot(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for HIGH maxIter values """
         #print("mandelbrot center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
+        #print("mandelbrot maxIter: %s" % (str(maxIter)))
         (answer, lastZ, remainingPrecision) = c.our_steps_mandelbrot(escapeRadius, maxIter)
         #print("answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
+        #print("answer: %s, remainingPrecision: %s" % (str(answer), str(remainingPrecision)))
         return(answer, lastZ)
 
     def mandelbrot_check_precision(self, c, escapeRadius, maxIter):
@@ -744,8 +749,10 @@ class DiveMathSupportFlintCustom(DiveMathSupportFlint):
     def mandelbrot_beginning(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for LOW maxIter values """
         #print("mandelbrot_beginning center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
+        #print("mandelbrot_beginning radius: %s maxIter: %s" % (str(escapeRadius), str(maxIter)))
         (answer, lastZ, remainingPrecision) = c.our_mandelbrot(escapeRadius, maxIter)
         #print("beginning answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
+        #print("beginning answer: %s, remainingPrecision: %s" % (str(answer), str(remainingPrecision)))
         return(answer, lastZ)
 
     def mandelbrot_beginning_check_precision(self, c, escapeRadius, maxIter):

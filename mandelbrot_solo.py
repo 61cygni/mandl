@@ -48,6 +48,7 @@ class MandelbrotSolo(EscapeAlgo):
         mesh_array = self.dive_mesh.generateMesh()
         math_support = self.dive_mesh.mathSupport
 
+        #mandelbrot_function = np.vectorize(math_support.mandelbrot_beginning)
         mandelbrot_function = np.vectorize(math_support.mandelbrot)
         (pixel_values_2d, last_zees) = mandelbrot_function(mesh_array, self.escape_radius, self.max_escape_iterations)
 
