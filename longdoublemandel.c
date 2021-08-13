@@ -20,14 +20,14 @@
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 
-static int img_w = 12288, img_h = 6480;
-//static int img_w = 1024, img_h = 768;
-static int max_iter = 12000;
+//static int img_w = 12288, img_h = 6480;
+static int img_w = 0, img_h = 0;
+static int max_iter = 2000;
 
 //static long double c_real  = -1;
-static long double c_real  = -.749696000010025;
-static long double c_imag  = 0.031456625003;
-static long double cmplx_w = .00001; // max precision before pixelation
+static long double c_real  = -0.05;
+static long double c_imag  = .6805; 
+static long double cmplx_w = .001; 
 static long double cmplx_h = .0; // calculated in body from imgw/imgh 
 
                                      #
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 {
     int ch, iflag = 0, vflag = 0;
 
-    while ((ch = getopt(argc, argv, "iv")) != -1) {
+    while ((ch = getopt(argc, argv, "ivw:h:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -136,10 +136,21 @@ int main(int argc, char **argv)
             case 'v':
                 vflag = 1;
                 break;
+            case 'w':
+                img_w = atoi(optarg); 
+                break;
+            case 'h':
+                img_h = atoi(optarg); 
+                break;
             case '?':
             default:
                 usage();
         }
+    }
+
+    if(!img_w || !img_h){
+        fprintf(stderr, " Error: you must specify image width and height \n");
+        return 0;
     }
 
 
@@ -157,6 +168,8 @@ int main(int argc, char **argv)
     //}
 
     if(vflag){
+        fprintf(stderr, "img width %d\n", img_w);
+        fprintf(stderr, "img height %d\n", img_h);
         fprintf(stderr, "re_start %.20Lf\n", re_start);
         fprintf(stderr, "re_end   %.20Lf\n", re_end);
         fprintf(stderr, "im_start %.20Lf\n", im_start);
