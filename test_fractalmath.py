@@ -47,7 +47,7 @@ class TestMathSupport(unittest.TestCase):
         radius = 2.0
 
         maxIterations = 100 
-        placesToMatch = 9 
+        placesToMatch = 8 
 
         # The answer for this particular point, is supposed to be 133, but we're
         # capping iterations to 100 here.
@@ -56,8 +56,8 @@ class TestMathSupport(unittest.TestCase):
         #print(str(iterations))
         #print(str(lastZee))
         self.assertEqual(100, iterations)
-        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
-        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(0.07974379578605828, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.03921502776351098, float(lastZee.imag), placesToMatch) # when maxIterations == 100
 
         # Slightly adjusted center, just to get a different answer
         center = self.mathSupport.createComplex('-1.7693831791-0.5042368479j')
@@ -71,7 +71,7 @@ class TestMathSupport(unittest.TestCase):
 
         # More iterations, fewer decimal places required to match for comparison
         # 3 digits seems to be near the low-end for correctness of the iteration count?
-        maxIterations = 110 
+        maxIterations = 110
         placesToMatch = 3 
 
         # The answer for this particular point, is supposed to be 133, but we're
@@ -81,9 +81,17 @@ class TestMathSupport(unittest.TestCase):
         #print(str(iterations))
         #print(str(lastZee))
         self.assertEqual(110, iterations)
-        self.assertAlmostEqual(0.04427332710633869, float(lastZee.real), placesToMatch) # when maxIterations == 110
-        self.assertAlmostEqual(0.053034798128938195, float(lastZee.imag), placesToMatch) # when maxIterations == 110
+        self.assertAlmostEqual(-1.7702357414195125, float(lastZee.real), placesToMatch) # when maxIterations == 110
+        self.assertAlmostEqual(0.00893290183116224, float(lastZee.imag), placesToMatch) # when maxIterations == 110
 
+class TestMathSupportDecimal(TestMathSupport):
+    @classmethod
+    def setUpClass(cls):
+        cls.mathSupport = fm.DiveMathSupportDecimal()
+        # Set prec to what gets the closest value for comparing to
+        # native python.  It's a little arbitrary, even knowing the 
+        # prec value *should* be 53 to match precision.
+        cls.mathSupport.setPrecision(16)
 
 class TestMathSupportFlint(TestMathSupport):
     @classmethod
@@ -116,7 +124,7 @@ class TestMathSupportFlintCustom(TestMathSupport):
         Since 2 of these (#3 and #4) belong to the custom math support, we make sure their
         values match each other here.  Could be more flexible and remember the answer, but oh well.
         """
-        placesToMatch = 9 
+        placesToMatch = 8 
         radius = 2.0
 
         maxIterations = 100 
@@ -128,8 +136,8 @@ class TestMathSupportFlintCustom(TestMathSupport):
         #print(str(iterations))
         #print("lastZee as string: %s" % str(lastZee))
         self.assertEqual(100, iterations)
-        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
-        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(0.0797437953537099, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.03921502719242046, float(lastZee.imag), placesToMatch) # when maxIterations == 100
 
         # Slightly adjusted center, just to get a different answer
         center = self.mathSupport.createComplex('-1.7693831791-0.5042368479j')
@@ -146,8 +154,8 @@ class TestMathSupportFlintCustom(TestMathSupport):
         #print(str(iterations))
         #print(str(lastZee))
         self.assertEqual(100, iterations)
-        self.assertAlmostEqual(1.3599199256223002, float(lastZee.real), placesToMatch) # when maxIterations == 100
-        self.assertAlmostEqual(-0.0159758949202937, float(lastZee.imag), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(0.0797437953537099, float(lastZee.real), placesToMatch) # when maxIterations == 100
+        self.assertAlmostEqual(-0.03921502719242046, float(lastZee.imag), placesToMatch) # when maxIterations == 100
 
         # Slightly adjusted center, just to get a different answer
         center = self.mathSupport.createComplex('-1.7693831791-0.5042368479j')

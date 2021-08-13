@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Example of embarassingly parallel start/stop range commands that all write
 # out tiffs that can be assembled with 'compile_video.py' after finishing.
 
@@ -26,10 +28,12 @@
 #processCount=12
 # Tried 12 again, think it's very slow.
 
-processCount=4
+processCount=6
 
-startFrame=610
-lastNumber=646
+# 30 frames per batch, 4 batches, = 120 frames, going a little extra
+# 30 frames per process, let's say 6 processes? = 180 frames
+startFrame=750
+lastNumber=930
 
 stride=$(((lastNumber-startFrame)/processCount))
 

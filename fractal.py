@@ -1235,9 +1235,11 @@ def set_demo1_params(fractal_ctx, view_ctx):
     #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
     #fractal_ctx.max_iter       = 2048 
     #fractal_ctx.max_iter       = 2048 * 15 # ~30k, ok at e-180?
+    #fractal_ctx.max_iter       = int(2048 * 15.5) # ~31k, ok at e-225
+    fractal_ctx.max_iter       = int(2048 * 16) # ~31k, ok at e-225
     #fractal_ctx.max_iter       = 2048 * 20 # ~41k, ok at e-391
     #fractal_ctx.max_iter       = 2048 * 40 # ~82k, ok at e-497
-    fractal_ctx.max_iter       = 2048 * 34 # ~70k, ok at e-504
+    #fractal_ctx.max_iter       = 2048 * 34 # ~70k, ok at e-504
     #fractal_ctx.max_iter       = 2048 * 71 # ~145k, ok at e-752
     #fractal_ctx.max_iter       = 2048 * 140 # ~286k iter, ok at e-1204
     #fractal_ctx.max_iter       = 2048 * 300 # ~614k iter, ok at e-1505

@@ -9,28 +9,6 @@ import math
 
 import numpy as np
 
-#FLINT_HIGH_PRECISION_SIZE = 16 # 53 is how many bits are in float64
-#FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
-#3.32 bits per digit, on average
-#2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
-
-#FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) # 2200*3.32 = 7304, lol
-#FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
-#FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
-FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
-#FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
-#FLINT_HIGH_PRECISION_SIZE = int(400 * 3.32) 
-
-# For debugging, looks like we're bottoming out somewhere around e-11
-# So, only really need ~20 digits for this test
-# Blowing out frame 30, which is ~28?
-#FLINT_HIGH_PRECISION_SIZE = int(50 * 3.32) 
-# Native blew out somewhere e-13 to e-15
-#FLINT_HIGH_PRECISION_SIZE = int(200 * 3.32) 
-
-
-GMP_HIGH_PRECISION_SIZE=53
-
 class DiveMathSupport:
     """
     Toolbox for math functions that need to be type-aware, so we
@@ -49,6 +27,10 @@ class DiveMathSupport:
     """
     def __init__(self):
         self.precisionType = 'native'
+
+    def setPrecision(self, newPrecision):
+        """ Seems meaningless for pure python impelmentation, but seems like calling this shouldn't force a crash either? """
+        raise NotImplementedError("setPrecision is meaningless for base class, and must be implemented in DiveMathSupport sublcasses") 
 
     def createComplex(self, *args):
         """
@@ -262,9 +244,14 @@ class DiveMathSupport:
         """
         z = complex(0,0)
         n = 0
-        while abs(z) <= escapeRadius and n < maxIter:
+
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            if abs(z) > escapeRadius:
+                break
+
             z = z*z + c
-            n += 1
 
         return (n, z)
 
@@ -288,9 +275,14 @@ class DiveMathSupport:
         """
         z = z0
         n = 0
-        while abs(z) <= escapeRadius and n < maxIter:
+
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            if abs(z) > escapeRadius:
+                break
+
             z = z*z + c
-            n += 1
 
         return (n, z)
 
@@ -340,14 +332,19 @@ class DiveMathSupport:
         dz = complex(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
         absOfZ = 0.0 # Will re-use the final result for smoothing
         n = 0
-        while absOfZ < escapeRadius and n < maxIter:
+
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            if absOfZ > escapeRadius:
+                break
+
             # Z' -> 2·Z·Z' + 1
             dz = 2.0 * (z*dz) + 1
             # Z -> Z² + c           
             z = z*z + c
 
             absOfZ = abs(z)
-            n += 1
 
         if n == maxIter:
             return (n, 0.0)
@@ -394,6 +391,8 @@ class DiveMathSupport:
        return max(min(num, max_value), min_value)
 
     def orig_mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
+        """ This seems to be old and a bit buggy.  At the least it's off by one
+        for iters, because it doesn't update n and range quite the same? """
         c2 = c.real*c.real + c.imag*c.imag
         # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
         if  256.0*c2*c2 - 96.0*c2 + 32.0*c.real - 3.0 < 0.0: 
@@ -442,8 +441,33 @@ class DiveMathSupportFlint(DiveMathSupport):
         super().__init__()
 
         self.flint = __import__('flint') # Only imports if you instantiate this DiveMathSupport subclass.
-        self.flint.ctx.prec = FLINT_HIGH_PRECISION_SIZE  # Sets flint's precision (in bits)
+
+        #FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
+        #3.32 bits per digit, on average
+        #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
+        
+        #FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) # 2200*3.32 = 7304, lol
+        #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
+        #FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
+        #FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
+        #FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
+        #FLINT_HIGH_PRECISION_SIZE = int(400 * 3.32) 
+        
+        # For debugging, looks like we're bottoming out somewhere around e-11
+        # So, only really need ~20 digits for this test
+        # Blowing out frame 30, which is ~28?
+        #FLINT_HIGH_PRECISION_SIZE = int(50 * 3.32) 
+        # Native blew out somewhere e-13 to e-15
+        #FLINT_HIGH_PRECISION_SIZE = int(200 * 3.32) 
+        
+        self.defaultPrecisionSize = int(500 * 3.32) 
+        self.flint.ctx.prec = self.defaultPrecisionSize  # Sets flint's precision (in bits)
         self.precisionType = 'flint'
+
+    def setPrecision(self, newPrecision):
+        oldPrecision = self.flint.ctx.prec
+        self.flint.ctx.prec = newPrecision
+        return oldPrecision
 
     def createComplex(self, *args):
         """ 
@@ -625,9 +649,14 @@ class DiveMathSupportFlint(DiveMathSupport):
         """
         z = self.flint.acb(0,0)
         n = 0
-        while float(z.abs_lower()) <= escapeRadius and n < maxIter:
+
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            if float(z.abs_lower()) > escapeRadius:
+                break
+
             z = z*z + c
-            n += 1
 
         return (n, z)
 
@@ -665,14 +694,19 @@ class DiveMathSupportFlint(DiveMathSupport):
         dz = self.flint.acb(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
         absOfZ = 0.0 # Will re-use the final result for smoothing
         n = 0
-        while float(absOfZ) < escapeRadius and n < maxIter:
+
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            if float(absOfZ) > escapeRadius:
+                break
+
             # Z' -> 2·Z·Z' + 1
             dz = 2.0 * (z*dz) + 1
             # Z -> Z² + c           
             z = z*z + c
 
             absOfZ = z.abs_lower()
-            n += 1
 
         dzMag = dz.abs_lower()
         if n == maxIter or dzMag == 0.0:
@@ -774,8 +808,14 @@ class DiveMathSupportGmp(DiveMathSupport):
         super().__init__()
 
         self.gmp = __import__('gmpy2') # Only imports if you instantiate this DiveMathSupport subclass.
-        self.gmp.get_context().precision = GMP_HIGH_PRECISION_SIZE
+        self.defaultPrecisionSize = 53
+        self.gmp.get_context().precision = self.defaultPrecisionSize
         self.precisionType = 'gmp'
+
+    def setPrecision(self, newPrecision):
+        oldPrecision = self.gmp.get_context().precision
+        self.gmp.get_context().precision = newPrecision
+        return oldPrecision
 
     def createComplex(self, *args):
         """
@@ -836,9 +876,14 @@ class DiveMathSupportGmp(DiveMathSupport):
         # Because norm() doesn't work for python3-gmp2 v 2.1.0a4 
         #while float(self.gmp.sqrt(self.gmp.square(z.real) + self.gmp.square(z.imag))) <= escapeRadius and n < maxIter:
         # looks like abs() gets to the right place, even though there's no explicit abs_lower() in libgmp?
-        while abs(z) <= escapeRadius and n < maxIter:
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            if abs(z) > escapeRadius:
+                break
+
             z = z*z + c
-            n += 1
+
         return (n, z)
 
     def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
@@ -857,5 +902,135 @@ class DiveMathSupportGmp(DiveMathSupport):
             # Note: Results in a float. We think.
             return float(endingIter + 1 - self.gmp.log10(self.gmp.log2(self.gmp.norm(endingZ))) / math.log(2.0))
             #return float(endingIter + 1 - self.gmp.log10(self.gmp.log10(self.gmp.sqrt(self.gmp.square(endingZ.real) + self.gmp.square(endingZ.imag)))))
+
+class DecimalComplex:
+    def __init__(self, realValue, imagValue):
+        super().__init__()
+        self.real = realValue
+        self.imag = imagValue
+
+    def __repr__(self):
+        return u"DecimalComplex(%s, %s)" % (str(self.real), str(self.imag))
+
+class DiveMathSupportDecimal(DiveMathSupport):
+    def __init__(self):
+        super().__init__()
+
+        self.decimal = __import__('decimal') # Only imports if you instantiate this DiveMathSupport subclass.
+        self.defaultPrecisionSize = 16 
+        self.decimal.getcontext().prec = self.defaultPrecisionSize
+        self.precisionType = 'decimal'
+
+    def setPrecision(self, newPrecision):
+        oldPrecision = self.decimal.getcontext().prec
+        self.decimal.getcontext().prec = newPrecision
+        return oldPrecision
+
+    def createComplex(self, *args):
+        if len(args) == 2:
+            return DecimalComplex(self.decimal.Decimal(args[0]), self.decimal.Decimal(args[1]))
+        elif len(args) == 1:
+            if isinstance(args[0], str):
+                partsString = args[0]
+
+                # Trim off the leading sign
+                firstIsPositive = True
+                if partsString.startswith('+'):
+                    partsString = partsString[1:]
+                elif partsString.startswith('-'):
+                    firstIsPositive = False
+                    partsString = partsString[1:]
+
+                # Trim off the trailing letter 
+                lastIsImag = False
+                if partsString.endswith('j'):
+                    lastIsImag = True
+                    partsString = partsString[:-1]
+
+                # Remaining string might have an internal sign.
+                # If there's no internal sign, then the whole remaining
+                # string is either the real or the complex
+                positiveParts = partsString.split('+')
+                negativeParts = partsString.split('-')
+
+                realIsPositive = True
+                imagIsPositive = True
+                realPart = ""
+                imagPart = ""
+                if len(positiveParts) == 2:
+                    realIsPositive = firstIsPositive
+                    realPart = positiveParts[0]
+                    imagIsPositive = True
+                    imagPart = positiveParts[1]
+                elif len(negativeParts) == 2:
+                    realIsPositive = firstIsPositive
+                    realPart = negativeParts[0]
+                    imagIsPositive = False
+                    imagPart = negativeParts[1]
+                elif len(positiveParts) == 1 and len(negativeParts) == 1:
+                    # No internal + or -, so it should just be a number
+                    if lastIsImag == True:
+                        imagPart = partsString
+                        imagIsPositive = firstIsPositive
+                    else:
+                        realPart = partsString
+                        realIsPositive = firstIsPositive
+                else:
+                    raise ValueError("String parameter not identifiably a complex number, in createComplex()")
+
+                preparedReal = '0.0'
+                preparedImag = '0.0'
+                if realPart != "":
+                    if realIsPositive == True:
+                        preparedReal = realPart
+                    else:
+                        preparedReal = "-%s" % realPart
+
+                if imagPart != "":
+                    if imagIsPositive == True:
+                        preparedImag = imagPart
+                    else:
+                        preparedImag = "-%s" % imagPart
+
+                return DecimalComplex(self.decimal.Decimal(preparedReal), self.decimal.Decimal(preparedImag))
+            else:
+                if isinstance(args[0], complex):
+                    return DecimalComplex(self.decimal.Decimal(args[0].real), self.decimal.Decimal(args[0].imag))
+                else:
+                    return DecimalComplex(self.decimal.Decimal(args[0]),self.decimal.Decimal(0))# Just a constant, so make a 0-imaginary value
+        elif len(args) == 0:
+            return DecimalComplex(self.decimal.Decimal(0),self.decimal.Decimal(0))
+        else:
+            raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
+
+    def mandelbrot(self, c, escapeRadius, maxIter):
+        """
+        Step-wise impementation, sacrificing some theoretical precision for fewer
+        multiplications
+        """
+        radSquared = escapeRadius * escapeRadius
+
+        z = DecimalComplex(self.decimal.Decimal(0), self.decimal.Decimal(0))
+        n = 0
+
+        zrSquared = self.decimal.Decimal(0)
+        ziSquared = self.decimal.Decimal(0)
+
+        for currIter in range(maxIter + 1):
+            n = currIter
+
+            currMagnitude = zrSquared + ziSquared
+            if currMagnitude > radSquared:
+                break
+
+            partSum = z.real + z.imag
+            z.imag = partSum * partSum - zrSquared - ziSquared + c.imag
+            z.real = zrSquared - ziSquared + c.real
+
+            zrSquared = z.real * z.real
+            ziSquared = z.imag * z.imag
+
+        return (n, z)        
+
 
 

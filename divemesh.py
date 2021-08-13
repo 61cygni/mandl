@@ -92,6 +92,27 @@ class MeshGenerator:
             raise ValueError("varyingAxis must be one of (%s)" % ", ".join(axisOptions))
         self.varyingAxis = varyingAxis
 
+#    def __getstate__(self):
+#        pickleInfo = self.__dict__.copy() 
+#        pickleInfo['mathSupport'] = type(self.mathSupport).__name__
+# 
+#        #for currKey, currValue in pickleInfo.items():
+#        #    pickleInfo[currKey] = str(currValue)
+#
+#        return pickleInfo
+#
+#    def __setstate__(self, state):
+#        mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
+#                "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+#                "DiveMathSupport":fm.DiveMathSupport}
+#
+#        mathSupportClassName = state['mathSupport']
+# 
+#        state['mathSupport'] = mathSupportClasses[mathSupportClassName]()
+#
+#        self.__dict__.update(state)
+
+
     def generateForDiveMesh(self):
         raise NotImplementedError("generateForDiveMesh() must be overridden in a MeshGenerator subclass")
 
