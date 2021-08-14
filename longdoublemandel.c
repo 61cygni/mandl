@@ -24,13 +24,14 @@
 static int img_w = 0, img_h = 0;
 static int max_iter = 2000;
 
-//static long double c_real  = -1;
-static long double c_real  = -0.05;
-static long double c_imag  = .6805; 
-static long double cmplx_w = .001; 
+static long double c_real  = -1;
+static long double c_imag  = 0; 
+static long double cmplx_w = 4.; 
 static long double cmplx_h = .0; // calculated in body from imgw/imgh 
 
                                      #
+// static long double c_real  = -0.05;
+// static long double c_imag  = .6805; 
 // static long double c_real  = -1.769383202706626;
 // static long double c_imag  =  0.0042368369187367722149;
 // static long double cmplx_w =  .000000008; 
@@ -127,8 +128,9 @@ void usage() {
 int main(int argc, char **argv)
 {
     int ch, iflag = 0, vflag = 0;
+    int numblocks = 0, blockno = 0;
 
-    while ((ch = getopt(argc, argv, "ivw:h:")) != -1) {
+    while ((ch = getopt(argc, argv, "ivw:h:n:b:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -136,11 +138,17 @@ int main(int argc, char **argv)
             case 'v':
                 vflag = 1;
                 break;
-            case 'w':
+            case 'w': 
                 img_w = atoi(optarg); 
                 break;
-            case 'h':
+            case 'h': 
                 img_h = atoi(optarg); 
+                break;
+            case 'n': 
+                numblocks = atoi(optarg); 
+                break;
+            case 'b': 
+                blockno = atoi(optarg); 
                 break;
             case '?':
             default:
@@ -152,8 +160,11 @@ int main(int argc, char **argv)
         fprintf(stderr, " Error: you must specify image width and height \n");
         return 0;
     }
+    printf("!\n"); fflush(stdout);
 
-
+    if(!numblocks || !blockno) {
+        numblocks = blockno = 1;
+    }
 
     cmplx_h = cmplx_w*((float)img_h/(float)img_w);
 
@@ -188,13 +199,24 @@ int main(int argc, char **argv)
     int red,green,blue;
     libattopng_t* png = 0;
 
+    // we only want to calculate our block 
+    int blocksize = img_h / numblocks;
+    int ystart    = (blockno-1) * blocksize;
+    int yend      = ystart + blocksize;
+    if(blockno == numblocks){
+        yend = img_h;
+    }
+
     if(iflag) {
-        png = libattopng_new(img_w, img_h, PNG_RGB);
+        //png = libattopng_new(img_w, img_h, PNG_RGB);
+        png = libattopng_new(img_w, yend - ystart, PNG_RGB);
     }else{
         printf("d = {};\n");
     }
 
     for(int y = 0; y < img_h; ++y){
+        if(y < ystart || y > yend)
+            continue;
         for(int x = 0; x < img_w; ++x){
             // map from pixels to complex coordinates 
             // Re_x = (re_start) + (x / img_width)  * (re_end - re_start)
@@ -206,7 +228,7 @@ int main(int argc, char **argv)
 
             if(iflag) {
                 map_to_color(res,&red,&green,&blue);
-                libattopng_set_pixel(png, x, y, RGBA(red,green,blue)); 
+                libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(red,green,blue)); 
             }else{
                 printf("d[(%d,%d)] = %f; ",x,y,res);
                 fflush(stdout);
