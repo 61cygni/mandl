@@ -19,6 +19,7 @@
 #include "libattopng.h"
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
+#define FILESTR_LEN 64
 
 //static int img_w = 12288, img_h = 6480;
 static int img_w = 0, img_h = 0;
@@ -129,11 +130,17 @@ int main(int argc, char **argv)
 {
     int ch, iflag = 0, vflag = 0;
     int numblocks = 0, blockno = 0;
+    char filename[FILESTR_LEN];
 
-    while ((ch = getopt(argc, argv, "ivw:h:n:b:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
+                if(strlen(optarg) > FILESTR_LEN){
+                    fprintf(stderr," * error : filename on command line too large\n");
+                    return 0;
+                }
+                strncpy(filename, optarg, FILESTR_LEN);
                 break;
             case 'v':
                 vflag = 1;
@@ -156,11 +163,14 @@ int main(int argc, char **argv)
         }
     }
 
-    if(!img_w || !img_h){
+    if(!img_w){
         fprintf(stderr, " Error: you must specify image width and height \n");
         return 0;
     }
-    printf("!\n"); fflush(stdout);
+
+    if(!img_h){ // fill using ratio of w/h 1024/768
+        img_h = (float)img_w*(768. / 1024.);
+    }
 
     if(!numblocks || !blockno) {
         numblocks = blockno = 1;
@@ -246,7 +256,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"\n");
 
     if(iflag){
-        libattopng_save(png, "longdouble.png");
+        libattopng_save(png, filename); 
         libattopng_destroy(png);
     }
 
