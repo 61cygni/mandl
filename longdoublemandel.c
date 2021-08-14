@@ -120,9 +120,16 @@ void print_header() {
 }
 
 void usage() {
-    printf("Usage: nativemandel [-i] [-v]\n");
+    printf("Usage: nativemandel [-i filname] [-v] [-w] [-h] [-n NUM] [-b NUM]\n");
     printf(" -i dump to image for debugging\n");
     printf(" -v debug output to stderr\n");
+    printf(" -w specify image width (REQUIRED) \n");
+    printf(" -h specify image height \n");
+    printf(" -n specify number of chunks \n");
+    printf(" -b specify chunk number to compute \n");
+    printf(" -x real value of center on complex plane \n");
+    printf(" -y imag value of center on complex plane \n");
+    printf(" -l width on complex plane \n");
     exit(0);
 }
 
@@ -132,7 +139,7 @@ int main(int argc, char **argv)
     int numblocks = 0, blockno = 0;
     char filename[FILESTR_LEN];
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:l:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -153,6 +160,15 @@ int main(int argc, char **argv)
                 break;
             case 'n': 
                 numblocks = atoi(optarg); 
+                break;
+            case 'x': 
+                c_real = strtold(optarg, 0); 
+                break;
+            case 'y': 
+                c_imag = strtold(optarg, 0); 
+                break;
+            case 'l': 
+                cmplx_w = strtold(optarg, 0); 
                 break;
             case 'b': 
                 blockno = atoi(optarg); 

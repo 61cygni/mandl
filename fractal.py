@@ -19,8 +19,6 @@ import sys
 import math
 import importlib
 
-import out
-
 import numpy as  np
 
 import moviepy.editor as mpy
@@ -140,27 +138,34 @@ class FractalContext:
 
     def draw_image_PIL(self, values, snapshot_filename):    
 
-        im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
-        draw = ImageDraw.Draw(im)
+        im   = None
+        draw = None
 
-        if self.keyframe or snapshot_filename:
-            self.pre_time = time.perf_counter()  
-            print("Calculating colors [", end="")
-            sys.stdout.flush()
-        
-        for x in range(0, self.img_width):
-            for y in range(0, self.img_height):
-                
-                color = (128,128,128)
-                if (x,y) in values: 
-                    color = self.algo.map_value_to_color(values[(x,y)])
+        if type(values) == type({}): 
+            im = Image.new('RGB', (self.img_width, self.img_height), (0, 0, 0))
+            draw = ImageDraw.Draw(im)
 
-                # Plot the point
-                draw.point([x, y], color) 
+            if self.keyframe or snapshot_filename:
+                self.pre_time = time.perf_counter()  
+                print("Calculating colors [", end="")
+                sys.stdout.flush()
+            
+            for x in range(0, self.img_width):
+                for y in range(0, self.img_height):
+                    
+                    color = (128,128,128)
+                    if (x,y) in values: 
+                        color = self.algo.map_value_to_color(values[(x,y)])
 
-        if self.keyframe or snapshot_filename:
-            print("%f]"%(time.perf_counter() - self.pre_time))
-            sys.stdout.flush()
+                    # Plot the point
+                    draw.point([x, y], color) 
+
+            if self.keyframe or snapshot_filename:
+                print("%f]"%(time.perf_counter() - self.pre_time))
+                sys.stdout.flush()
+        else: # assume it's an image
+            im = values
+            draw = ImageDraw.Draw(im)
 
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
