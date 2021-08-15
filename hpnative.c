@@ -315,6 +315,9 @@ void usage() {
     printf(" -n specify number of chunks \n");
     printf(" -b specify chunk number to compute \n");
     printf(" -p <int> precision (number of bits) \n");
+    printf(" -x \"str\" real value of center on complex plane \n");
+    printf(" -y \"str\" imag value of center on complex plane \n");
+    printf(" -l width on complex plane \n");
     exit(0);
 }
 
@@ -323,10 +326,13 @@ int main(int argc, char **argv)
     int ch, iflag = 0, vflag = 0;
     int numblocks = 0, blockno = 0;
     char filename[FILESTR_LEN];
+    char* cla_c_real  = 0;
+    char* cla_c_imag  = 0;
+    char* cla_cmplx_w = 0;
 
     strncpy(filename, "hpcnative.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:p:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -349,8 +355,17 @@ int main(int argc, char **argv)
             case 'b': 
                 blockno = atoi(optarg); 
                 break;
+            case 'x': 
+                cla_c_real = strdup(optarg); 
+                break;
+            case 'y': 
+                cla_c_imag = strdup(optarg); 
+                break;
             case 'p': 
                 precision = atoi(optarg); 
+                break;
+            case 'l': 
+                cla_cmplx_w = strdup(optarg); 
                 break;
             case '?':
             default:
@@ -379,10 +394,19 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &c_real);
     bf_init(&bf_ctx, &c_imag);
 
-    str_to_bf_t(&c_real, str_real, precision);
-    //print_bf(&c_real);
-    str_to_bf_t(&c_imag, str_imag, precision);
-    // print_bf(&c_imag);
+    if(cla_c_real){
+        str_to_bf_t(&c_real, cla_c_real, precision);
+        free(cla_c_real);
+    }else{
+        str_to_bf_t(&c_real, str_real, precision);
+    }
+
+    if(cla_c_imag){
+        str_to_bf_t(&c_imag, cla_c_imag, precision);
+        free(cla_c_imag);
+    }else{
+        str_to_bf_t(&c_imag, str_imag, precision);
+    }
 
 
     // Fractal variables start here 
@@ -392,7 +416,12 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &cmplx_w);
     bf_init(&bf_ctx, &cmplx_h);
 
-    str_to_bf_t(&cmplx_w, str_cmplx_w, precision);
+    if(cla_cmplx_w){
+        str_to_bf_t(&cmplx_w, cla_cmplx_w, precision);
+        free(cla_cmplx_w);
+    }else{
+        str_to_bf_t(&cmplx_w, str_cmplx_w, precision);
+    }
 
     bf_set_float64(&cmplx_h, ((float)img_h / (float)img_w) ); 
     bf_mul(&cmplx_h, &cmplx_h, &cmplx_w, precision, BF_RNDU); 
@@ -447,6 +476,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "img height %d\n", img_h);
         fprintf(stderr, "max iter  %d\n",  max_iter);
         fprintf(stderr, "precision  %d\n", (int)precision);
+        fprintf(stderr, "c_real ");
+        fprint_bf(stderr, &c_real, precision); fprintf(stderr,"\n");
+        fprintf(stderr, "c_imag ");
+        fprint_bf(stderr, &c_imag, precision); fprintf(stderr,"\n");
         fprintf(stderr, "re_start ");
         fprint_bf(stderr, &re_start, precision); fprintf(stderr,"\n");
         fprintf(stderr, "re_end =  ");
