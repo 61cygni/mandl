@@ -43,7 +43,7 @@
 #define FILESTR_LEN 64
 
 static int img_w = 0, img_h = 0;
-static limb_t precision  = 100; 
+static limb_t precision  = 500; 
 static int max_iter      = 5000;
 
 static char *str_real = "-.749696000010025";
@@ -101,56 +101,6 @@ static int bf_log2(bf_t* ret, const bf_t* in, limb_t prec,
     bf_log(&logofin,  in,   prec, BF_RNDU);
     bf_log(&logoftwo, &two, prec, BF_RNDU);
     return bf_div(ret, &logofin, &logoftwo, prec, BF_RNDU);
-}
-
-//--
-//Take a null terminated string and convert to a bf_t
-//--
-static int str_to_bf_t(bf_t* result,char* str, int prec){
-    bf_t digit;
-    bf_t position;
-    
-    bf_init(&bf_ctx, &digit);
-    bf_init(&bf_ctx, &position);
-
-    bf_set_ui(&digit, 0);
-    bf_set_ui(result, 0);
-
-    bf_set_ui(&position, 1); // position of digit after decimal
-
-    int top = atoi(str); // pull off int before the decimal
-    int neg = 1;
-    if(str[0] == '-' || top < 0){
-        neg = -1; 
-        top *= neg; // turn positive while we add digits
-    }
-    bf_set_si(result, top); 
-    // print_bf(result);
-
-    int index = 0;
-
-    while (str[index] && str[index++] != '.') { ;
-    }
-    if(! str[index]){
-        bf_mul_si(result, result, neg, prec, BF_RNDU); 
-        return 0;
-    }
-    // Should be just past the decimal point here ...
-    int num;
-    uint64_t val = 0;
-
-    while (str[index]){
-
-        num = str[index] - '0'; // convert char to int
-        bf_set_ui(&digit, num);
-        bf_mul_ui(&position, &position, 10, prec, BF_RNDU); 
-        bf_div(&digit, &digit, &position, prec, BF_RNDU);  
-        bf_add(result, result, &digit, prec, BF_RNDU);
-        val++;
-        index++;
-    }
-    bf_mul_si(result, result, neg, prec, BF_RNDU); 
-    return val; // number of digits after decimal point
 }
 
 void squared_modulus(bf_t* result, bf_t* real, bf_t* imag, int prec){
@@ -400,17 +350,20 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &c_imag);
 
     if(cla_c_real){
-        str_to_bf_t(&c_real, cla_c_real, precision);
+        bf_atof(&c_real, cla_c_real, 0, 10, precision, 0);
         free(cla_c_real);
     }else{
-        str_to_bf_t(&c_real, str_real, precision);
+        //str_to_bf_t(&c_real, str_real, precision);
+        bf_atof(&c_real, str_real, 0, 10, precision, 0);
     }
 
     if(cla_c_imag){
-        str_to_bf_t(&c_imag, cla_c_imag, precision);
+        bf_atof(&c_imag, cla_c_imag, 0, 10, precision, 0);
+        //str_to_bf_t(&c_imag, cla_c_imag, precision);
         free(cla_c_imag);
     }else{
-        str_to_bf_t(&c_imag, str_imag, precision);
+        //str_to_bf_t(&c_imag, str_imag, precision);
+        bf_atof(&c_imag, str_imag, 0, 10, precision, 0);
     }
 
 
@@ -422,10 +375,12 @@ int main(int argc, char **argv)
     bf_init(&bf_ctx, &cmplx_h);
 
     if(cla_cmplx_w){
-        str_to_bf_t(&cmplx_w, cla_cmplx_w, precision);
+        bf_atof(&cmplx_w, cla_cmplx_w, 0, 10, precision, 0);
+        //str_to_bf_t(&cmplx_w, cla_cmplx_w, precision);
         free(cla_cmplx_w);
     }else{
-        str_to_bf_t(&cmplx_w, str_cmplx_w, precision);
+        //str_to_bf_t(&cmplx_w, str_cmplx_w, precision);
+        bf_atof(&cmplx_w, str_cmplx_w, 0, 10, precision, 0);
     }
 
     bf_set_float64(&cmplx_h, ((float)img_h / (float)img_w) ); 

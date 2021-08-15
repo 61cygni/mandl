@@ -169,9 +169,6 @@ class HPCSmooth(Algo):
         global c_height
         global c_real
         global c_imag
-        global scaling_factor
-        global magnification
-        global num_epochs
 
         print("c_real: %s"%(c_real))
         print("c_imag: %s"%(c_imag))
@@ -223,7 +220,6 @@ class HPCSmooth(Algo):
         scaling_factor = self.context.scaling_factor
         magnification = self.context.magnification
         num_epochs = self.context.num_epochs
-
 
     def zoom_in(self, iterations=1):
         global c_width
