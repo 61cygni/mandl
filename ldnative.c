@@ -1,6 +1,6 @@
 /*-----------------------------------------------------------------------------
- * file: longdoublemandel.c 
- * date : Wed Aug 11 08:13:56 PDT 2021  
+ * file: ldnative.c 
+ * date: Wed Aug 11 08:13:56 PDT 2021  
  * Author: Martin Casado 
  *
  * Mostly to push performance limits with some precision
@@ -124,6 +124,7 @@ void usage() {
     printf(" -v debug output to stderr\n");
     printf(" -w specify image width (REQUIRED) \n");
     printf(" -h specify image height \n");
+    printf(" -m <int> max iter \n");
     printf(" -n specify number of chunks \n");
     printf(" -b specify chunk number to compute \n");
     printf(" -x real value of center on complex plane \n");
@@ -140,7 +141,7 @@ int main(int argc, char **argv)
 
     strncpy(filename, "longdouble.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:l:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:l:m:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -158,6 +159,9 @@ int main(int argc, char **argv)
                 break;
             case 'h': 
                 img_h = atoi(optarg); 
+                break;
+            case 'm': 
+                max_iter = atoi(optarg); 
                 break;
             case 'n': 
                 numblocks = atoi(optarg); 
@@ -208,6 +212,7 @@ int main(int argc, char **argv)
     if(vflag){
         fprintf(stderr, "img width %d\n", img_w);
         fprintf(stderr, "img height %d\n", img_h);
+        fprintf(stderr, "max iter  %d\n",  max_iter);
         fprintf(stderr, "re_start %.20Lf\n", re_start);
         fprintf(stderr, "re_end   %.20Lf\n", re_end);
         fprintf(stderr, "im_start %.20Lf\n", im_start);

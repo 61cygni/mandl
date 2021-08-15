@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * file: nativemandel.c 
+ * file: hpnative.c 
  * date Sat Aug 07 08:48:52 PDT 2021 :
  * Author: Martin Casado 
  *
@@ -311,8 +311,10 @@ void usage() {
     printf(" -v debug output to stderr\n");
     printf(" -w specify image width (REQUIRED) \n");
     printf(" -h specify image height \n");
+    printf(" -m <int> max iter \n");
     printf(" -n specify number of chunks \n");
     printf(" -b specify chunk number to compute \n");
+    printf(" -p <int> precision (number of bits) \n");
     exit(0);
 }
 
@@ -324,7 +326,7 @@ int main(int argc, char **argv)
 
     strncpy(filename, "hpcnative.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:p:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -338,11 +340,17 @@ int main(int argc, char **argv)
             case 'h': 
                 img_h = atoi(optarg); 
                 break;
+            case 'm': 
+                max_iter = atoi(optarg); 
+                break;
             case 'n': 
                 numblocks = atoi(optarg); 
                 break;
             case 'b': 
                 blockno = atoi(optarg); 
+                break;
+            case 'p': 
+                precision = atoi(optarg); 
                 break;
             case '?':
             default:
@@ -435,8 +443,10 @@ int main(int argc, char **argv)
     }
 
     if(vflag){
-        fprintf(stderr, "img width %d\n", img_w);
+        fprintf(stderr, "img width  %d\n", img_w);
         fprintf(stderr, "img height %d\n", img_h);
+        fprintf(stderr, "max iter  %d\n",  max_iter);
+        fprintf(stderr, "precision  %d\n", (int)precision);
         fprintf(stderr, "re_start ");
         fprint_bf(stderr, &re_start, precision); fprintf(stderr,"\n");
         fprintf(stderr, "re_end =  ");

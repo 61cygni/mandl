@@ -1,4 +1,4 @@
-PROGS=nativemandel longdoublemandel
+PROGS=hpnative ldnative
 LIBS=-lm
 CFLAGS=-Wall -I thirdparty/ -g $(PROFILE) -MMD
 
@@ -7,10 +7,10 @@ all: $(PROGS) pre-build
 pre-build:
 	python3 setup.py build_ext --inplace
 
-nativemandel: nativemandel.o libbf.o cutils.o libattopng.o
+hpnative: hpnative.o libbf.o cutils.o libattopng.o
 	$(CC) $(LDFLAGS) -I libbf/ -o $@ $^ $(LIBS)
 
-longdoublemandel: longdoublemandel.o libbf.o cutils.o libattopng.o
+ldnative: ldnative.o libbf.o cutils.o libattopng.o
 	$(CC) $(LDFLAGS) -I libbf/ -o $@ $^ $(LIBS)
 
 %.o: %.c
