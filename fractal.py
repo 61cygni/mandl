@@ -177,7 +177,7 @@ class FractalContext:
             im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
             im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
 
-            burn_in_text = u"%d re range %f %f im range %f %f center %f + %f i" %\
+            burn_in_text = u"%d re range %.20f %.20f im range %.20f %.20f center %.20f + %.20f i" %\
                 (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag)
 
             burn_in_location = (10,10)
@@ -199,14 +199,10 @@ class FractalContext:
         crop_img   = self.cur_keyframe.crop((crop_x,crop_y,crop_x + crop_w, crop_y+crop_h))
         resize_img = crop_img.resize((self.img_width, self.img_height), Image.LANCZOS)
 
-        self.algo.zoom_in() # will update num_epochs
+        # self.algo.zoom_in() # will update num_epochs
 
-        if self.num_epochs % self.keyframe == 0:
-            self.cur_keyframe = None
-        else:
-            self.cur_keyframe = resize_img
 
-        return np.array(resize_img)
+        return resize_img
 
     def next_epoch(self, t, snapshot_filename = None):
         """Called for each frame of the animation. Will calculate
@@ -215,14 +211,14 @@ class FractalContext:
         values = None
 
         if self.keyframe and self.cur_keyframe: 
-            return self.zoom_and_crop_keyframe()
+            values = self.zoom_and_crop_keyframe()
         
-        if self.cache: 
+        if not values and self.cache: 
             values = self.cache.read_cache()
             if values:
                 self.algo.cache_loaded(values)
 
-        if not values:    
+        if not values: 
             # primary calculation function
             values = self.calc_cur_frame(snapshot_filename)
 
@@ -233,8 +229,11 @@ class FractalContext:
         self.algo.pre_image_hook()
         im = self.draw_image_PIL(values, snapshot_filename)
 
-        if self.keyframe and not self.cur_keyframe:
+        if self.num_epochs % self.keyframe == 0:
+            self.cur_keyframe = None
+        else:
             self.cur_keyframe = im
+
 
         # -- 
         # Do next step in animation
