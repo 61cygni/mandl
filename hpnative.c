@@ -332,10 +332,15 @@ int main(int argc, char **argv)
 
     strncpy(filename, "hpcnative.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:l:m:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
+                if(strlen(optarg) > FILESTR_LEN){
+                    fprintf(stderr," * error : filename on command line too large\n");
+                    return 0;
+                }
+                strncpy(filename, optarg, FILESTR_LEN);
                 break;
             case 'v':
                 vflag = 1;
