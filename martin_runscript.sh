@@ -51,5 +51,5 @@ python3 fractal.py --algo=csmooth --res=12k
 # minibrot at e-64
 python3 fractal.py --algo=hpcsmooth --dive --duration=60  --img-w=400 --img-h=300 --max-iter=15000 --scaling=.80 --keyframe=3 --advance=700
 
-# high res dive ithout keyframes to exercise high performance C implementation 
+# high res dive without keyframes to exercise high performance C implementation 
 fractal.py --algo=nativelong --res=4k --dive --burn

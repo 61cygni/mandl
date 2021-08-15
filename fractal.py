@@ -229,7 +229,7 @@ class FractalContext:
         self.algo.pre_image_hook()
         im = self.draw_image_PIL(values, snapshot_filename)
 
-        if self.num_epochs % self.keyframe == 0:
+        if self.keyframe and self.num_epochs % self.keyframe == 0:
             self.cur_keyframe = None
         else:
             self.cur_keyframe = im

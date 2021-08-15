@@ -21,7 +21,6 @@
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 #define FILESTR_LEN 64
 
-//static int img_w = 12288, img_h = 6480;
 static int img_w = 0, img_h = 0;
 static int max_iter = 2000;
 
@@ -121,7 +120,7 @@ void print_header() {
 
 void usage() {
     printf("Usage: nativemandel [-i filname] [-v] [-w] [-h] [-n NUM] [-b NUM]\n");
-    printf(" -i dump to image for debugging\n");
+    printf(" -i <filename> dump to image for debugging\n");
     printf(" -v debug output to stderr\n");
     printf(" -w specify image width (REQUIRED) \n");
     printf(" -h specify image height \n");
@@ -138,6 +137,8 @@ int main(int argc, char **argv)
     int ch, iflag = 0, vflag = 0;
     int numblocks = 0, blockno = 0;
     char filename[FILESTR_LEN];
+
+    strncpy(filename, "longdouble.png",FILESTR_LEN - 1);
 
     while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:l:")) != -1) {
         switch (ch) {
@@ -180,7 +181,7 @@ int main(int argc, char **argv)
     }
 
     if(!img_w){
-        fprintf(stderr, " Error: you must specify image width and height \n");
+        fprintf(stderr, " Error: you must specify image width\n");
         return 0;
     }
 
@@ -234,7 +235,6 @@ int main(int argc, char **argv)
     }
 
     if(iflag) {
-        //png = libattopng_new(img_w, img_h, PNG_RGB);
         png = libattopng_new(img_w, yend - ystart, PNG_RGB);
     }else{
         printf("d = {};\n");

@@ -40,14 +40,15 @@
 #include "libattopng.h"
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
+#define FILESTR_LEN 64
 
-static int img_w = 2048, img_h = 1536;
+static int img_w = 0, img_h = 0;
 static limb_t precision  = 100; 
 static int max_iter      = 5000;
 
 static char *str_real = "-.749696000010025";
 static char *str_imag = "0.031456625003";
-static char *str_cmplx_w = ".0000000000001";
+static char *str_cmplx_w = ".00000000001";
 
 
 // Full mandelbrot set
@@ -306,16 +307,24 @@ void print_header() {
 
 void usage() {
     printf("Usage: nativemandel [-i] [-v]\n");
-    printf(" -i dump to image for debugging\n");
+    printf(" -i <filename> dump to image for debugging\n");
     printf(" -v debug output to stderr\n");
+    printf(" -w specify image width (REQUIRED) \n");
+    printf(" -h specify image height \n");
+    printf(" -n specify number of chunks \n");
+    printf(" -b specify chunk number to compute \n");
     exit(0);
 }
 
 int main(int argc, char **argv)
 {
     int ch, iflag = 0, vflag = 0;
+    int numblocks = 0, blockno = 0;
+    char filename[FILESTR_LEN];
 
-    while ((ch = getopt(argc, argv, "iv")) != -1) {
+    strncpy(filename, "hpcnative.png",FILESTR_LEN - 1);
+
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -323,10 +332,35 @@ int main(int argc, char **argv)
             case 'v':
                 vflag = 1;
                 break;
+            case 'w': 
+                img_w = atoi(optarg); 
+                break;
+            case 'h': 
+                img_h = atoi(optarg); 
+                break;
+            case 'n': 
+                numblocks = atoi(optarg); 
+                break;
+            case 'b': 
+                blockno = atoi(optarg); 
+                break;
             case '?':
             default:
                 usage();
         }
+    }
+
+    if(!img_w){
+        fprintf(stderr, " Error: you must specify image width\n");
+        return 0;
+    }
+
+    if(!img_h){ // fill using ratio of w/h 1024/768
+        img_h = (float)img_w*(768. / 1024.);
+    }
+
+    if(!numblocks || !blockno) {
+        numblocks = blockno = 1;
     }
 
     bf_context_init(&bf_ctx, my_bf_realloc, NULL);
@@ -401,6 +435,8 @@ int main(int argc, char **argv)
     }
 
     if(vflag){
+        fprintf(stderr, "img width %d\n", img_w);
+        fprintf(stderr, "img height %d\n", img_h);
         fprintf(stderr, "re_start ");
         fprint_bf(stderr, &re_start, precision); fprintf(stderr,"\n");
         fprintf(stderr, "re_end =  ");
@@ -431,13 +467,23 @@ int main(int argc, char **argv)
     int red,green,blue;
     libattopng_t* png = 0;
 
+    // we only want to calculate our block 
+    int blocksize = img_h / numblocks;
+    int ystart    = (blockno-1) * blocksize;
+    int yend      = ystart + blocksize;
+    if(blockno == numblocks){
+        yend = img_h;
+    }
+
     if(iflag) {
-        png = libattopng_new(img_w, img_h, PNG_RGB);
+        png = libattopng_new(img_w, yend - ystart, PNG_RGB);
     }else{
         printf("d = {};\n");
     }
 
     for(int y = 0; y < img_h; ++y){
+        if(y < ystart || y > yend)
+            continue;
         for(int x = 0; x < img_w; ++x){
             // map from pixels to complex coordinates 
             // Re_x = (re_start) + (x / img_width)  * (re_end - re_start)
@@ -458,7 +504,7 @@ int main(int argc, char **argv)
             res = calc_pixel_smooth(&re_x, &im_y, precision); // main calculation!
             if(iflag) {
                 map_to_color(res,&red,&green,&blue);
-                libattopng_set_pixel(png, x, y, RGBA(red,green,blue)); 
+                libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(red,green,blue)); 
             }else{
                 printf("d[(%d,%d)] = %f; ",x,y,res);
                 fflush(stdout);
@@ -475,7 +521,10 @@ int main(int argc, char **argv)
     fprintf(stderr,"\n");
 
     if(iflag){
-        libattopng_save(png, "nativemandel.png");
+        if(vflag) {
+            fprintf(stderr,"Writing to image file %s\n", filename);
+        }
+        libattopng_save(png, filename);
         libattopng_destroy(png);
     }
 
