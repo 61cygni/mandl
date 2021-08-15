@@ -14,6 +14,30 @@ class TestMathSupport(unittest.TestCase):
     def tearDownClass(cls):
         cls.mathSupport = None
 
+    def test_instantiations(self):
+        """ 
+        String-based number instantiations.
+        Short enough for all implementations.
+        """
+        floatString = '-1.7693831791'
+        complexString = '-1.7693831791+0.0042368479j'
+        complexParenString = '(-1.7693831791+0.0042368479j)'
+        
+        complexRealString = '-1.7693831791'
+        complexImagString = '0.0042368479'
+
+        firstFloat = self.mathSupport.createFloat(floatString)
+        self.assertIsNotNone(firstFloat)
+
+        firstComplex = self.mathSupport.createComplex(complexString)
+        self.assertIsNotNone(firstComplex)
+
+        parenComplex = self.mathSupport.createComplex(complexParenString)
+        self.assertIsNotNone(parenComplex)
+
+        partwiseComplex = self.mathSupport.createComplex(complexRealString, complexImagString)
+        self.assertIsNotNone(partwiseComplex)
+
     def test_scaleValue(self):
         """ Extra casts of returns to float() so assertAlmostEqual works """
         startValue = 5.0
@@ -102,7 +126,47 @@ class TestMathSupportFlint(TestMathSupport):
         # prec value *should* be 53 to match precision.
         cls.mathSupport.flint.ctx.prec = 53 
 
-class TestMathSupportFlintCustom(TestMathSupport):
+    def test_instantiations(self):
+        """ 
+        String-based number instantiations.
+        Short enough for most all precisions.
+        """
+        floatString = '-1.7693831791'
+        firstFloat = self.mathSupport.createFloat(floatString)
+        self.assertIsNotNone(firstFloat)
+
+        complexString = '-1.7693831791+0.0042368479j'
+        firstComplex = self.mathSupport.createComplex(complexString)
+        self.assertIsNotNone(firstComplex)
+
+        complexParenString = '(-1.7693831791+0.0042368479j)'
+        parenComplex = self.mathSupport.createComplex(complexParenString)
+        self.assertIsNotNone(parenComplex)
+
+        complexRealString = '-1.7693831791'
+        complexImagString = '0.0042368479'
+        partwiseComplex = self.mathSupport.createComplex(complexRealString, complexImagString)
+        self.assertIsNotNone(partwiseComplex)
+
+        complexFlintBracketString = '[-1.76938317910000 +/- 3.53e-16] + [0.00423684790000000 +/- 1.68e-18]j' 
+        bracketComplex = self.mathSupport.createComplex(complexFlintBracketString)
+        self.assertIsNotNone(bracketComplex)
+
+        complexFlintBracketStringNeg = '[-1.76938317910000 +/- 3.53e-16] - [0.00423684790000000 +/- 1.68e-18]j' 
+        bracketNegativeComplex = self.mathSupport.createComplex(complexFlintBracketStringNeg)
+        self.assertIsNotNone(bracketNegativeComplex)
+
+        complexFlintBracketRealOnly = '[-1.76938317910000 +/- 3.53e-16]' 
+        bracketRealOnlyComplex = self.mathSupport.createComplex(complexFlintBracketRealOnly)
+        self.assertIsNotNone(bracketRealOnlyComplex)
+        #print("realOnly: %s" % complexFlintBracketRealOnly)
+
+        complexFlintBracketImagOnly = '[0.00423684790000000 +/- 1.68e-18]j' 
+        bracketImagOnlyComplex = self.mathSupport.createComplex(complexFlintBracketImagOnly)
+        self.assertIsNotNone(bracketImagOnlyComplex)
+        #print("imagOnly: %s" % complexFlintBracketImagOnly)
+
+class TestMathSupportFlintCustom(TestMathSupportFlint):
     @classmethod
     def setUpClass(cls):
         cls.mathSupport = fm.DiveMathSupportFlintCustom()

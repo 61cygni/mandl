@@ -55,7 +55,53 @@ class DiveMesh:
         # pass an extra parameter here and there.
         self.mathSupport = mathSupport
 
-        self.extraParams = extraParams
+        # Currently, extraParams is NOT pickled
+        # because we don't know which types the values are
+        self.extraParams = extraParams 
+
+    def __getstate__(self):
+        pickleInfo = self.__dict__.copy() 
+        # Currently, extraParams is NOT pickled
+        # because we don't know which types the values are
+        del(pickleInfo['extraParams'])
+
+        #pickleInfo['meshWidth'] = str(pickleInfo['meshWidth'])
+        #pickleInfo['meshHeight'] = str(pickleInfo['meshHeight'])
+        pickleInfo['center'] = str(pickleInfo['center'])
+
+        # Going to encode both the class name of the MathSupport, and
+        # the 'precision' it was apparently set at, making a string
+        # like "DiveMathSupportFlint:2048".
+        mathSupportString = type(self.mathSupport).__name__ + ":" + str(self.mathSupport.precision())
+        pickleInfo['mathSupport'] = mathSupportString
+      
+        return pickleInfo
+
+    def __setstate__(self, state):
+        """ 
+        NOTE: A new MathSupport sublass is instantiated during un-pickling.
+        This can be a problem if you're relying on specific precision settings, 
+        because the only MathSupport configuration that's handled here
+        is setting the precision from the encode classname:precision string.
+
+        It *is* important to set the precision before loading any numbers, or
+        else the numbers may be clipped to lower precision than what they 
+        were saved at.
+        """
+        mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
+                "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+                "DiveMathSupport":fm.DiveMathSupport}
+
+        (mathSupportClassName, precisionString) = state['mathSupport'].split(':')
+        #print("mathSupport reads as: %s" % mathSupportClassName)
+ 
+        state['mathSupport'] = mathSupportClasses[mathSupportClassName]()
+        state['mathSupport'].setPrecision(int(precisionString))
+        #print("mathSupport is: %s" % str(state['mathSupport']))
+
+        state['center'] = state['mathSupport'].createComplex(state['center'])
+
+        self.__dict__.update(state)
 
     def generateMesh(self):
         realMesh = self.realMeshGenerator.generateForDiveMesh(self)
@@ -92,26 +138,38 @@ class MeshGenerator:
             raise ValueError("varyingAxis must be one of (%s)" % ", ".join(axisOptions))
         self.varyingAxis = varyingAxis
 
-#    def __getstate__(self):
-#        pickleInfo = self.__dict__.copy() 
-#        pickleInfo['mathSupport'] = type(self.mathSupport).__name__
-# 
-#        #for currKey, currValue in pickleInfo.items():
-#        #    pickleInfo[currKey] = str(currValue)
-#
-#        return pickleInfo
-#
-#    def __setstate__(self, state):
-#        mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
-#                "DiveMathSupportFlint":fm.DiveMathSupportFlint,
-#                "DiveMathSupport":fm.DiveMathSupport}
-#
-#        mathSupportClassName = state['mathSupport']
-# 
-#        state['mathSupport'] = mathSupportClasses[mathSupportClassName]()
-#
-#        self.__dict__.update(state)
+    def __getstate__(self):
+        pickleInfo = self.__dict__.copy() 
+        # Going to encode both the class name of the MathSupport, and
+        # the 'precision' it was apparently set at, making a string
+        # like "DiveMathSupportFlint:2048".
+        mathSupportString = type(self.mathSupport).__name__ + ":" + str(self.mathSupport.precision())
+        pickleInfo['mathSupport'] = mathSupportString
+       
+        return pickleInfo
 
+    def __setstate__(self, state):
+        """ 
+        NOTE: A new MathSupport sublass is instantiated during un-pickling.
+        This can be a problem if you're relying on specific precision settings, 
+        because the only MathSupport configuration that's handled here
+        is setting the precision from the encode classname:precision string.
+
+        It *is* important to set the precision before loading any numbers, or
+        else the numbers may be clipped to lower precision than what they 
+        were saved at.
+        """
+        mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
+                "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+                "DiveMathSupport":fm.DiveMathSupport}
+
+        (mathSupportClassName, precisionString) = state['mathSupport'].split(':')
+        #print("mathSupport reads as: %s" % mathSupportClassName)
+ 
+        state['mathSupport'] = mathSupportClasses[mathSupportClassName]()
+        state['mathSupport'].setPrecision(int(precisionString))
+        #print("mathSupport is: %s" % str(state['mathSupport']))
+        self.__dict__.update(state)
 
     def generateForDiveMesh(self):
         raise NotImplementedError("generateForDiveMesh() must be overridden in a MeshGenerator subclass")
@@ -130,6 +188,21 @@ class MeshGeneratorUniform(MeshGenerator):
         super().__init__(mathSupport, varyingAxis)
         self.valuesCenter = valuesCenter
         self.baseWidth = baseWidth
+
+    def __getstate__(self):
+        pickleInfo = MeshGenerator.__getstate__(self)
+
+        pickleInfo['valuesCenter'] = str(pickleInfo['valuesCenter'])
+        pickleInfo['baseWidth'] = str(pickleInfo['baseWidth'])
+
+        return pickleInfo
+
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        #print("mathSupport exists as: %s" % str(self.mathSupport))
+        # Should probably be updating __dict__ instead?
+        self.valuesCenter = self.mathSupport.createFloat(self.valuesCenter)
+        self.baseWidth = self.mathSupport.createFloat(self.baseWidth)
 
     def generateForDiveMesh(self, diveMesh):
         """

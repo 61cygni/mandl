@@ -30,7 +30,11 @@ class DiveMathSupport:
 
     def setPrecision(self, newPrecision):
         """ Seems meaningless for pure python impelmentation, but seems like calling this shouldn't force a crash either? """
-        raise NotImplementedError("setPrecision is meaningless for base class, and must be implemented in DiveMathSupport sublcasses") 
+        pass;
+        #raise NotImplementedError("setPrecision is meaningless for base class, and must be implemented in DiveMathSupport sublcasses") 
+
+    def precision(self):
+        return 16 # Heh - pytnon's native float64, right?
 
     def createComplex(self, *args):
         """
@@ -42,6 +46,8 @@ class DiveMathSupport:
         # detect that, jam them into floats
         if len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
             return complex(float(args[0]), float(args[1]))
+        #elif len(args) == 1 and isinstance(args[0], str):
+        #    # Strip parens out of the definition string?
         else:
             return complex(*args) 
 
@@ -469,8 +475,15 @@ class DiveMathSupportFlint(DiveMathSupport):
         self.flint.ctx.prec = newPrecision
         return oldPrecision
 
+    def precision(self):
+        return self.flint.ctx.prec
+
     def createComplex(self, *args):
         """ 
+        Flint complex only accepts a flint-style square-bracket complex
+        string for instantiation.  So unless we detect that, we do some
+        extra string conversions here, to be flexible and consistent.
+
         Flint complex type doesn't accept a string for instantiation.
 
         So, we do a string conversion here, to be flexible
@@ -483,65 +496,19 @@ class DiveMathSupportFlint(DiveMathSupport):
             if isinstance(args[0], str):
                 partsString = args[0]
 
-                # Trim off the leading sign
-                firstIsPositive = True
-                if partsString.startswith('+'):
-                    partsString = partsString[1:]
-                elif partsString.startswith('-'):
-                    firstIsPositive = False
-                    partsString = partsString[1:]
-
-                # Trim off the trailing letter 
-                lastIsImag = False
-                if partsString.endswith('j'):
-                    lastIsImag = True
-                    partsString = partsString[:-1]
-
-                # Remaining string might have an internal sign.
-                # If there's no internal sign, then the whole remaining
-                # string is either the real or the complex
-                positiveParts = partsString.split('+')
-                negativeParts = partsString.split('-')
-
-                realIsPositive = True
-                imagIsPositive = True
-                realPart = ""
-                imagPart = ""
-                if len(positiveParts) == 2:
-                    realIsPositive = firstIsPositive
-                    realPart = positiveParts[0]
-                    imagIsPositive = True
-                    imagPart = positiveParts[1]
-                elif len(negativeParts) == 2:
-                    realIsPositive = firstIsPositive
-                    realPart = negativeParts[0]
-                    imagIsPositive = False
-                    imagPart = negativeParts[1]
-                elif len(positiveParts) == 1 and len(negativeParts) == 1:
-                    # No internal + or -, so it should just be a number
-                    if lastIsImag == True:
-                        imagPart = partsString
-                        imagIsPositive = firstIsPositive
-                    else:
-                        realPart = partsString
-                        realIsPositive = firstIsPositive
-                else:
-                    raise ValueError("String parameter not identifiably a complex number, in createComplex()")
-
                 preparedReal = '0.0'
                 preparedImag = '0.0'
-                if realPart != "":
-                    if realIsPositive == True:
-                        preparedReal = realPart
-                    else:
-                        preparedReal = "-%s" % realPart
 
-                if imagPart != "":
-                    if imagIsPositive == True:
-                        preparedImag = imagPart
-                    else:
-                        preparedImag = "-%s" % imagPart
-
+                #print("Looking at \"%s\"" % partsString)
+                if partsString.startswith('['):
+                    # Flint-style 'acb' complex string detected
+                    (preparedReal, preparedImag) = self.separateFlintComplexString(partsString)
+                else:
+                    (preparedReal, preparedImag) = self.separateOrdinaryComplexString(partsString)
+    
+                #print("real: %s" % preparedReal)
+                #print("imag: %s" % preparedImag)
+    
                 return self.flint.acb(preparedReal, preparedImag)
             else:
                 if isinstance(args[0], complex):
@@ -552,6 +519,120 @@ class DiveMathSupportFlint(DiveMathSupport):
             return self.flint.acb(0,0)
         else:
             raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
+
+
+    def separateFlintComplexString(self, paramPartsString):
+        partsString = paramPartsString
+
+        lastIsImag = False
+        if partsString.endswith('j'):
+            lastIsImag = True
+            partsString = partsString[:-1]
+
+        # Remaining string might have an internal sign.
+        # If there's no internal sign, then the whole remaining
+        # string is either the real or the complex
+        positiveParts = partsString.split(' + ')
+        negativeParts = partsString.split(' - ')
+
+        imagIsPositive = True
+        realPart = ""
+        imagPart = ""
+        if len(positiveParts) == 2:
+            realPart = positiveParts[0]
+            imagIsPositive = True
+            imagPart = positiveParts[1]
+        elif len(negativeParts) == 2:
+            realPart = negativeParts[0]
+            imagIsPositive = False
+            imagPart = negativeParts[1]
+        elif len(positiveParts) == 1 and len(negativeParts) == 1:
+            # No internal + or -, so it should just be a number
+            if lastIsImag == True:
+                realPart = '0.0'
+                imagPart = partsString
+            else:
+                realPart = partsString
+                imagPart = '0.0'
+        else:
+            raise ValueError("String parameter \"%s\" not identifiably a complex number, in createComplex()->separateFlintComplexString()" % paramPartsString)
+
+        realPart = realPart.strip()
+        imagPart = imagPart.strip()
+
+        # When imag is negative, need to insert the negative
+        # inside of the brackets.
+        if imagPart != '0.0' and imagIsPositive == False:
+            imagPart = imagPart[:1] + "-" + imagPart[1:]
+
+        return (realPart, imagPart)
+
+    def separateOrdinaryComplexString(self, partsString):
+        # 'Normal' complex with or without parens
+        # Trim off surrounding parens, if present
+        if partsString.startswith('('):
+            partsString = partsString[1:]
+        if partsString.endswith(')'):
+            partsString = partsString[:-1]
+   
+        # Trim off the leading sign
+        firstIsPositive = True
+        if partsString.startswith('+'):
+            partsString = partsString[1:]
+        elif partsString.startswith('-'):
+            firstIsPositive = False
+            partsString = partsString[1:]
+  
+        # Trim off the trailing letter 
+        lastIsImag = False
+        if partsString.endswith('j'):
+            lastIsImag = True
+            partsString = partsString[:-1]
+ 
+        # Remaining string might have an internal sign.
+        # If there's no internal sign, then the whole remaining
+        # string is either the real or the complex
+        positiveParts = partsString.split('+')
+        negativeParts = partsString.split('-')
+
+        realIsPositive = True
+        imagIsPositive = True
+        realPart = ""
+        imagPart = ""
+        if len(positiveParts) == 2:
+            realIsPositive = firstIsPositive
+            realPart = positiveParts[0]
+            imagIsPositive = True
+            imagPart = positiveParts[1]
+        elif len(negativeParts) == 2:
+            realIsPositive = firstIsPositive
+            realPart = negativeParts[0]
+            imagIsPositive = False
+            imagPart = negativeParts[1]
+        elif len(positiveParts) == 1 and len(negativeParts) == 1:
+            # No internal + or -, so it should just be a number
+            if lastIsImag == True:
+                imagPart = partsString
+                imagIsPositive = firstIsPositive
+            else:
+                realPart = partsString
+                realIsPositive = firstIsPositive
+        else:
+            raise ValueError("String parameter \"%s\" not identifiably a complex number, in createComplex()" % args[0])
+
+        if realPart != "":
+            if realIsPositive == True:
+                preparedReal = realPart
+            else:
+                preparedReal = "-%s" % realPart
+
+        if imagPart != "":
+            if imagIsPositive == True:
+                preparedImag = imagPart
+            else:
+                preparedImag = "-%s" % imagPart
+
+        return (preparedReal, preparedImag)
 
     def createFloat(self, floatValue):
         return self.flint.arb(floatValue)
@@ -926,12 +1007,21 @@ class DiveMathSupportDecimal(DiveMathSupport):
         self.decimal.getcontext().prec = newPrecision
         return oldPrecision
 
+    def precision(self):
+        return self.decimal.getcontext().prec
+
     def createComplex(self, *args):
         if len(args) == 2:
             return DecimalComplex(self.decimal.Decimal(args[0]), self.decimal.Decimal(args[1]))
         elif len(args) == 1:
             if isinstance(args[0], str):
                 partsString = args[0]
+
+                # Trim off surrounding parens, if present
+                if partsString.startswith('('):
+                    partsString = partsString[1:]
+                if partsString.endswith(')'):
+                    partsString = partsString[:-1]
 
                 # Trim off the leading sign
                 firstIsPositive = True
@@ -976,7 +1066,7 @@ class DiveMathSupportDecimal(DiveMathSupport):
                         realPart = partsString
                         realIsPositive = firstIsPositive
                 else:
-                    raise ValueError("String parameter not identifiably a complex number, in createComplex()")
+                    raise ValueError("String parameter \"%s\" not identifiably a complex number, in createComplex()" % args[0])
 
                 preparedReal = '0.0'
                 preparedImag = '0.0'

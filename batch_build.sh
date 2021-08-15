@@ -28,12 +28,12 @@
 #processCount=12
 # Tried 12 again, think it's very slow.
 
-processCount=6
+processCount=7
 
 # 30 frames per batch, 4 batches, = 120 frames, going a little extra
 # 30 frames per process, let's say 6 processes? = 180 frames
 startFrame=750
-lastNumber=930
+lastNumber=778
 
 stride=$(((lastNumber-startFrame)/processCount))
 
