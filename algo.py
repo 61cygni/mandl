@@ -17,6 +17,9 @@ class Algo(object):
     def animate_step(self, t):
         pass
 
+    def burn_string(self):
+        return None
+   
     def pre_image_hook(self):
         pass
 

@@ -42,19 +42,27 @@ class HPNative(Algo):
         self.exe   = NativeLong_EXE
         self.dir   = "./"+Gen_DIR+"/"
         self.color = (.1,.2,.3) 
-        self.numprocs = 0
+        self.numprocs  = 0
+        self.precision = 0
         #self.color = (.0,.6,1.0) 
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
             if opt in ['--nocolor']:
                 self.color = None 
-            if opt in ['--numprocs']:
+            elif opt in ['--numprocs']:
                 self.numprocs = int(arg) 
-            if opt in ['--setcolor']: # XXX TODO
+            elif opt in ['--precision']:
+                self.precision = int(arg) 
+            elif opt in ['--setcolor']: # XXX TODO
                 pass
                 #self.color = (.1,.2,.3)   # dark
                 #self.color = (.0,.6,1.0) # blue / yellow
+
+        if self.precision == 0:
+            self.precision = PRECISION
+            decimal.getcontext().prec = self.precision 
+
 
     def set_default_params(self):
 
@@ -64,7 +72,7 @@ class HPNative(Algo):
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
-            self.context.max_iter     = 2048
+            self.context.max_iter     = 8000
 
     def calc_pixel(self, c):
         assert 0
@@ -86,7 +94,7 @@ class HPNative(Algo):
             fn = self.dir+"hpm%d.png"%(i)
             filenames.append(fn)
             cmd_args =  self.exe+" -v -w %d -h %d -n %d -b %d -i %s -p %d -m %d -x \"%s\" -y \"%s\" -l \"%s\""%\
-                                 (img_width, img_height, self.numprocs, i+1, fn, PRECISION, self.context.max_iter, \
+                                 (img_width, img_height, self.numprocs, i+1, fn, self.precision, self.context.max_iter, \
                                  str(c_real), str(c_imag), str(c_width) )
             cmds.append(cmd_args)
 
@@ -149,6 +157,11 @@ class HPNative(Algo):
     def animate_step(self, t):
         self.zoom_in()
 
+    def burn_string(self):
+        burn_in_text = u"epoch: %d width %s " %\
+            (self.context.num_epochs, str(magnification))
+        return burn_in_text    
+        
     def zoom_in(self, iterations=1):
         global c_width
         global c_height

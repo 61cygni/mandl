@@ -17,10 +17,6 @@
  * https://www.shadertoy.com/view/4df3Rn coloring and smoothing working
  *
  *
- * usage : nativemandel 
- *              -i generate a PNG image (for debugging
- *              -v dump debugging output to stderr
- *
  * TODO:
  * - move initializations out of calc_pixel_smooth
  * - print timing for frames and output

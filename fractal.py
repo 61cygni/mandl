@@ -170,15 +170,23 @@ class FractalContext:
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
 
+
         if self.burn_in == True:
-            re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
-            re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
 
-            im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
-            im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
+            burn_in_text = self.algo.burn_string()
 
-            burn_in_text = u"%d re range %.20f %.20f im range %.20f %.20f center %.20f + %.20f i" %\
-                (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag)
+            if not burn_in_text:
+
+                print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+
+                re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
+                re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
+
+                im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
+                im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
+
+                burn_in_text = u"%d re range %.20f %.20f im range %.20f %.20f center %.20f + %.20f i" %\
+                    (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag)
 
             burn_in_location = (10,10)
             burn_in_margin = 5 
@@ -489,6 +497,8 @@ def parse_options():
                                 "palette-test=",
                                 "color=",
                                 "keyframe=",
+                                "precision=",
+                                "numprocs=",
                                 "dive",
                                 "burn",
                                 "banner",
