@@ -1,5 +1,60 @@
 # mandl
 
+
+# Constructing A Dive
+
+## Exploration
+
+Establish at least two frames to dive between.
+ - real and imaginary starting widths
+    (real -> horiz, imag -> vert, or was it the other way?)
+ - real and imaginary ending widths 
+    (second width is redundant if aspect ratio is constant)
+ - single center point, used as middle of both start and end frames
+
+While exploring, write out points of interest, creating a waypoint list.
+The first and last waypoints are the default endpoints for an 
+editing project.
+
+## Editing
+
+Need at least 2 waypoints to establish the 'outer' parameters for
+a dive animation.  
+
+In terms of an epoch-based definition, these are the starting widths 
+and the appropriate combination of zoom factor, framerate,
+and duration, that achieve the window widths at the start and the end.
+
+In terms of mesh exploration, these are two meshes that define the starting
+and ending widths, and either a framerate or a duration.
+
+## Statistics
+
+For an edit, would like to have statistics gathered across the frames
+that show:
+ - How many pixels are which values (counts and/or hists)
+ - Some kinds of entropy estimates for each frame
+ - Pattern matching results, against a library of shapes
+
+## Sync
+
+Timing of color palette and drawing algorithm type should be flexible
+enough that we can sync it to a music track, or to our defined waypoints.
+
+Sound generations from a sequence might require timing adjustments for
+the animation, to make a rhythm or a tone adjustment more consistent.
+e.g. if we have a good start of a beat, but the 4th bar is messy, we could
+rush or delay that phrase to make it fit more consistently.
+
+Sound sync will probably require a similar kind of adjustment, except the
+satisfaction is backwards, where we take a rhythm or a tone definition,
+and bend the temporal locations that we've targeted as waypoints to
+line up with the beat or tone.
+
+
+
+# Notes on Architecture and Classes
+
 FractalContext
  - Keeps and manages overall parameters.
  - Instantiates algorithm and precision-aware subclasses.
