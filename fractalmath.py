@@ -9,6 +9,28 @@ import math
 
 import numpy as np
 
+#FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
+#3.32 bits per digit, on average
+#2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
+
+#FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) # 2200*3.32 = 7304, lol
+#FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
+#FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
+#FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(400 * 3.32) 
+
+# For debugging, looks like we're bottoming out somewhere around e-11
+# So, only really need ~20 digits for this test
+# Blowing out frame 30, which is ~28?
+#FLINT_HIGH_PRECISION_SIZE = int(50 * 3.32) 
+# Native blew out somewhere e-13 to e-15
+#FLINT_HIGH_PRECISION_SIZE = int(200 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(60 * 3.32) 
+#FLINT_HIGH_PRECISION_SIZE = int(30 * 3.32) 
+FLINT_HIGH_PRECISION_SIZE = int(16 * 3.32) 
+
 class DiveMathSupport:
     """
     Toolbox for math functions that need to be type-aware, so we
@@ -53,6 +75,13 @@ class DiveMathSupport:
 
     def createFloat(self, floatValue):
         return float(floatValue)
+
+    def stringFromFloat(self, paramFloat):
+        return str(paramFloat)
+
+    def shorterStringFromFloat(self, paramFloat, places):
+        # I guess for native, just ignore the truncation request?
+        return self.stringFromFloat(paramFloat) 
 
     def floor(self, value):
         return math.floor(value)
@@ -448,25 +477,7 @@ class DiveMathSupportFlint(DiveMathSupport):
 
         self.flint = __import__('flint') # Only imports if you instantiate this DiveMathSupport subclass.
 
-        #FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
-        #3.32 bits per digit, on average
-        #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
-        
-        #FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) # 2200*3.32 = 7304, lol
-        #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
-        #FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
-        #FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
-        #FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
-        #FLINT_HIGH_PRECISION_SIZE = int(400 * 3.32) 
-        
-        # For debugging, looks like we're bottoming out somewhere around e-11
-        # So, only really need ~20 digits for this test
-        # Blowing out frame 30, which is ~28?
-        #FLINT_HIGH_PRECISION_SIZE = int(50 * 3.32) 
-        # Native blew out somewhere e-13 to e-15
-        #FLINT_HIGH_PRECISION_SIZE = int(200 * 3.32) 
-        
-        self.defaultPrecisionSize = int(500 * 3.32) 
+        self.defaultPrecisionSize = FLINT_HIGH_PRECISION_SIZE
         self.flint.ctx.prec = self.defaultPrecisionSize  # Sets flint's precision (in bits)
         self.precisionType = 'flint'
 
@@ -620,6 +631,9 @@ class DiveMathSupportFlint(DiveMathSupport):
         else:
             raise ValueError("String parameter \"%s\" not identifiably a complex number, in createComplex()" % args[0])
 
+        preparedReal = ""
+        preparedImag = ""
+
         if realPart != "":
             if realIsPositive == True:
                 preparedReal = realPart
@@ -637,6 +651,14 @@ class DiveMathSupportFlint(DiveMathSupport):
     def createFloat(self, floatValue):
         return self.flint.arb(floatValue)
 
+    def stringFromFloat(self, paramFloat):
+        # Trying to clear out the error ball?!
+        return self.flint.arb(paramFloat.mid(), 0).str() 
+
+    def shorterStringFromFloat(self, paramFloat, places):
+        # Trying to clear out the error ball?!
+        return self.flint.arb(paramFloat.mid(), 0).str(places) 
+
     def floor(self, value):
         return self.flint.arb(value).floor()
 
@@ -652,7 +674,10 @@ class DiveMathSupportFlint(DiveMathSupport):
         """
         zoomAsArb = self.flint.arb(overallZoomFactor)
         iterationsAsArb = self.flint.arb(iterations)
+        #calculatedValue = startValue * pow(zoomAsArb, iterationsAsArb)
+        #return self.flint.arb(calculatedValue.mid(), 0) # Trying to clear out the error ball?!
         return startValue * pow(zoomAsArb, iterationsAsArb)
+
        
 
     def interpolateLogTo(self, startX, startY, endX, endY, targetX):
@@ -727,6 +752,8 @@ class DiveMathSupportFlint(DiveMathSupport):
 
         Could just call julia with a zero start here, but seems wiser to
         not have one extra function call in the core of the calculation?
+        (In retrospect, the extra call isn't worth tabulating at higher
+        iteration counts)
         """
         z = self.flint.acb(0,0)
         n = 0
@@ -738,6 +765,12 @@ class DiveMathSupportFlint(DiveMathSupport):
                 break
 
             z = z*z + c
+      
+            # Forcibly clearing the error component of the arb.
+            # Custom flint implementation could be more graceful with this.
+            zRealNoErr = self.flint.arb(z.real.mid(), 0)
+            zImagNoErr = self.flint.arb(z.imag.mid(), 0)
+            z = self.flint.acb(zRealNoErr, zImagNoErr) 
 
         return (n, z)
 

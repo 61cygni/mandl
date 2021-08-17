@@ -32,8 +32,8 @@ processCount=7
 
 # 30 frames per batch, 4 batches, = 120 frames, going a little extra
 # 30 frames per process, let's say 6 processes? = 180 frames
-startFrame=750
-lastNumber=778
+startFrame=0
+lastNumber=21
 
 stride=$(((lastNumber-startFrame)/processCount))
 
@@ -54,62 +54,6 @@ for currPID in ${pidList[*]}; do
     wait $currPID
     echo "Done"
 done
-
-
-#echo "Batch 4"
-#date
-#
-#startFrame=700
-#lastNumber=800
-#
-#stride=$(((lastNumber-startFrame)/processCount))
-#
-##stride=45
-##lastNumber=359
-#batchCount=0
-#pidList=()
-#
-#until [ $startFrame -ge $lastNumber ]
-#do
-#    echo startFrame: $startFrame &
-#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
-#    pidList[${batchCount}]=$!
-#    ((startFrame=startFrame+stride))
-#    ((batchCount=batchCount+1))
-#done
-#
-## wait for all pids
-#for currPID in ${pidList[*]}; do
-#    wait $currPID
-#    echo "Done"
-#done
-#
-#
-#echo "Batch 5"
-#date
-#
-#startFrame=800
-#lastNumber=900
-#
-#stride=$(((lastNumber-startFrame)/processCount))
-#
-#batchCount=0
-#pidList=()
-#
-#until [ $startFrame -ge $lastNumber ]
-#do
-#    echo startFrame: $startFrame &
-#    python3.9 fractal.py --algo=mandelbrot_solo --demo --burn --flintcustom --clip-start-frame=${startFrame} --clip-frame-count=${stride}&
-#    pidList[${batchCount}]=$!
-#    ((startFrame=startFrame+stride))
-#    ((batchCount=batchCount+1))
-#done
-#
-## wait for all pids
-#for currPID in ${pidList[*]}; do
-#    wait $currPID
-#    echo "Done"
-#done
 
 
 # AFTER all the processes finish

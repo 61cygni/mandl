@@ -169,6 +169,9 @@ class Frame:
     def create_image_metadata_file_name(self):
         return u"%s.pik" % self.create_image_file_name()
 
+    def create_mesh_file_name(self):
+        return u"%s.mesh.pik" % self.create_image_file_name()
+
     def write_image_to_file(self, image):
         self.create_image_subpath(mkdir_if_needed=True) # Just for side-effect folder creation
 
@@ -180,6 +183,10 @@ class Frame:
             frame_meta = self.frame_info.empty_copy()
             frame_meta.raw_histogram = self.frame_info.raw_histogram
             pickle.dump(frame_meta,fd)
+
+        mesh_filename = self.create_mesh_file_name()
+        with open(mesh_filename, 'wb') as mesh_handle:
+            pickle.dump(self.dive_mesh, mesh_handle)
 
         return filename
 
