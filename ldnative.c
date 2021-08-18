@@ -294,9 +294,13 @@ void map_to_color(float val, int* red, int* green, int* blue) {
     float c2 = 0.;
     float c3 = 0.;
 
-    c1 +=  1 + cos( 3.0 + val*0.15 + sc0);
-    c2 +=  1 + cos( 3.0 + val*0.15 + sc1);
-    c3 +=  1 + cos( 3.0 + val*0.15 + sc2);
+    c1 +=  1 + cos( 3.0 + val*0.05 + sc0);
+    c2 +=  1 + cos( 3.0 + val*0.05 + sc1);
+    c3 +=  1 + cos( 3.0 + val*0.05 + sc2);
+
+    //c1 +=  1 + cos( 3.0 + val*0.15 + sc0);
+    //c2 +=  1 + cos( 3.0 + val*0.15 + sc1);
+    //c3 +=  1 + cos( 3.0 + val*0.15 + sc2);
 
     *red    = (int)(255.*((c1/4.) * 3.) / 1.5);
     *green  = (int)(255.*((c2/4.) * 3.) / 1.5);

@@ -91,6 +91,8 @@ class FractalContext:
         self.palette = None
         self.burn_in = False
 
+        self.sleep   = 0
+
         self.cache   = None
 
         self.verbose = 0 # how much to print about progress
@@ -177,8 +179,6 @@ class FractalContext:
 
             if not burn_in_text:
 
-                print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
-
                 re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
                 re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
 
@@ -253,7 +253,11 @@ class FractalContext:
             print("Done]")
 
         self.algo.per_frame_reset()
-        
+
+        if self.sleep:
+            print("Sleeping for %ds"%(self.sleep))
+            time.sleep(self.sleep)
+    
         if snapshot_filename:
             return im.save(snapshot_filename,"gif")
         else:    
@@ -499,6 +503,7 @@ def parse_options():
                                 "keyframe=",
                                 "precision=",
                                 "numprocs=",
+                                "sleep=",
                                 "dive",
                                 "burn",
                                 "banner",
@@ -574,6 +579,8 @@ def parse_options():
             fractal_ctx.fps = int(arg)
         elif opt in ['--keyframe']:
             fractal_ctx.keyframe = int(arg) 
+        elif opt in ['--sleep']:
+            fractal_ctx.sleep = int(arg) 
         elif opt in ['--cache']:
             fractal_ctx.cache = fc.FractalCache(fractal_ctx) 
         elif opt in ['--center']:

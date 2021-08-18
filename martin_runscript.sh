@@ -52,4 +52,4 @@ python3 fractal.py --algo=csmooth --res=12k
 python3 fractal.py --algo=hpcsmooth --dive --duration=60  --img-w=400 --img-h=300 --max-iter=15000 --scaling=.80 --keyframe=3 --advance=700
 
 # high res dive without keyframes to exercise high performance C implementation 
-fractal.py --algo=nativelong --res=4k --dive --burn
+fractal.py --algo=ldnative --res=4k --dive --burn
