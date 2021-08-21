@@ -73,6 +73,7 @@ class FractalContext:
         self.advance = 0   # Call advance for this many frames prior to rendering
 
         self.snapshot       = False # Generate a single, high res shotb
+        self.exploere       = False # pop up a visual explorer  
 
         self.precision = 17 # int decimal precision for calculations
 
@@ -126,7 +127,7 @@ class FractalContext:
         if self.keyframe or snapshot_filename:
             self.pre_time = time.perf_counter()  
 
-        values = self.algo.calc_cur_frame(self.img_width, self. img_height, re_start, re_end, im_start, im_end)         
+        values = self.algo.calc_cur_frame(self.img_width, self. img_height,re_start, re_end, im_start, im_end)         
 
             #if self.keyframe or snapshot_filename:
             #    print(".",end="")

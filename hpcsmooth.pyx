@@ -68,8 +68,8 @@ cdef inline bint cinside_M1_or_M2(long double real, long double imag):
 @cython.profile(False)
 def ccalc_pixel(real, imag, int max_iter, int escape_rad):
 
-    #if cinside_M1_or_M2(real, imag):
-    #    return 0 
+    if cinside_M1_or_M2(real, imag):
+        return 0 
 
     cdef float l = 0.0
     z_real = hpf(0.) 
@@ -170,19 +170,15 @@ class HPCSmooth(Algo):
         global c_real
         global c_imag
 
-        print("c_real: %s"%(c_real))
-        print("c_imag: %s"%(c_imag))
 
         re_start = hpf(c_real - (c_width / hpf(2.)))
         re_end   = hpf(c_real + (c_width / hpf(2.)))
 
         im_start = hpf(c_imag - (c_height / hpf(2.)))
         im_end   = hpf(c_imag + (c_height / hpf(2.)))
-        
-        print("re_start: %s"%(re_start))
-        print("re_end: %s"%(re_end))
 
-        print(" + calculating frame at complex width %s"%(re_start - re_end))
+        print(" + [hpcsmooth]calculating frame at center %f %fi"%(c_real, c_imag))
+        print(" + Re_start %f Im_start %f"%(re_start, im_start))
         
         return ccalc_cur_frame(img_width, img_height, re_start, re_end, im_start, im_end, self.context.max_iter, self.context.escape_rad)
 

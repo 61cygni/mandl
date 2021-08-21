@@ -70,9 +70,6 @@ class Smooth(Algo):
 
         return sl 
 
-    def calc_cur_frame(self, img_width, img_height, x, xx, xxx, xxxx):
-        import out
-        return out.d
 
     def _map_to_color(self, val):
         magnification = 1. / self.context.cmplx_width
