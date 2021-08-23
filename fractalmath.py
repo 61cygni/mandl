@@ -322,6 +322,9 @@ class DiveMathSupport:
         return (n, z)
 
     def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
+        # TODO: seems like the order of params to smoothAfterCalculation are 
+        # all needlessly scrambled up? 
+
         if endingIter == maxIter:
             return float(maxIter)
         else:

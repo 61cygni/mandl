@@ -34,13 +34,12 @@ class DiveMesh:
     # Then, the separate 2D meshes are combined to become the overall mesh values.
     # Finally, overall distortions are applied to the overall mesh values.
     """
-    def __init__(self, width, height, center, realMeshGenerator, imagMeshGenerator, mathSupport, extraParams={}):
+    def __init__(self, width, height, realMeshGenerator, imagMeshGenerator, mathSupport, extraParams={}):
         # Trying not to apply castings to these types, to keep them the same as
         # the original parameters, which could make swapping out different 
         # precision libraries simpler?
         self.meshWidth = width
         self.meshHeight = height
-        self.center = center
 
         self.realMeshGenerator = realMeshGenerator
         self.imagMeshGenerator = imagMeshGenerator
@@ -67,7 +66,6 @@ class DiveMesh:
 
         #pickleInfo['meshWidth'] = str(pickleInfo['meshWidth'])
         #pickleInfo['meshHeight'] = str(pickleInfo['meshHeight'])
-        pickleInfo['center'] = str(pickleInfo['center'])
 
         # Going to encode both the class name of the MathSupport, and
         # the 'precision' it was apparently set at, making a string
@@ -99,9 +97,11 @@ class DiveMesh:
         state['mathSupport'].setPrecision(int(precisionString))
         #print("mathSupport is: %s" % str(state['mathSupport']))
 
-        state['center'] = state['mathSupport'].createComplex(state['center'])
-
         self.__dict__.update(state)
+
+    def getCenter(self):
+        """ Pretty common to want the mesh center, so assemble it from the generators. """
+        return self.mathSupport.createComplex(self.realMeshGenerator.valuesCenter, self.imagMeshGenerator.valuesCenter)
 
     def generateMesh(self):
         realMesh = self.realMeshGenerator.generateForDiveMesh(self)
@@ -115,9 +115,10 @@ class DiveMesh:
         # The native python 'complex' type assigns into "object" type arrays without problems,
         # but not vice-versa, so use object type for everything.
 
-        for x in range(0, meshShape[0]):
-            for y in range(0, meshShape[1]):
-                combinedMesh[x,y] = self.mathSupport.createComplex(realMesh[x,y], imagMesh[x,y])
+        # numpyArray.shape returns (rows, columns)
+        for y in range(0, meshShape[0]):
+            for x in range(0, meshShape[1]):
+                combinedMesh[y,x] = self.mathSupport.createComplex(realMesh[y,x], imagMesh[y,x])
 
         return combinedMesh
 
@@ -234,7 +235,7 @@ class MeshGeneratorUniform(MeshGenerator):
 
     def __repr__(self):
         return """\
-[MeshGeneratorUniform center:{vCenter} baseWidth:{vWidth} along axis:{vAxis}]\
+[MeshGeneratorUniform valuesCenter:{vCenter} baseWidth:{vWidth} along axis:{vAxis}]\
 """.format(vCenter=self.valuesCenter, vWidth=self.baseWidth, vAxis=self.varyingAxis)
 
 # Not implemented yet: 

@@ -26,6 +26,7 @@ import math
 import os
 
 import pickle
+import json # For params file reading and writing
 
 import multiprocessing # Can't actually make this work yet - gonna need pickling?
 
@@ -48,8 +49,8 @@ import divemesh       as mesh
 
 from algo import Algo # Abstract base class import, because we rely on it.
 from julia import Julia 
-from mandelbrot import Mandelbrot
 from mandelbrot_solo import MandelbrotSolo
+from mandelbrot_smooth import MandelbrotSmooth
 from mandeldistance import MandelDistance
 from smooth import Smooth
 
@@ -98,8 +99,8 @@ class FractalContext:
         self.invalidate_cache = False
 
         self.algorithm_map = {'julia' : Julia, 
-                'mandelbrot' : Mandelbrot,
                 'mandelbrot_solo' : MandelbrotSolo,
+                'mandelbrot_smooth' : MandelbrotSmooth,
                 'mandeldistance' : MandelDistance,
                 'smooth': Smooth}
         self.algorithm_name = None
@@ -128,21 +129,10 @@ class FractalContext:
 
         #print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
         #print(".") # Just to keep the time-per-frame calculations from being overwritten in the terminal
-        frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh=dive_mesh, frame_number=display_frame_number, project_folder_name=self.project_name, shared_cache_path=self.shared_cache_path, build_cache=self.build_cache, invalidate_cache=self.invalidate_cache, extra_params=extra_params)
+        frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh=dive_mesh, frame_number=display_frame_number, output_folder_name=self.project_name, extra_params=extra_params)
 
-        frame_algorithm.beginning_hook()
-        
-        frame_algorithm.generate_results()
-        
-        frame_algorithm.pre_image_hook()
-
-        frame_image = frame_algorithm.generate_image()
-
-        image_file_name = frame_algorithm.write_image_to_file(frame_image)
-
-        frame_algorithm.ending_hook()
-
-        return image_file_name
+        frame_algorithm.run()
+        return frame_algorithm.output_image_file_name
 
     def __repr__(self):
         return """\
@@ -358,13 +348,23 @@ class DiveTimeline:
     There are currently only 3 'tracks' of keyframes (for complex 
     center, window base sizes, and perspective).  Keyframes 
     currently all live on integer frame numbers.
+
+    # TODO: Seems like algorithm should be a per-span property, instead of
+    # per-timeline, doesn't it?
     """
 
-    def __init__(self, projectFolderName, algorithm_name, framerate, frameWidth, frameHeight, mathSupport, sharedCachePath):
+    @staticmethod
+    def algorithm_map():
+        return {'julia' : Julia, 
+                'mandelbrot_solo' : MandelbrotSolo,
+                'mandelbrot_smooth' : MandelbrotSmooth,
+                'mandeldistance' : MandelDistance,
+                'smooth': Smooth,
+        }
+
+    def __init__(self, projectFolderName, algorithm_name, framerate, frameWidth, frameHeight, mathSupport):
         
         self.projectFolderName = projectFolderName
-        self.sharedCachePath = sharedCachePath
-
         self.algorithm_name = algorithm_name
 
         self.framerate = float(framerate)
@@ -500,7 +500,7 @@ class DiveTimeline:
             for (leftKeyframe, rightKeyframe) in currKeyframePairs:
                 extraFrameParams[currParamName] = self.interpolateFloatBetweenParameterKeyframes(localFrameNumber, leftKeyframe, rightKeyframe) 
 
-        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, meshCenterValue, realMeshGenerator, imagMeshGenerator, self.mathSupport, extraFrameParams)
+        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, realMeshGenerator, imagMeshGenerator, self.mathSupport, extraFrameParams)
         #print (diveMesh)
         return diveMesh
 
@@ -1359,140 +1359,328 @@ def set_snapshot_mode(fractal_ctx, view_ctx, snapshot_filename='snapshot.gif'):
     view_ctx.fps            = 0
 
 
-def parse_options(fractal_ctx, view_ctx):
-    argv = sys.argv[1:]
-    
-    opts, args = getopt.getopt(argv, "pd:m:s:f:w:h:c:a:",
-                               ["preview",
-                                "algo=",
-                                "flint",
-                                "flintcustom",
-                                "gmp",
-                                "demo",
-                                "demo-julia-walk",
-                                "duration=",
-                                "fps=",
-                                "clip-start-frame=",
-                                "clip-frame-count=",
-                                "project-name=",
-                                "image-frame-path=",
-                                "shared-cache-path=",
-                                "build-cache",
-                                "invalidate-cache",
-                                "banner",
-                                "max-iter=",
-                                "img-w=",
-                                "img-h=",
-                                "cmplx-w=",
-                                "cmplx-h=",
-                                "center=",
-                                "scaling-factor=",
-                                "snapshot=",
-                                "gif=",
-                                "mpeg=",
-                                "verbose=",
-                                "palette-test=",
-                                #"color=",
-                                "color",
-                                "julia-center=", # Julia
-                                "julia-list=", # Julia
-                                "burn", # Hopefully all algorithms?
-                                "escape_radius", # Mandelbrot, Julia
-                                "max_escape_iterations", # Mandelbrot, Julia
-                                "smooth", # Mandelbrot, Julia
-                                ])
+def make_project(params):
+    """
+    Sets up a project directory structure, as long as the provided
+    name is legal enough and not already taken.
 
+    It might be more pure to only create subdirs as they're needed
+    and used, but it's actually helpful to have a pre-defined structure
+    in place to rely on, even if the paths end up shifting around later
+    because of changes to settings.
+    """
+    folder_name = params['make_project_name']
+    print("Making project: \"%s\"" % folder_name)
+    if os.path.exists(folder_name):
+        print("NOT CREATING project:")
+        print("  File already exists where fractal project would be created.")
+        exit(0)
 
-    # First-pass parameters handled so others can be responsive
-    # - Math support, so instantiations are properly typed
-    # - Algorithm name, so additional parameters can be read
+    project_params = {
+        "math_support": params['math_support'].precisionType,
+        "exploration_mesh_width": "160",
+        "exploration_mesh_height": "120",
+        "exploration_default_algo_name": "mandelbrot_solo",
+        "exploration_default_zoom_factor": "0.8",
+        "exploration_output_path": "exploration/output",
+        "exploration_markers_path": "exploration/markers",
+        "edit_markers_path": "edit/markers",
+        "edit_timelines_path": "edit/timelines",
+        "render_mesh_width": "1024",
+        "render_mesh_height": "768",
+        "render_fps": "23.976",
+        "render_output_path": "output",
+        "render_exports_path": "exports",
+        }
+ 
+    subfolder_names = [project_params['exploration_output_path'],
+        project_params['exploration_markers_path'],
+        project_params['edit_markers_path'],
+        project_params['edit_timelines_path'],
+        project_params['render_output_path'],
+        project_params['render_exports_path'],
+        ]
+
+    for curr_subfolder_name in subfolder_names:
+        os.makedirs(os.path.join(folder_name, curr_subfolder_name))
+
+    param_file_name = os.path.join(folder_name, 'params.json')
+    with open(param_file_name, 'wt') as param_handle:
+        param_handle.write(json.dumps(project_params, indent=4))
+        param_handle.close()
+
+    print("Project folder created at \"%s\"" % folder_name)
+
+def parse_options():
+    """
+    Handles parsing of command line parameters, including those specified
+    in Algo implementations.
+
+    For all modes except "--make-project", also load the values 
+    from params.json into params['project_params']
+    """
+
+#def parse_options(fractal_ctx, view_ctx):
+ #   argv = sys.argv[1:]
+ #   opts, args = getopt.getopt(argv, "pd:m:s:f:w:h:c:a:",
+ #                              ["preview",
+ #                               "algo=",
+ #                               "flint",
+ #                               "flintcustom",
+ #                               "gmp",
+ #                               "demo",
+ #                               "demo-julia-walk",
+ #                               "duration=",
+ #                               "fps=",
+ #                               "clip-start-frame=",
+ #                               "clip-frame-count=",
+ #                               "project-name=",
+ #                               "image-frame-path=",
+ #                               "shared-cache-path=",
+ #                               "build-cache",
+ #                               "invalidate-cache",
+ #                               "banner",
+ #                               "max-iter=",
+ #                               "img-w=",
+ #                               "img-h=",
+ #                               "cmplx-w=",
+ #                               "cmplx-h=",
+ #                               "center=",
+ #                               "scaling-factor=",
+ #                               "snapshot=",
+ #                               "gif=",
+ #                               "mpeg=",
+ #                               "verbose=",
+ #                               "palette-test=",
+ #                               #"color=",
+ #                               "color",
+ #                               "julia-center=", # Julia
+ #                               "julia-list=", # Julia
+ #                               "burn", # Hopefully all algorithms?
+ #                               "escape_radius", # Mandelbrot, Julia
+ #                               "max_escape_iterations", # Mandelbrot, Julia
+ #                               "smooth", # Mandelbrot, Julia
+ #                               "make-project=",
+ ##                               "project=",
+ #                               "math-support=",
+ #                               ])
+
+    params = {} # Most everything here fills this dictionary
+
+    options_list = ["math-support=",
+                    "digits-precision=",
+                    "project=",
+                    # Mode params
+                    "make-project=",
+                    "exploration",
+                    "timeline-name=",
+                    # Exploration-only params
+                    "expl-algo=",
+                    "expl-real-width=",
+                    "expl-imag-width=",
+                    "expl-center=",
+                    "expl-frame-number=",
+                    # Timeline-only params
+                    "batch-frame-numbers=",
+                   ]
+
+    # Add *all* the command line options that Algos recognize, even though
+    # I'd rather only load up for the active Algo.  There's not a really
+    # clean way to first load the Algo, and second, trim out the algo-specific
+    # options, in a way that keeps getopt working simply.      
+    algorithm_map = DiveTimeline.algorithm_map()
+    algorithm_extra_params = {}
+    for algorithm_name, algorithm_class in algorithm_map.items():
+        options_list.extend(algorithm_class.options_list())
+    # Make param list unique, just for readability
+    options_list = list(set(options_list)) 
+
+    opts, args = getopt.getopt(sys.argv[1:], "", options_list)
+
+    # First-pass at params to set up MathSupport because lots of 
+    # things depend on it for names and types.
+    math_support_classes = {'native': fm.DiveMathSupport,
+        'flint': fm.DiveMathSupportFlint,
+        'flintcustom': fm.DiveMathSupportFlintCustom,
+        # maybe not complete?# 'gmp': fm.DiveMathSupportGmp,
+        # maybe not complete?# 'decimal': fm.DiveMathSupportDecimal,
+        # definitely not built yet.# 'libbf': fm.DiveMathSupportLibbf,
+    } 
+    math_support = math_support_classes['native']() # Creates an instance
     for opt, arg in opts:
-        if opt in ['--gmp']:
-            fractal_ctx.math_support = fm.DiveMathSupportGmp()
-        elif opt in ['--flint']:
-            fractal_ctx.math_support = fm.DiveMathSupportFlint()
-        elif opt in ['--flintcustom']:
-            fractal_ctx.math_support = fm.DiveMathSupportFlintCustom()
-        elif opt in ['-a', '--algo']:
-            if str(arg) in fractal_ctx.algorithm_map:
-                fractal_ctx.algorithm_name = str(arg)
+        if opt in ['--math-support']:
+            if arg in math_support_classes:
+                # Creates an instance
+                math_support = math_support_classes[arg]() 
+        elif opt in ['--digits-precision']:
+            params['digits_precision'] = int(arg)
+    # Important to also set expected precision before parsing param values
+    support_precision = params.get('digits_precision', 16) # 16 == native
+    math_support.setPrecision(support_precision)
+    params['math_support'] = math_support
 
-    if fractal_ctx.algorithm_name is None:
-        fractal_ctx.algorithm_name = 'mandelbrot'
-
-    # Kinda a crazy invocation.  Loads algorithm-specific parameters into
-    # a dictionary, based on that algorithm's static class parse function.
-    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name] = fractal_ctx.algorithm_map[fractal_ctx.algorithm_name].parse_options(opts)
-    # Theoretically possible we'll eventually want to run this for all
-    # possible algorithm types, but for now, just loading for the 
-    # 'active' algorithm.
-
-    for opt,arg in opts:
-        if opt in ['-p', '--preview']:
-            set_preview_mode(fractal_ctx, view_ctx)
-        elif opt in ['-s', '--snapshot']:
-            set_snapshot_mode(fractal_ctx, view_ctx, arg)
-        elif opt in ['--demo']:
-            set_demo1_params(fractal_ctx, view_ctx)
-        elif opt in ['--demo-julia-walk']:
-            set_julia_walk_demo1_params(fractal_ctx, view_ctx)
-
-    palette = fp.FractalPalette() # Will get stashed for the algorithm to use
-
+    # Second-pass at params, figures out which mode we're operating
+    # in, so enforcement of parameter consistency can be localized.
+    #
+    # 4 modes: make-project, exploration, timeline, batch-in-timeline
+    mode_count = 0
     for opt, arg in opts:
-        if opt in ['-d', '--duration']:
-            view_ctx.duration  = float(arg) 
-        elif opt in ['-f', '--fps']:
-            view_ctx.fps  = float(arg)
-        elif opt in ['--clip-start-frame']:
-            # For construct_simple_timeline, use of --clip-start-frame
-            # makes --clip-frame-count kinda required
-            fractal_ctx.clip_start_frame = int(arg)
-        elif opt in ['--clip-frame-count']:
-            fractal_ctx.clip_frame_count = int(arg)
-        elif opt in ['-m', '--max-iter']:
-            fractal_ctx.max_iter = int(arg)
-        elif opt in ['-w', '--img-w']:
-            fractal_ctx.img_width = int(arg)
-        elif opt in ['-h', '--img-h']:
-            fractal_ctx.img_height = int(arg)
-        elif opt in ['--cmplx-w']:
-            fractal_ctx.cmplx_width = fractal_ctx.math_support.createFloat(arg)
-        elif opt in ['--cmplx-h']:
-            fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(arg)
-        elif opt in ['-c', '--center']:
-            fractal_ctx.cmplx_center= fractal_ctx.math_support.createComplex(arg)
-        elif opt in ['--scaling-factor']:
-            fractal_ctx.scaling_factor = float(arg)
-        elif opt in ['-z', '--zoom']:
-            fractal_ctx.set_zoom_level = int(arg)
+        if opt in ['--make-project']:
+            params['mode'] = 'make_project'
+            params['make_project_name'] = arg
+            mode_count += 1
+        elif opt in ['--exploration']:
+            params['mode'] = 'exploration'
+            mode_count += 1
+        elif opt in ['--timeline-name']:
+            # 'timeline' mode may be overwritten later with more specificity
+            params['mode'] = 'timeline'
+            params['timeline_name'] = arg
+            mode_count += 1
+        elif opt in ['--project']:
+            params['project_name'] = arg
 
-        # Worth noting, julia-list is used only for Timeline construction, 
-        # and isn't an intrisic thing to the Algo.
-        elif opt in ['--julia-list']:
-            raw_julia_list = eval(arg)  # expects a list of complex numbers
-            if len(raw_julia_list) <= 1:
-                print("Error: List of complex numbers for Julia walk must be at least two points")
-                sys.exit(0)
-            julia_list = []
-            for currCenter in raw_julia_list:
-                julia_list.append(fractal_ctx.math_support.create_complex(currCenter))
-            fractal_ctx.julia_list = julia_list
-        elif opt in ['--palette-test']:
-            if str(arg) == "gauss":
-                palette.create_gauss_gradient((255,255,255),(0,0,0))
-            elif str(arg) == "exp":    
-                palette.create_exp_gradient((255,255,255),(0,0,0))
-            elif str(arg) == "exp2":    
-                palette.create_exp2_gradient((0,0,0),(128,128,128))
-            elif str(arg) == "list":    
-                palette.create_gradient_from_list()
-            else:
-                print("Error: --palette-test arg must be one of gauss|exp|list")
-                sys.exit(0)
-            palette.display()
-            sys.exit(0)
-#        elif opt in ['--color']:
+    if mode_count != 1:
+        raise ValueError("Exactly one of '--make-project=', '--timeline-name=', or '--exploration' is required to set the running mode.")
+
+    # Special case where we can do all the work here and be done.
+    if params['mode'] == 'make_project':
+        make_project(params)
+        exit(0)
+
+    # We know we're in a project mode, if we made it this far, so
+    # require that a project has been specified.
+    if 'project_name' not in params:
+        raise ValueError("Specifying --project=<name> is required")
+
+    # Load project parameters out of the params file
+    param_file_name = os.path.join(params['project_name'], 'params.json')
+    with open(param_file_name, 'rt') as param_handle:
+        params['project_params'] = json.load(param_handle)
+ 
+    # Fourth pass at parameters, gathering those that are
+    # mode-specific, with mode-specific enforcement 
+    if params['mode'] == 'exploration':
+        # Exploration also reads parameters out of the project's params.json:
+        # exploration_mesh_width
+        # exloration_mesh_height
+        # exploration_output_path
+        for opt, arg in opts:
+            if opt in ['--expl-algo']:
+                params['expl_algo'] = arg
+            elif opt in ['--expl-real-width']:
+                params['expl_real_width'] = math_support.createFloat(arg) 
+            elif opt in ['--expl-imag-width']:
+                params['expl_imag_width'] = math_support.createFloat(arg)
+            elif opt in ['--expl-center']:
+                params['expl_center'] = math_support.createComplex(arg)
+            elif opt in ['--expl-frame-number']:
+                params['expl_frame_number'] = int(arg)
+
+        required_params = ["expl_algo",
+                    "expl_real_width",
+                    "expl_imag_width",
+                    "expl_center",
+                    "expl_frame_number",
+        ]
+        for param_name in required_params:
+            if param_name not in params:
+                raise ValueError("For exploration mode, \"%s\" is a required parameter (well, that name with hyphens, not underscores)." % param_name)
+
+        # Kinda a crazy invocation.  Loads algorithm-specific parameters into
+        # a dictionary, based on that algorithm's static class parse function.
+        expl_algorithm_name = params.get('expl_algo', 'mandelbrot_solo')
+        params['algorithm_extra_params'] = algorithm_map[expl_algorithm_name].parse_options(opts)
+        # Theoretically possible we'll eventually want to run this for all
+        # possible algorithm types, but for now, just loading for the 
+        # 'active' algorithm.
+
+    elif params['mode'] == 'timeline':
+        for opt, arg in opts:
+            if opt in ['--batch-frame-numbers']:
+                # We're in batch mode, instead of entire-timeline mode,
+                # so get more specific.
+                params['mode'] = 'batch_timeline'
+                params['batch_frame_numbers'] = arg
+
+    return params
+
+#    # First-pass parameters handled so others can be responsive
+#    # - Math support, so instantiations are properly typed
+#    # - Algorithm name, so additional parameters can be read
+#    for opt, arg in opts:
+#        if opt in ['--gmp']:
+#            fractal_ctx.math_support = fm.DiveMathSupportGmp()
+#        elif opt in ['--flint']:
+#            fractal_ctx.math_support = fm.DiveMathSupportFlint()
+#        elif opt in ['--flintcustom']:
+#            fractal_ctx.math_support = fm.DiveMathSupportFlintCustom()
+#        elif opt in ['-a', '--algo']:
+#            if str(arg) in fractal_ctx.algorithm_map:
+#                fractal_ctx.algorithm_name = str(arg)
+#
+#    if fractal_ctx.algorithm_name is None:
+#        fractal_ctx.algorithm_name = 'mandelbrot'
+#
+#    # Kinda a crazy invocation.  Loads algorithm-specific parameters into
+#    # a dictionary, based on that algorithm's static class parse function.
+#    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name] = fractal_ctx.algorithm_map[fractal_ctx.algorithm_name].parse_options(opts)
+#    # Theoretically possible we'll eventually want to run this for all
+#    # possible algorithm types, but for now, just loading for the 
+#    # 'active' algorithm.
+#
+#    for opt,arg in opts:
+#        if opt in ['-p', '--preview']:
+#            set_preview_mode(fractal_ctx, view_ctx)
+#        elif opt in ['-s', '--snapshot']:
+#            set_snapshot_mode(fractal_ctx, view_ctx, arg)
+#        elif opt in ['--demo']:
+#            set_demo1_params(fractal_ctx, view_ctx)
+#        elif opt in ['--demo-julia-walk']:
+#            set_julia_walk_demo1_params(fractal_ctx, view_ctx)
+#
+#    palette = fp.FractalPalette() # Will get stashed for the algorithm to use
+#
+#    for opt, arg in opts:
+#        if opt in ['-d', '--duration']:
+#            view_ctx.duration  = float(arg) 
+#        elif opt in ['-f', '--fps']:
+#            view_ctx.fps  = float(arg)
+#        elif opt in ['--clip-start-frame']:
+#            # For construct_simple_timeline, use of --clip-start-frame
+#            # makes --clip-frame-count kinda required
+#            fractal_ctx.clip_start_frame = int(arg)
+#        elif opt in ['--clip-frame-count']:
+#            fractal_ctx.clip_frame_count = int(arg)
+#        elif opt in ['-m', '--max-iter']:
+#            fractal_ctx.max_iter = int(arg)
+#        elif opt in ['-w', '--img-w']:
+#            fractal_ctx.img_width = int(arg)
+#        elif opt in ['-h', '--img-h']:
+#            fractal_ctx.img_height = int(arg)
+#        elif opt in ['--cmplx-w']:
+#            fractal_ctx.cmplx_width = fractal_ctx.math_support.createFloat(arg)
+#        elif opt in ['--cmplx-h']:
+#            fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(arg)
+#        elif opt in ['-c', '--center']:
+#            fractal_ctx.cmplx_center= fractal_ctx.math_support.createComplex(arg)
+#        elif opt in ['--scaling-factor']:
+#            fractal_ctx.scaling_factor = float(arg)
+#        elif opt in ['-z', '--zoom']:
+#            fractal_ctx.set_zoom_level = int(arg)
+#
+#        # Worth noting, julia-list is used only for Timeline construction, 
+#        # and isn't an intrisic thing to the Algo.
+#        elif opt in ['--julia-list']:
+#            raw_julia_list = eval(arg)  # expects a list of complex numbers
+#            if len(raw_julia_list) <= 1:
+#                print("Error: List of complex numbers for Julia walk must be at least two points")
+#                sys.exit(0)
+#            julia_list = []
+#            for currCenter in raw_julia_list:
+#                julia_list.append(fractal_ctx.math_support.create_complex(currCenter))
+#            fractal_ctx.julia_list = julia_list
+#        elif opt in ['--palette-test']:
 #            if str(arg) == "gauss":
 #                palette.create_gauss_gradient((255,255,255),(0,0,0))
 #            elif str(arg) == "exp":    
@@ -1504,47 +1692,127 @@ def parse_options(fractal_ctx, view_ctx):
 #            else:
 #                print("Error: --palette-test arg must be one of gauss|exp|list")
 #                sys.exit(0)
-#            fractal_ctx.palette = palette
-        elif opt in ['--project-name']:
-            fractal_ctx.project_name = arg
-        elif opt in ['--shared-cache-path']:
-            fractal_ctx.shared_cache_path = arg 
-        elif opt in ['--build-cache']:
-            fractal_ctx.build_cache = True
-        elif opt in ['--invalidate-cache']:
-            fractal_ctx.invalidate_cache = True
-        elif opt in ['--banner']:
-            view_ctx.banner = True
-        elif opt in ['--verbose']:
-            verbosity = int(arg)
-            if verbosity not in [0,1,2,3]:
-                print("Invalid verbosity level (%d) use range 0-3"%(verbosity))
-                sys.exit(0)
-            fractal_ctx.verbose = verbosity
-        elif opt in ['--gif']:
-            if view_ctx.vfilename != None:
-                print("Error : Already specific media type %s"%(view_ctx.vfilename))
-                sys.exit(0)
-            view_ctx.vfilename = arg
-        elif opt in ['--mpeg']:
-            if view_ctx.vfilename != None:
-                print("Error : Already specific media type %s"%(view_ctx.vfilename))
-                sys.exit(0)
-            view_ctx.vfilename = arg
+#            palette.display()
+#            sys.exit(0)
+##        elif opt in ['--color']:
+##            if str(arg) == "gauss":
+##                palette.create_gauss_gradient((255,255,255),(0,0,0))
+##            elif str(arg) == "exp":    
+##                palette.create_exp_gradient((255,255,255),(0,0,0))
+##            elif str(arg) == "exp2":    
+##                palette.create_exp2_gradient((0,0,0),(128,128,128))
+##            elif str(arg) == "list":    
+##                palette.create_gradient_from_list()
+##            else:
+##                print("Error: --palette-test arg must be one of gauss|exp|list")
+##                sys.exit(0)
+##            fractal_ctx.palette = palette
+#        elif opt in ['--project-name']:
+#            fractal_ctx.project_name = arg
+#        elif opt in ['--shared-cache-path']:
+#            fractal_ctx.shared_cache_path = arg 
+#        elif opt in ['--build-cache']:
+#            fractal_ctx.build_cache = True
+#        elif opt in ['--invalidate-cache']:
+#            fractal_ctx.invalidate_cache = True
+#        elif opt in ['--banner']:
+#            view_ctx.banner = True
+#        elif opt in ['--verbose']:
+#            verbosity = int(arg)
+#            if verbosity not in [0,1,2,3]:
+#                print("Invalid verbosity level (%d) use range 0-3"%(verbosity))
+#                sys.exit(0)
+#            fractal_ctx.verbose = verbosity
+#        elif opt in ['--gif']:
+#            if view_ctx.vfilename != None:
+#                print("Error : Already specific media type %s"%(view_ctx.vfilename))
+#                sys.exit(0)
+#            view_ctx.vfilename = arg
+#        elif opt in ['--mpeg']:
+#            if view_ctx.vfilename != None:
+#                print("Error : Already specific media type %s"%(view_ctx.vfilename))
+#                sys.exit(0)
+#            view_ctx.vfilename = arg
+#
+#    # Stash the palette as an extra parameter
+#    extra_params = fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]
+#    extra_params['palette'] = palette
 
-    # Stash the palette as an extra parameter
-    extra_params = fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]
-    extra_params['palette'] = palette
+def run_exploration(params):
+    algorithm_name = params['expl_algo']
+    project_params = params['project_params']
+    project_folder_name = params['project_name']
+
+    timeline = DiveTimeline(projectFolderName=project_folder_name, algorithm_name=algorithm_name, framerate=23.976, frameWidth=project_params['exploration_mesh_width'], frameHeight=project_params['exploration_mesh_height'], mathSupport=params['math_support'])
+    real_width = params['expl_real_width']
+    imag_width = params['expl_imag_width']
+    center = params['expl_center']
+
+    span = timeline.addNewSpanAtEnd(1, center, real_width, imag_width, real_width, imag_width)
+
+    extra_params = params['algorithm_extra_params']
+    dive_mesh=timeline.getMeshForFrame(0)
+    extra_params.update(dive_mesh.extraParams) # Allow per-frame info to overwrite algorithm info?
+
+    output_folder_name = os.path.join(project_folder_name, project_params['exploration_output_path'])
+
+    # Following is a class instantiation, of a string-specified Algo class
+    algorithm_map = DiveTimeline.algorithm_map()
+    frame_algorithm = algorithm_map[algorithm_name](dive_mesh=dive_mesh, frame_number=params['expl_frame_number'], output_folder_name=output_folder_name, extra_params=extra_params)
+
+    frame_algorithm.run()
+
+    
+#    if algorithm_name == 'julia':
+#        # Probably better to check for instance-of Julia Algo?
+#        span = DiveTimelineSpan(timeline, 1)
+#        span.addNewWindowKeyframe(0, real_width, imag_width)
+#        span.addNewWindowKeyframe(1, real_width, imag_width)
+#        span.addNewUniformKeyframe(0)
+#        span.addNewUniformKeyframe(1)
+#
+#        span.addNewCenterKeyframe(0, center)
+#        span.addNewCenterKeyframe(1, center) 
+#
+## Let's try to rely on extra params to pass in the julia_center?
+## Should work, since I don't have to interpolate it anywhere?
+##
+##        julia_center = algo_params['julia_center']
+##        span.addNewComplexParameterKeyframe(0, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
+##        span.addNewComplexParameterKeyframe(1, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
+#
+#        timeline.timelineSpans.append(span)
+#
+#    else:
+#        span = timeline.addNewSpanAtEnd(1, center, real_width, imag_width, real_width, imag_width)
+
+
+def run_timeline(params):
+    pass
+
+def run_batch_timeline(params):
+    pass
 
 if __name__ == "__main__":
 
     print("++ fractal.py version %s" % (MANDL_VER))
 
-    fractal_ctx = FractalContext()
-    view_ctx  = MediaView(16, 16, fractal_ctx)
+    params = parse_options()
+    mode = params['mode']
+    if mode == 'exploration':
+        run_exploration(params)
+    elif mode == 'timeline':
+        run_timeline(params)
+    elif mode == 'batch_timeline':
+        run_batch_timeline(params)
+    else:
+        raise ValueError("Run mode is unrecognized - abandoning run")
 
-    parse_options(fractal_ctx, view_ctx)
-   
-    view_ctx.setup()
-    view_ctx.run()
+ 
+    #fractal_ctx = FractalContext()
+    #view_ctx  = MediaView(16, 16, fractal_ctx)
+    #parse_options(fractal_ctx, view_ctx)
+  
+    #view_ctx.setup()
+    #view_ctx.run()
 

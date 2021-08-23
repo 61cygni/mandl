@@ -207,6 +207,15 @@ if __name__ == '__main__':
 
     global params
     params = parse_options()
+    (params, remainingOptions) = parse_options()
+
+    print("First remaining: %s" % remainingOptions)
+    opts, secondRemaining = getopt.getopt(remainingOptions,["foo=",
+                                ])
+    print("Second remaining: %s" % secondRemaining)
+
+    exit(0)
+
     frameNumber = params.get('frameNumber', 0)
 
     centerString = params.get('centerString', None)

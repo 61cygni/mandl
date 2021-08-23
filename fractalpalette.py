@@ -58,7 +58,11 @@ class FractalPalette:
     def map_value_to_color(self, m, smoothing=False):
 
         if len(self.palette) == 0: 
-            c = 255 - int(255 * self.hues[math.floor(m)]) 
+            if len(self.hues) == 0:
+                # This is the default 'distance estimate' palette
+                c = int(float(m)*255)
+            else:
+                c = 255 - int(255 * self.hues[math.floor(m)]) 
             return (c, c, c)
             
         if smoothing:

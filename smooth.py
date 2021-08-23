@@ -14,9 +14,9 @@
 import math
 import numpy as np
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from algo import Algo, EscapeFrameInfo, EscapeAlgo
+from algo import Algo, EscapeAlgo
 
 
 class Smooth(EscapeAlgo):

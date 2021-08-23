@@ -3,9 +3,9 @@ import numpy as np
 
 from collections import defaultdict
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
-from algo import JuliaFrameInfo, JuliaAlgo
+from algo import JuliaAlgo
 
 import fractalpalette as fp
 

@@ -20,8 +20,29 @@ class TestDiveMesh(unittest.TestCase):
         cls.pyMathSupport = None
         cls.flintMathSupport = None
 
+    def test_meshShape(self):
+        meshWidth = 5
+        meshHeight = 3
+        widthGen = MeshGeneratorUniform(self.pyMathSupport, 'width', 0.5, 0.5)
+        heightGen = MeshGeneratorUniform(self.pyMathSupport, 'height', 2.0, 4.0)
+        comparisonArrayString = """[[(0.25+0j) (0.375+0j) (0.5+0j) (0.625+0j) (0.75+0j)]
+ [(0.25+2j) (0.375+2j) (0.5+2j) (0.625+2j) (0.75+2j)]
+ [(0.25+4j) (0.375+4j) (0.5+4j) (0.625+4j) (0.75+4j)]]"""
+
+        diveMesh = DiveMesh(meshWidth, meshHeight, widthGen, heightGen, self.pyMathSupport)
+
+        meshArray = diveMesh.generateMesh()
+        meshShape = meshArray.shape
+        #print(meshArray)
+
+        # numpy array.shape returns (rows, columns), which is (height, width)
+        self.assertEqual(meshShape[1], meshWidth)
+        self.assertEqual(meshShape[0], meshHeight)
+
+        self.assertEqual(str(meshArray), comparisonArrayString)
+
     def test_pythonGeneratorPickle(self):
-        centerFloatString = '-1.769383179195515018213'
+        centerFloatString = '-1.7693831791955'
         baseWidthString = '2.0'
 
         pyCenter = self.pyMathSupport.createFloat(centerFloatString)
@@ -37,7 +58,7 @@ class TestDiveMesh(unittest.TestCase):
 
     def test_flintGeneratorPickle(self):
         # Maybe better to use a bracket-arb string here?  But doesn't matter?
-        centerFloatString = '-1.769383179195515018213'
+        centerFloatString = '-1.7693831791955'
         baseWidthString = '2.0'
 
         flintCenter = self.flintMathSupport.createFloat(centerFloatString)
@@ -52,8 +73,8 @@ class TestDiveMesh(unittest.TestCase):
         self.assertEqual(float(uniformGen.baseWidth), float(otherGen.baseWidth))
 
     def test_pythonDiveMeshPickle(self):
-        centerWidthString = '-1.769383179195515018213'
-        centerHeightString = '0.00423684791873677221'
+        centerWidthString = '-1.7693831791955'
+        centerHeightString = '0.0042368479187'
 
         baseRealWidthString = '5.0'
         baseImagWidthString = '3.0'
@@ -68,23 +89,16 @@ class TestDiveMesh(unittest.TestCase):
         imagWidth = mathSupport.createFloat(baseImagWidthString)
         imagGen = MeshGeneratorUniform(mathSupport, 'height', imagCenter, imagWidth)
         
-        centerComplexString = '-1.769383179195515018213+0.00423684791873677221j'
-        pyComplex = mathSupport.createComplex(centerComplexString)
-
         meshWidth = 320
         meshHeight = 240
 
-        diveMesh = DiveMesh(meshWidth, meshHeight, pyComplex, realGen, imagGen, mathSupport)
+        diveMesh = DiveMesh(meshWidth, meshHeight, realGen, imagGen, mathSupport)
 
         pickleValue = pickle.dumps(diveMesh)
         loadedMesh = pickle.loads(pickleValue)
 
         self.assertEqual(int(diveMesh.meshWidth), int(loadedMesh.meshWidth))
         self.assertEqual(int(diveMesh.meshHeight), int(loadedMesh.meshHeight))
-
-        self.assertEqual(float(diveMesh.center.real), float(loadedMesh.center.real))
-        self.assertEqual(float(diveMesh.center.imag), float(loadedMesh.center.imag))
-        self.assertEqual(float(diveMesh.center.imag), float(loadedMesh.center.imag))
 
         #print("realGen: \"%s\"" % str(diveMesh.realMeshGenerator))
         #print("imagGen: \"%s\"" % str(diveMesh.imagMeshGenerator))
@@ -93,8 +107,8 @@ class TestDiveMesh(unittest.TestCase):
 
     def test_flintDiveMeshPickle(self):
         # Maybe better to use a bracket-arb string here?  But doesn't matter?
-        centerWidthString = '-1.769383179195515018213'
-        centerHeightString = '0.00423684791873677221'
+        centerWidthString = '-1.7693831791955'
+        centerHeightString = '0.0042368479187'
 
         baseRealWidthString = '5.0'
         baseImagWidthString = '3.0'
@@ -109,23 +123,16 @@ class TestDiveMesh(unittest.TestCase):
         imagWidth = mathSupport.createFloat(baseImagWidthString)
         imagGen = MeshGeneratorUniform(mathSupport, 'height', imagCenter, imagWidth)
         
-        centerComplexString = '-1.769383179195515018213+0.00423684791873677221j'
-        pyComplex = mathSupport.createComplex(centerComplexString)
-
         meshWidth = 320
         meshHeight = 240
 
-        diveMesh = DiveMesh(meshWidth, meshHeight, pyComplex, realGen, imagGen, mathSupport)
+        diveMesh = DiveMesh(meshWidth, meshHeight, realGen, imagGen, mathSupport)
 
         pickleValue = pickle.dumps(diveMesh)
         loadedMesh = pickle.loads(pickleValue)
 
         self.assertEqual(int(diveMesh.meshWidth), int(loadedMesh.meshWidth))
         self.assertEqual(int(diveMesh.meshHeight), int(loadedMesh.meshHeight))
-
-        self.assertEqual(float(diveMesh.center.real), float(loadedMesh.center.real))
-        self.assertEqual(float(diveMesh.center.imag), float(loadedMesh.center.imag))
-        self.assertEqual(float(diveMesh.center.imag), float(loadedMesh.center.imag))
 
         #print("realGen: \"%s\"" % str(diveMesh.realMeshGenerator))
         #print("imagGen: \"%s\"" % str(diveMesh.imagMeshGenerator))
