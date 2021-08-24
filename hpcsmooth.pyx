@@ -116,14 +116,13 @@ cdef cmap_to_color(val, int[:] colors):
 def ccalc_cur_frame(int img_width, int img_height, re_start, re_end,
                     im_start, im_end, int max_iter, int escape_rad):
     values = {}
-
     printf("[")
     fflush(stdout)
     for x in range(0, img_width):
         for y in range(0, img_height):
             in_x = hpf(x)
             in_y = hpf(y)
-            # ap from pixels to complex coordinates
+            # map from pixels to complex coordinates
             Re_x = (re_start) + (in_x / img_width)  * (re_end - re_start)
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
@@ -189,7 +188,7 @@ class HPCSmooth(Algo):
     def _map_to_color(self, val):
         c = np.zeros((3), dtype=np.int32)
         cmap_to_color(val, c)
-        return (c[0], c[1], c[2]) 
+        return  (c[0], c[1], c[2]) 
 
     def map_value_to_color(self, val):
         return self._map_to_color(val)
@@ -210,8 +209,10 @@ class HPCSmooth(Algo):
         c_height = hpf(self.context.cmplx_height)
         #c_real = hpf('-1.76938317919551501821384728608547378290574726365475143746552821652788819126')
         #c_imag = hpf('0.00423684791873677221492650717136799707668267091740375727945943565011234400')
-        c_real = hpf('-1')
-        c_imag = hpf('0')
+        #c_real = hpf('-1')
+        #c_imag = hpf('0')
+        c_real = hpf(self.context.cmplx_center.real)
+        c_imag = hpf(self.context.cmplx_center.imag)
 
         scaling_factor = self.context.scaling_factor
         magnification = self.context.magnification

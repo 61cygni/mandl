@@ -74,17 +74,23 @@ cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, 
 @cython.boundscheck(False)
 cdef cmap_to_color(val, int[:] colors):
 
-    cdef float sc0 = 0.1
-    cdef float sc1 = 0.2
-    cdef float sc2 = 0.3
+    cdef float sc0 = 0.0
+    cdef float sc1 = 0.6
+    cdef float sc2 = 1.0
 
     cdef float c1 = 0.
     cdef float c2 = 0.
     cdef float c3 = 0.
 
-    c1 +=  1 + math.cos( 3.0 + val*0.15 + sc0);
-    c2 +=  1 + math.cos( 3.0 + val*0.15 + sc1);
-    c3 +=  1 + math.cos( 3.0 + val*0.15 + sc2);
+    for m in val:
+        c1 +=  1 + math.cos( 3.0 + m*0.15 + sc0);
+        c2 +=  1 + math.cos( 3.0 + m*0.15 + sc1);
+        c3 +=  1 + math.cos( 3.0 + m*0.15 + sc2);
+
+    c1 /= len(val)    
+    c2 /= len(val)    
+    c3 /= len(val)    
+
     cdef short c1int = int(255.*((c1/4.) * 3.) / 1.5)
     cdef short c2int = int(255.*((c2/4.) * 3.) / 1.5)
     cdef short c3int = int(255.*((c3/4.) * 3.) / 1.5)
@@ -106,6 +112,13 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
     cdef long double in_x
     cdef long double in_y
 
+    fraction_x = (re_end - re_start) / img_width
+    fraction_y = (im_end - im_start) / img_height
+    fraction_3x = fraction_x / 3.
+    fraction_3y = fraction_y / 3.
+    fraction_5x = fraction_x / 5.
+    fraction_5y = fraction_y / 5.
+
     for x in range(0, img_width):
         for y in range(0, img_height):
             in_x = x
@@ -115,7 +128,20 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
             # Call primary calculation function here
-            m = ccalc_pixel(Re_x, Im_y, max_iter, escape_rad)
+            m = []
+            m.append(ccalc_pixel(Re_x, Im_y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x + fraction_3x, Im_y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x - fraction_3x, Im_y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x, Im_y + fraction_3y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x, Im_y - fraction_3y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x + fraction_3x, Im_y + fraction_3y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x - fraction_3x, Im_y - fraction_3y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x - fraction_3x, Im_y + fraction_3y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x + fraction_3x, Im_y - fraction_3y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x + fraction_5x, Im_y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x - fraction_5x, Im_y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x, Im_y + fraction_5y, max_iter, escape_rad))
+            m.append(ccalc_pixel(Re_x, Im_y - fraction_5y, max_iter, escape_rad))
 
             values[(x,y)] = m 
 

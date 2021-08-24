@@ -29,6 +29,14 @@ static long double c_imag  = 0;
 static long double cmplx_w = 4.; 
 static long double cmplx_h = .0; // calculated in body from imgw/imgh 
 
+static float red   = 0.1; 
+static float green = 0.2;
+static float blue  = 0.3;
+
+//static float red   = 0.0;
+//static float green = 0.6;
+//static float blue  = 1.0;
+
                                      #
 // static long double c_real  = -0.05;
 // static long double c_imag  = .6805; 
@@ -99,7 +107,7 @@ float calc_pixel_smooth(long double re_x, long double im_y) {
     return (l - log2(log2((z_real*z_real+z_imag*z_imag)))) + 4.0;
 }
 
-void map_to_color(float value, int* red, int* blue, int* green);
+void map_to_color(float* val, int numres, int* r, int* g, int* b);
 
 void print_header() {
     // printf(" # -- \n");
@@ -119,17 +127,20 @@ void print_header() {
 }
 
 void usage() {
-    printf("Usage: nativemandel [-i filname] [-v] [-w] [-h] [-n NUM] [-b NUM]\n");
+    printf("Usage: nativemandel [-i filname] [-v] [-w] [-h] [-n NUM] [-c NUM]\n");
     printf(" -i <filename> dump to image for debugging\n");
     printf(" -v debug output to stderr\n");
     printf(" -w specify image width (REQUIRED) \n");
     printf(" -h specify image height \n");
     printf(" -m <int> max iter \n");
     printf(" -n specify number of chunks \n");
-    printf(" -b specify chunk number to compute \n");
+    printf(" -c specify chunk number to compute \n");
     printf(" -x real value of center on complex plane \n");
     printf(" -y imag value of center on complex plane \n");
     printf(" -l width on complex plane \n");
+    printf(" -r red\n");
+    printf(" -g green\n");
+    printf(" -b blue\n");
     exit(0);
 }
 
@@ -141,7 +152,7 @@ int main(int argc, char **argv)
 
     strncpy(filename, "longdouble.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:l:m:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:c:x:y:l:m:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -175,8 +186,17 @@ int main(int argc, char **argv)
             case 'l': 
                 cmplx_w = strtold(optarg, 0); 
                 break;
-            case 'b': 
+            case 'c': 
                 blockno = atoi(optarg); 
+                break;
+            case 'r': 
+                red = strtof(optarg, 0); 
+                break;
+            case 'g': 
+                green = strtof(optarg, 0); 
+                break;
+            case 'b': 
+                blue = strtof(optarg, 0); 
                 break;
             case '?':
             default:
@@ -225,8 +245,19 @@ int main(int argc, char **argv)
     long double re_x;
     long double  im_y;
 
-    float res;
-    //int res;
+
+    float res[16];
+    int   numres = 9;
+
+    // for sampling for higher precision
+    long double fraction_x = (re_end - re_start) / img_w;
+    long double fraction_y = (im_end - im_start) / img_h;
+    long double fraction_3x = fraction_x / 3.;
+    long double fraction_3y = fraction_y / 3.;
+    long double fraction_5x = fraction_x / 5.;
+    long double fraction_5y = fraction_y / 5.;
+
+
 
     int red,green,blue;
     libattopng_t* png = 0;
@@ -255,13 +286,23 @@ int main(int argc, char **argv)
             // Im_y = (im_start) + (y / img_height) * (im_end - im_start)
             im_y = im_start + (((float)y/(float)img_h) * (im_end - im_start));
 
-            res = calc_pixel_smooth(re_x, im_y); // main calculation!
+
+            // main calculation
+            res[0] = calc_pixel_smooth(re_x, im_y); 
+            res[1] = calc_pixel_smooth(re_x + fraction_3x, im_y); 
+            res[2] = calc_pixel_smooth(re_x - fraction_3x, im_y); 
+            res[3] = calc_pixel_smooth(re_x, im_y + fraction_3y); 
+            res[4] = calc_pixel_smooth(re_x, im_y - fraction_3y); 
+            res[5] = calc_pixel_smooth(re_x + fraction_5x, im_y + fraction_5y); 
+            res[6] = calc_pixel_smooth(re_x - fraction_5x, im_y - fraction_5y); 
+            res[7] = calc_pixel_smooth(re_x - fraction_5x, im_y + fraction_5y); 
+            res[8] = calc_pixel_smooth(re_x + fraction_5x, im_y - fraction_5y); 
 
             if(iflag) {
-                map_to_color(res,&red,&green,&blue);
+                map_to_color(res, numres,&red, &green, &blue);
                 libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(red,green,blue)); 
             }else{
-                printf("d[(%d,%d)] = %f; ",x,y,res);
+                printf("d[(%d,%d)] = %f; ",x,y,res[0]);
                 fflush(stdout);
             }
         } // y
@@ -284,21 +325,23 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void map_to_color(float val, int* red, int* green, int* blue) {
+void map_to_color(float* val, int numres, int* r, int* g, int* b) {
     // change these values to change color
-    float sc0 = 0.2;
-    float sc1 = 0.1;
-    float sc2 = 0.5;
 
     float c1 = 0.;
     float c2 = 0.;
     float c3 = 0.;
 
-    c1 +=  1 + cos( 3.0 + val*0.15 + sc0);
-    c2 +=  1 + cos( 3.0 + val*0.15 + sc1);
-    c3 +=  1 + cos( 3.0 + val*0.15 + sc2);
+    for( int i = 0; i < numres; ++i){
+        c1 +=  1 + cos( 3.0 + val[i]*0.15 + red);
+        c2 +=  1 + cos( 3.0 + val[i]*0.15 + green);
+        c3 +=  1 + cos( 3.0 + val[i]*0.15 + blue);
+    }
+    c1 /= numres;
+    c2 /= numres;
+    c3 /= numres;
 
-    *red    = (int)(255.*((c1/4.) * 3.) / 1.5);
-    *green  = (int)(255.*((c2/4.) * 3.) / 1.5);
-    *blue   = (int)(255.*((c3/4.) * 3.) / 1.5);
+    *r = (int)(255.*((c1/4.) * 3.) / 1.5);
+    *g = (int)(255.*((c2/4.) * 3.) / 1.5);
+    *b = (int)(255.*((c3/4.) * 3.) / 1.5);
 }

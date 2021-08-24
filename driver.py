@@ -13,8 +13,15 @@ DISPLAY_WIDTH  = 1024
 image_w = 1024
 image_h = 768
 
-real = hpf(-1)
-imag = hpf(0)
+red   = 0.1
+green = 0.2
+blue  = 0.3
+
+real = hpf(-.745)
+imag = hpf(.186)
+#real = hpf(-1)
+#imag = hpf(0)
+
 c_width = hpf(5)
 c_height = hpf(0)
 
@@ -69,7 +76,7 @@ def display():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_s:
-                    ALGO = "hpcsmooth"
+                    ALGO = "csmooth"
                     return (real, imag)
 
             if event.type == pygame.KEYDOWN:
@@ -93,6 +100,15 @@ def display():
                 if event.key == pygame.K_d:
                     ALGO = "mandeldistance"
                     return (real, imag)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_z:
+                    # zoom in
+                    epoch = epoch + 1
+                    c_width  = hpf(scaling) * c_width
+                    c_height = hpf(scaling) * c_height
+                    return (real, imag)
+
 
             if event.type == pygame.MOUSEBUTTONUP:
                 pos = pygame.mouse.get_pos()   

@@ -196,22 +196,26 @@ class FractalContext:
             draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
             draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
+        # Code to track the center of the image. Helps to debug zooming, find coordinates etc. leaving in for
+        # future debugging help /mc
+        #
+        #x0 = int(self.img_width / 2.0) - 4
+        #y0 = int(self.img_height / 2.0) - 4
+        #x1 = x0 + 8
+        #y1 = y0 + 8
+        #draw.ellipse((x0,y0,x1,y1), fill=(255,0,0), width=3)
+
         return im    
 
     def zoom_and_crop_keyframe(self):    
-        crop_w = self.img_width  * self.scaling_factor
-        crop_h = self.img_height * self.scaling_factor
-        diff_w = self.img_width  - crop_w
-        diff_h = self.img_height - crop_h
-        crop_x = int(diff_w / 2.) 
-        crop_y = int(diff_h / 2.)
-        crop_img   = self.cur_keyframe.crop((crop_x,crop_y,crop_x + crop_w, crop_y+crop_h))
-        resize_img = crop_img.resize((self.img_width, self.img_height), Image.LANCZOS)
+        center_x = self.img_width  / 2
+        center_y = self.img_height / 2
+        scaling2 = self.scaling_factor / 2.0
 
-        # self.algo.zoom_in() # will update num_epochs
-
-
-        return resize_img
+        img = self.cur_keyframe.crop((center_x - (self.img_width * scaling2), center_y - (self.img_height * scaling2),
+                                      center_x + (self.img_width * scaling2), center_y + (self.img_height * scaling2)))
+        resize_img = img.resize((self.img_width, self.img_height), resample = Image.LANCZOS)
+        return resize_img 
 
     def next_epoch(self, t, snapshot_filename = None):
         """Called for each frame of the animation. Will calculate
