@@ -48,11 +48,13 @@ import fractalmath    as fm
 import divemesh       as mesh
 
 from algo import Algo # Abstract base class import, because we rely on it.
-from julia import Julia 
 from mandelbrot_solo import MandelbrotSolo
 from mandelbrot_smooth import MandelbrotSmooth
 from mandeldistance import MandelDistance
-from smooth import Smooth
+from julia_solo import JuliaSolo
+from julia_smooth import JuliaSmooth 
+
+#from smooth import Smooth
 
 MANDL_VER = "0.1"
 
@@ -355,11 +357,12 @@ class DiveTimeline:
 
     @staticmethod
     def algorithm_map():
-        return {'julia' : Julia, 
-                'mandelbrot_solo' : MandelbrotSolo,
+        return {'mandelbrot_solo' : MandelbrotSolo,
                 'mandelbrot_smooth' : MandelbrotSmooth,
                 'mandeldistance' : MandelDistance,
-                'smooth': Smooth,
+                'julia_solo' : JuliaSolo, 
+                'julia_smooth' : JuliaSmooth, 
+                #'smooth': Smooth,
         }
 
     def __init__(self, projectFolderName, algorithm_name, framerate, frameWidth, frameHeight, mathSupport):
@@ -1590,7 +1593,7 @@ def parse_options():
         # Kinda a crazy invocation.  Loads algorithm-specific parameters into
         # a dictionary, based on that algorithm's static class parse function.
         expl_algorithm_name = params.get('expl_algo', 'mandelbrot_solo')
-        params['algorithm_extra_params'] = algorithm_map[expl_algorithm_name].parse_options(opts)
+        params['algorithm_extra_params'] = algorithm_map[expl_algorithm_name].load_options_with_math_support(opts, math_support)
         # Theoretically possible we'll eventually want to run this for all
         # possible algorithm types, but for now, just loading for the 
         # 'active' algorithm.

@@ -45,7 +45,7 @@ class Algo(object):
         return []    
 
     @staticmethod
-    def parse_options(opts):
+    def load_options_with_math_support(opts, math_support):
         return {}
 
     def __init__(self, dive_mesh, frame_number, output_folder_name, extra_params={}):
@@ -148,8 +148,8 @@ class EscapeAlgo(Algo):
         return whole_list
 
     @staticmethod
-    def parse_options(opts):
-        options = Algo.parse_options(opts)
+    def load_options_with_math_support(opts, math_support):
+        options = Algo.load_options_with_math_support(opts, math_support)
 
         for opt,arg in opts:
             if opt in ['--escape-radius']:
@@ -191,14 +191,14 @@ class JuliaAlgo(EscapeAlgo):
         return whole_list
 
     @staticmethod
-    def parse_options(opts):
+    def load_options_with_math_support(opts, math_support):
         # Considered loading this with default values, but didn't
         # want to compete with the defaults in __init__()?
-        options = EscapeAlgo.parse_options(opts)
+        options = EscapeAlgo.load_options_with_math_support(opts, math_support)
 
         for opt,arg in opts:
             if opt in ['--julia-center']:
-                options['julia_center'] = arg
+                options['julia_center'] = math_support.createComplex(arg)
 
         return options
 
