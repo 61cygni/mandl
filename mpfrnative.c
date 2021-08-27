@@ -1,25 +1,12 @@
 /*-----------------------------------------------------------------------------
- * file: hpnative.c 
- * date Sat Aug 07 08:48:52 PDT 2021 :
- * Author: Martin Casado 
+ * file: mpfrnative.c 
  *
- * Description:
+ * manderlbrot kernel built around libmpfr for very deep dives. This has
+ * been tested to e-510. 
  *
- * c kernel for high precision mandelbrot calculations. This is not meant
- * as a standalone program, but expected to be driven by a python harness
- * which handles the output. It's also specifically not meant for anything
- * but deep dives. So it doesn't use any optimizations such as skipping M1, M2
- * or native floats at low zoom levels. 
- *
- * Smoothing implementation based on :
- *
- * https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
- * https://www.shadertoy.com/view/4df3Rn coloring and smoothing working
- *
- *
- * TODO:
- * - move initializations out of calc_pixel_smooth
- * - print timing for frames and output
+ * Because this is built around a high precision library that is very
+ * slow relative to native floats, it doesn't make sense to use for
+ * frames with zooms less than e-13 or so.
  *
  *---------------------------------------------------------------------------*/
 
@@ -32,182 +19,89 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "libbf.h"
+#include "mpfr.h"
 #include "libattopng.h"
 
 #define RGBA(r, g, b) ((r) | ((g) << 8) | ((b) << 16))
 #define FILESTR_LEN 64
 
 static int img_w = 0, img_h = 0;
-static limb_t precision  = 64; 
-static int max_iter      = 5000;
-
-static char *str_real = "-.749696000010025";
-static char *str_imag = "0.031456625003";
-static char *str_cmplx_w = ".00000000001";
 
 
 // Full mandelbrot set
+// Doesn't really make sense to use
 // static char *str_real = "-1.";
 // static char *str_imag = "0.";
 // static char *str_cmplx_w = "4.";
 
+// These are good defaults for depth. e-20, renders sufficiently fast. 
+static int precision  = 80; 
+static int max_iter   = 3000;
+static char *str_real = "0.36024044343761436323612524444954530848260780795858575048837581474019534605";
+static char *str_imag = "-0.64131306106480317486037501517930206657949495228230525955617754306444857417";
+static char *str_cmplx_w = ".0000000000000000001";
+
+
 // The following values are used to max out the system. This is a snapshot at 10^-512 (should be the 8-fold circle)
 // static int img_w = 160, img_h = 120;
-// static limb_t precision  = 2000; 
+// static int precision  = 2000; 
 // static int max_iter      = 80000;
 // static char *str_real    = "-1.76938317919551501821384728608547378290574726365475143746552821652788819126475645883616344638952966730448582578182030315748749123842171940312824619511374752125508480620857874547728033032251679986623911241845427430171292144236397931692967543941816568313013426227935414237685724357839108499720568695273052075081914417347810617942906997531749111337143517341661174565202727561591789320429089324651026717908784146646282137559906504607383722834707778703064588828982026040017443489083888449628870745058537070958320394103234549205405343784";
 // static char *str_imag    = "0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805538736306127524814939292355930892834392050796724887904921986666045576626946900666103494014904714323725586979789908520656683202658064024115300378826789786394641622035341055102900456305723718684527210377325846307917512628774672005693326232806953822796755832517188873479124361430989485495501124096329421682827330693532171505367455526637382706988583456915684673202462211937384523487065290004627037270912"; 
 // static char *str_cmplx_w = ".00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
 
-static bf_context_t bf_ctx;
 
-static void *my_bf_realloc(void *opaque, void *ptr, size_t size) {
-    return realloc(ptr, size);
-}
-
-
-static void fprint_bf(FILE* fp, const bf_t *ptr, limb_t precision) {
-    char *digits;
-    size_t digits_len;
-    digits = bf_ftoa(&digits_len, ptr, 10, precision,
-                         BF_FTOA_FORMAT_FIXED | BF_RNDZ);
-    fprintf(fp, "%s",digits);
-    free(digits);
-}
-
-static void print_bf(const bf_t *ptr, limb_t precision) {
-    fprint_bf(stdout, ptr, precision);
-}
-
-static int bf_log2(bf_t* ret, const bf_t* in, limb_t prec,
-        bf_flags_t flags) {
-
-    bf_t logofin;
-    bf_t logoftwo;
-    bf_t two;
-
-    bf_init(&bf_ctx, &logofin);
-    bf_init(&bf_ctx, &logoftwo);
-    bf_init(&bf_ctx, &two);
-
-    bf_set_ui(&two, 2);
-
-    // log2(x) = log10(x) / log10(x)
-    bf_log(&logofin,  in,   prec, BF_RNDU);
-    bf_log(&logoftwo, &two, prec, BF_RNDU);
-    return bf_div(ret, &logofin, &logoftwo, prec, BF_RNDU);
-}
-
-void squared_modulus(bf_t* result, bf_t* real, bf_t* imag, int prec){
-    bf_t tmp;
-    bf_t tmp2;
-    bf_init(&bf_ctx, &tmp);
-    bf_init(&bf_ctx, &tmp2);
-
-    bf_mul(&tmp,  real, real, prec, BF_RNDU);
-    bf_mul(&tmp2, imag, imag, prec, BF_RNDU);
-    bf_add(result, &tmp, &tmp2, prec, BF_RNDU);
-}
-
-float calc_pixel(bf_t* re_x, bf_t* im_y, int prec) {
+float calc_pixel_smooth(mpfr_t re_x, mpfr_t im_y) {
     int squared_rad = 256 * 256;
 
-    bf_t z_real;
-    bf_t z_imag;
+    mpfr_t z_real;
+    mpfr_t z_imag;
 
-    bf_t tmp;
-    bf_t tmp2;
-    bf_t two;
-    bf_t sm;
-    bf_t rad;
+    mpfr_t tmp;
+    mpfr_t tmp2;
+    mpfr_t log2;
+    mpfr_t loglog2;
+    mpfr_t two;
+    mpfr_t sm;
+    mpfr_t rad;
 
-    bf_init(&bf_ctx, &z_real);
-    bf_init(&bf_ctx, &z_imag);
-    bf_init(&bf_ctx, &tmp);
-    bf_init(&bf_ctx, &tmp2);
-    bf_init(&bf_ctx, &two);
-    bf_init(&bf_ctx, &sm);
-    bf_init(&bf_ctx, &rad);
+    mpfr_init(z_real);
+    mpfr_init(z_imag);
+    mpfr_init(tmp);
+    mpfr_init(tmp2);
+    mpfr_init(two);
+    mpfr_init(sm);
+    mpfr_init(rad);
+    mpfr_init(log2);
+    mpfr_init(loglog2);
 
-    bf_set_ui(&z_real, 0);
-    bf_set_ui(&z_imag, 0);
-    bf_set_ui(&two,    2);
-    bf_set_ui(&rad,    squared_rad);
-
-    for(int i = 0; i < max_iter; ++i) {
-        // z_real =  (z_real*z_real - z_imag*z_imag) + re_x
-        bf_mul(&tmp,   &z_real, &z_real, prec, BF_RNDU);  
-        bf_mul(&tmp2,  &z_imag, &z_imag, prec, BF_RNDU);  
-        bf_sub(&tmp,    &tmp,   &tmp2,   prec, BF_RNDU);  
-        bf_add(&z_real, &tmp, re_x, prec, BF_RNDU); 
-
-        // z_imag = hpf(2)*z_real*z_imag + imag )
-        bf_mul(&tmp, &two, &z_real, prec, BF_RNDU);
-        bf_mul(&tmp, &tmp, &z_imag, prec, BF_RNDU);
-        bf_add(&z_imag, &tmp, im_y, prec, BF_RNDU);
-
-        //if csquared_modulus(z_real, z_imag) >= squared_er: 
-        squared_modulus(&sm, &z_real, &z_imag, prec);
-        if(! bf_cmp_lt(&sm, &rad)) {
-            return i;
-        }
-    }
-    return max_iter;
-}
-
-float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int prec) {
-    int squared_rad = 256 * 256;
-
-    bf_t z_real;
-    bf_t z_imag;
-
-    bf_t tmp;
-    bf_t tmp2;
-    bf_t log2;
-    bf_t loglog2;
-    bf_t two;
-    bf_t sm;
-    bf_t rad;
-
-    bf_init(&bf_ctx, &z_real);
-    bf_init(&bf_ctx, &z_imag);
-    bf_init(&bf_ctx, &tmp);
-    bf_init(&bf_ctx, &tmp2);
-    bf_init(&bf_ctx, &two);
-    bf_init(&bf_ctx, &sm);
-    bf_init(&bf_ctx, &rad);
-    bf_init(&bf_ctx, &log2);
-    bf_init(&bf_ctx, &loglog2);
-
-    bf_set_ui(&z_real, 0);
-    bf_set_ui(&z_imag, 0);
-    bf_set_ui(&two,    2);
-    bf_set_ui(&rad,    squared_rad);
+    mpfr_set_ui(z_real, 0, MPFR_RNDN);
+    mpfr_set_ui(z_imag, 0, MPFR_RNDN);
+    mpfr_set_ui(two,    2, MPFR_RNDN);
+    mpfr_set_ui(rad,    squared_rad, MPFR_RNDN);
 
     float l = 0.0;
 
     for(int i = 0; i < max_iter; ++i) {
         // z_real =  (z_real*z_real - z_imag*z_imag) + re_x
-        bf_mul(&tmp,  &z_real, &z_real, prec, BF_RNDU);  
-        bf_mul(&tmp2, &z_imag, &z_imag, prec, BF_RNDU);  
-        bf_sub(&tmp,  &tmp,    &tmp2,   prec, BF_RNDU);  
-        bf_add(&tmp2, &tmp,     re_x,   prec, BF_RNDU);  // save z_real result while we calc second portion
+        mpfr_mul(tmp,  z_real, z_real, MPFR_RNDN);
+        mpfr_mul(tmp2, z_imag, z_imag, MPFR_RNDN);
+        mpfr_sub(tmp,  tmp,    tmp2, MPFR_RNDN);
+        mpfr_add(tmp2, tmp,    re_x, MPFR_RNDN);  // save z_real result while we calc second portion
 
         // z_imag = 2.0 *z_real*z_imag + imag 
-        bf_mul(&tmp,    &two, &z_real, prec, BF_RNDU);
-        bf_mul(&tmp,    &tmp, &z_imag, prec, BF_RNDU);
-        bf_add(&z_imag, &tmp,  im_y,   prec, BF_RNDU);
+        mpfr_mul(tmp,    two, z_real, MPFR_RNDN);
+        mpfr_mul(tmp,    tmp, z_imag, MPFR_RNDN);
+        mpfr_add(z_imag, tmp,  im_y, MPFR_RNDN);
 
-        bf_set(&z_real, &tmp2);
+        mpfr_set(z_real, tmp2, MPFR_RNDN);
 
-        //if csquared_modulus(z_real, z_imag) >= squared_er: 
-        // squared_modulus(&sm, &z_real, &z_imag, prec);
-        bf_mul(&tmp,  &z_real, &z_real, prec, BF_RNDU);
-        bf_mul(&tmp2, &z_imag, &z_imag, prec, BF_RNDU);
-        bf_add(&sm,   &tmp,    &tmp2,   prec, BF_RNDU);
+        //if squared_modulus(z_real, z_imag) >= squared_er: 
+        mpfr_mul(tmp,  z_real, z_real, MPFR_RNDN);
+        mpfr_mul(tmp2, z_imag, z_imag, MPFR_RNDN);
+        mpfr_add(sm,   tmp,    tmp2, MPFR_RNDN);
 
-        if(! bf_cmp_lt(&sm, &rad)) {
+        if( mpfr_cmp(sm, rad) >= 0) {
             break; 
         }
         l += 1.0;
@@ -216,20 +110,19 @@ float calc_pixel_smooth(bf_t* re_x, bf_t* im_y, int prec) {
         return 1.0;
     }
 
+
     // sl = (l - math.log2(math.log2(csquared_modulus(z_real,z_imag)))) + 4.0;
     // sm should alrady contain sqaure_mod of z_real and z_imag
-    bf_log2(&log2,    &sm,   prec, BF_RNDU);
-    bf_log2(&loglog2, &log2, prec, BF_RNDU);
+    mpfr_log2(log2,    sm,   MPFR_RNDN);
+    mpfr_log2(loglog2, log2, MPFR_RNDN);
 
-    bf_set_float64(&tmp, l);
+    mpfr_set_d(tmp, l, MPFR_RNDN);
     // l - log2(log2(sqaured_mod()))
-    bf_sub(&tmp, &tmp, &loglog2, prec, BF_RNDU);
-    bf_set_float64(&tmp2, 4.0);
-    bf_add(&tmp, &tmp, &tmp2, prec, BF_RNDU);
+    mpfr_sub(tmp, tmp, loglog2, MPFR_RNDN);
+    mpfr_set_d(tmp2, 4.0, MPFR_RNDN);
+    mpfr_add(tmp, tmp, tmp2, MPFR_RNDN);
 
-    double ret;
-    bf_get_float64(&tmp, &ret, BF_RNDU);
-    return ret;
+    return mpfr_get_d(tmp, MPFR_RNDN);
 }
 
 void map_to_color(float value, int* red, int* blue, int* green);
@@ -337,94 +230,93 @@ int main(int argc, char **argv)
         numblocks = blockno = 1;
     }
 
-    bf_context_init(&bf_ctx, my_bf_realloc, NULL);
+    mpfr_set_default_prec(precision);
 
-    bf_t c_real; 
-    bf_t c_imag; 
+    mpfr_t c_real; 
+    mpfr_t c_imag; 
 
-    bf_init(&bf_ctx, &c_real);
-    bf_init(&bf_ctx, &c_imag);
+    mpfr_init (c_real);      
+    mpfr_init (c_imag);   
 
     if(cla_c_real){
-        bf_atof(&c_real, cla_c_real, 0, 10, precision, 0);
+        mpfr_set_str (c_real, cla_c_real, 10, MPFR_RNDN);
         free(cla_c_real);
     }else{
-        //str_to_bf_t(&c_real, str_real, precision);
-        bf_atof(&c_real, str_real, 0, 10, precision, 0);
+        mpfr_set_str (c_real, str_real, 10, MPFR_RNDN);
     }
 
     if(cla_c_imag){
-        bf_atof(&c_imag, cla_c_imag, 0, 10, precision, 0);
-        //str_to_bf_t(&c_imag, cla_c_imag, precision);
+        mpfr_set_str(c_imag, cla_c_imag, precision, MPFR_RNDN);
         free(cla_c_imag);
     }else{
-        //str_to_bf_t(&c_imag, str_imag, precision);
-        bf_atof(&c_imag, str_imag, 0, 10, precision, 0);
+        mpfr_set_str(c_imag, str_imag, 10, MPFR_RNDN);
     }
 
 
     // Fractal variables start here 
-    bf_t cmplx_w;  
-    bf_t cmplx_h;  
+    mpfr_t cmplx_w;  
+    mpfr_t cmplx_h;  
 
-    bf_init(&bf_ctx, &cmplx_w);
-    bf_init(&bf_ctx, &cmplx_h);
+    mpfr_init (cmplx_w);      
+    mpfr_init (cmplx_h);   
 
     if(cla_cmplx_w){
-        bf_atof(&cmplx_w, cla_cmplx_w, 0, 10, precision, 0);
-        //str_to_bf_t(&cmplx_w, cla_cmplx_w, precision);
+        mpfr_set_str(cmplx_w, cla_cmplx_w, 10, MPFR_RNDN);
         free(cla_cmplx_w);
     }else{
-        //str_to_bf_t(&cmplx_w, str_cmplx_w, precision);
-        bf_atof(&cmplx_w, str_cmplx_w, 0, 10, precision, 0);
+        mpfr_set_str(cmplx_w, str_cmplx_w, 10, MPFR_RNDN);
     }
 
-    bf_set_float64(&cmplx_h, ((float)img_h / (float)img_w) ); 
-    bf_mul(&cmplx_h, &cmplx_h, &cmplx_w, precision, BF_RNDU); 
+    mpfr_set_d(cmplx_h, ((float)img_h / (float)img_w), MPFR_RNDN ); 
+    mpfr_mul(cmplx_h, cmplx_h, cmplx_w, MPFR_RNDN); 
 
 
     // Calc Current Frame
-    bf_t re_start;
-    bf_t re_end;
-    bf_t im_start;
-    bf_t im_end;
-    bf_t two;
+    mpfr_t re_start;
+    mpfr_t re_end;
+    mpfr_t im_start;
+    mpfr_t im_end;
+    mpfr_t two;
 
-    bf_init(&bf_ctx, &re_start);
-    bf_init(&bf_ctx, &re_end);
-    bf_init(&bf_ctx, &im_start);
-    bf_init(&bf_ctx, &im_end);
-    bf_init(&bf_ctx, &two);
+    mpfr_init(re_start);
+    mpfr_init(re_end);
+    mpfr_init(im_start);
+    mpfr_init(im_end);
+    mpfr_init(two);
 
     // re_start = cmplx_center.real - cmplx_w / 2
     // re_end   = cmplx_center.real + cmplx_w / 2
-    bf_t tmp;
-    bf_init(&bf_ctx, &tmp);
-    bf_t tmp2;
-    bf_init(&bf_ctx, &tmp2);
+    mpfr_t tmp;
+    mpfr_init(tmp);
+    mpfr_t tmp2;
+    mpfr_init(tmp2);
 
-    bf_set_ui(&two, 2);
-    bf_div(&tmp, &cmplx_w, &two, precision, BF_RNDU);
+    mpfr_set_ui(two, 2, MPFR_RNDN);
+    mpfr_div(tmp, cmplx_w, two, MPFR_RNDN);
 
-    bf_sub(&re_start, &c_real, &tmp, precision, BF_RNDU); 
-    bf_add(&re_end, &c_real,   &tmp, precision, BF_RNDU); 
+    mpfr_sub(re_start, c_real, tmp, MPFR_RNDN);
+    mpfr_add(re_end,   c_real, tmp, MPFR_RNDN);
 
     // im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
     // im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
-    bf_div(&tmp, &cmplx_h, &two, precision, BF_RNDU);
-    bf_sub(&im_start, &c_imag, &tmp, precision, BF_RNDU); 
-    bf_add(&im_end,   &c_imag, &tmp, precision, BF_RNDU); 
+    mpfr_div(tmp,      cmplx_h, two, MPFR_RNDN);
+    mpfr_sub(im_start, c_imag,  tmp, MPFR_RNDN);
+    mpfr_add(im_end,   c_imag,  tmp, MPFR_RNDN);
 
     if(! iflag){
         print_header();
         printf("re_start = \"");
-        print_bf(&re_start, precision); printf("\"\n");
+        mpfr_out_str(stdout, 10, 100, re_start, MPFR_RNDN);
+       fprintf(stdout,"\n");
         printf("re_end =  \"");
-        print_bf(&re_end, precision);  printf("\"\n");
+        mpfr_out_str(stdout, 10, 100, re_end, MPFR_RNDN);
+       fprintf(stdout,"\n");
         printf("im_start = \"");
-        print_bf(&im_start, precision); printf("\"\n");
+        mpfr_out_str(stdout, 10, 100, im_start, MPFR_RNDN);
+       fprintf(stdout,"\n");
         printf("im_end = \"");
-        print_bf(&im_end, precision); printf("\"\n");
+        mpfr_out_str(stdout, 10, 100, im_end, MPFR_RNDN);
+       fprintf(stdout,"\n");
     }
 
     if(vflag){
@@ -433,30 +325,30 @@ int main(int argc, char **argv)
         fprintf(stderr, "max iter  %d\n",  max_iter);
         fprintf(stderr, "precision  %d\n", (int)precision);
         fprintf(stderr, "c_real ");
-        fprint_bf(stderr, &c_real, precision); fprintf(stderr,"\n");
+        mpfr_out_str(stderr, 10, 100, c_real, MPFR_RNDN);fprintf(stderr,"\n");
         fprintf(stderr, "c_imag ");
-        fprint_bf(stderr, &c_imag, precision); fprintf(stderr,"\n");
+        mpfr_out_str(stderr, 10, 100, c_imag, MPFR_RNDN);fprintf(stderr,"\n");
         fprintf(stderr, "re_start ");
-        fprint_bf(stderr, &re_start, precision); fprintf(stderr,"\n");
+        mpfr_out_str(stderr, 10, 100, re_start, MPFR_RNDN);fprintf(stderr,"\n");
         fprintf(stderr, "re_end =  ");
-        fprint_bf(stderr, &re_end, precision);  fprintf(stderr, "\n");
+        mpfr_out_str(stderr, 10, 100, re_end, MPFR_RNDN);fprintf(stderr,"\n");
         fprintf(stderr, "im_start ");
-        fprint_bf(stderr, &im_start, precision); fprintf(stderr, "\n");
+        mpfr_out_str(stderr, 10, 100, im_start, MPFR_RNDN);fprintf(stderr,"\n");
         fprintf(stderr, "im_end ");
-        fprint_bf(stderr, &im_end, precision); fprintf(stderr, "\n");
+        mpfr_out_str(stderr, 10, 100, im_end, MPFR_RNDN);fprintf(stderr,"\n");
         fprintf(stderr, "Complex width :");
-        fprint_bf(stderr, &cmplx_w, precision);
+        mpfr_out_str(stderr, 10, 100, cmplx_w, MPFR_RNDN);
         fprintf(stderr, "\n");
         fprintf(stderr, "Complex height :");
-        fprint_bf(stderr, &cmplx_h, precision);
+        mpfr_out_str(stderr, 10, 100, cmplx_h, MPFR_RNDN);
         fprintf(stderr, "\n");
     }
 
     // main loop here!!
-    bf_t re_x;
-    bf_t im_y;
-    bf_init(&bf_ctx, &re_x);
-    bf_init(&bf_ctx, &im_y);
+    mpfr_t re_x;
+    mpfr_t im_y;
+    mpfr_init(re_x);
+    mpfr_init(im_y);
 
 
     float prog; // fraction of progress
@@ -480,6 +372,7 @@ int main(int argc, char **argv)
         printf("d = {};\n");
     }
 
+
     for(int y = 0; y < img_h; ++y){
         if(y < ystart || y > yend)
             continue;
@@ -487,20 +380,20 @@ int main(int argc, char **argv)
             // map from pixels to complex coordinates 
             // Re_x = (re_start) + (x / img_width)  * (re_end - re_start)
             prog = (float)x/img_w; 
-            bf_sub(&tmp, &re_end, &re_start, precision, BF_RNDU);  // re_end - re_start
-            bf_set_float64(&tmp2, prog);
-            bf_mul(&tmp, &tmp2, &tmp, precision, BF_RNDU);
-            bf_add(&re_x, &re_start, &tmp, precision, BF_RNDU);
+            mpfr_sub(tmp, re_end, re_start, MPFR_RNDN);  // re_end - re_start
+            mpfr_set_d(tmp2, prog, MPFR_RNDN);
+            mpfr_mul(tmp, tmp2, tmp, MPFR_RNDN);
+            mpfr_add(re_x, re_start, tmp, MPFR_RNDN);
 
             // Im_y = (im_start) + (y / img_height) * (im_end - im_start)
             prog = (float)y/img_h;
-            bf_sub(&tmp, &im_end, &im_start, precision, BF_RNDU); 
-            bf_set_float64(&tmp2, prog);
-            bf_mul(&tmp, &tmp2, &tmp, precision, BF_RNDU);
-            bf_add(&im_y, &im_start, &tmp, precision, BF_RNDU);
+            mpfr_sub(tmp, im_end, im_start, MPFR_RNDN);
+            mpfr_set_d(tmp2, prog, MPFR_RNDN);
+            mpfr_mul(tmp, tmp2, tmp, MPFR_RNDN);
+            mpfr_add(im_y, im_start, tmp, MPFR_RNDN);
 
             // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
-            res = calc_pixel_smooth(&re_x, &im_y, precision); // main calculation!
+            res = calc_pixel_smooth(re_x, im_y); // main calculation!
             if(iflag) {
                 map_to_color(res,&red,&green,&blue);
                 libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(red,green,blue)); 

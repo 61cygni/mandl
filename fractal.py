@@ -186,8 +186,8 @@ class FractalContext:
                 im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
                 im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
 
-                burn_in_text = u"%d re range %.20f %.20f im range %.20f %.20f center %.20f + %.20f i" %\
-                    (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag)
+                burn_in_text = u"%d re len %.20e im len %.20e center %.20f + %.20f i" %\
+                    (self.num_epochs, re_end - re_start, im_end - im_start, self.cmplx_center.real, self.cmplx_center.imag)
 
             burn_in_location = (10,10)
             burn_in_margin = 5 
