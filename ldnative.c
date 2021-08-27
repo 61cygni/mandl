@@ -259,7 +259,7 @@ int main(int argc, char **argv)
 
 
 
-    int red,green,blue;
+    int r,g,b;
     libattopng_t* png = 0;
 
     // we only want to calculate our block 
@@ -299,8 +299,8 @@ int main(int argc, char **argv)
             res[8] = calc_pixel_smooth(re_x + fraction_5x, im_y - fraction_5y); 
 
             if(iflag) {
-                map_to_color(res, numres,&red, &green, &blue);
-                libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(red,green,blue)); 
+                map_to_color(res, numres,&r, &g, &b);
+                libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(r,g,b)); 
             }else{
                 printf("d[(%d,%d)] = %f; ",x,y,res[0]);
                 fflush(stdout);
@@ -326,7 +326,6 @@ int main(int argc, char **argv)
 }
 
 void map_to_color(float* val, int numres, int* r, int* g, int* b) {
-    // change these values to change color
 
     float c1 = 0.;
     float c2 = 0.;

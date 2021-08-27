@@ -27,6 +27,10 @@
 
 static int img_w = 0, img_h = 0;
 
+static float red   = 0.1; 
+static float green = 0.2;
+static float blue  = 0.3;
+
 
 // Full mandelbrot set
 // Doesn't really make sense to use
@@ -125,7 +129,6 @@ float calc_pixel_smooth(mpfr_t re_x, mpfr_t im_y) {
     return mpfr_get_d(tmp, MPFR_RNDN);
 }
 
-void map_to_color(float value, int* red, int* blue, int* green);
 
 void print_header() {
     printf(" # -- \n");
@@ -145,20 +148,25 @@ void print_header() {
 }
 
 void usage() {
-    printf("Usage: nativemandel [-i] [-v]\n");
+    printf("Usage: nativemandel [-i filname] [-v] [-w] [-h] [-n NUM] [-c NUM]\n");
     printf(" -i <filename> dump to image for debugging\n");
     printf(" -v debug output to stderr\n");
     printf(" -w specify image width (REQUIRED) \n");
     printf(" -h specify image height \n");
     printf(" -m <int> max iter \n");
     printf(" -n specify number of chunks \n");
-    printf(" -b specify chunk number to compute \n");
+    printf(" -c specify chunk number to compute \n");
     printf(" -p <int> precision (number of bits) \n");
     printf(" -x \"str\" real value of center on complex plane \n");
     printf(" -y \"str\" imag value of center on complex plane \n");
     printf(" -l width on complex plane \n");
+    printf(" -r red\n");
+    printf(" -g green\n");
+    printf(" -b blue\n");
     exit(0);
 }
+
+void map_to_color(float* val, int numres, int* r, int* g, int* b);
 
 int main(int argc, char **argv)
 {
@@ -171,7 +179,7 @@ int main(int argc, char **argv)
 
     strncpy(filename, "hpcnative.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:l:m:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:c:l:m:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -196,9 +204,6 @@ int main(int argc, char **argv)
             case 'n': 
                 numblocks = atoi(optarg); 
                 break;
-            case 'b': 
-                blockno = atoi(optarg); 
-                break;
             case 'x': 
                 cla_c_real = strdup(optarg); 
                 break;
@@ -210,6 +215,18 @@ int main(int argc, char **argv)
                 break;
             case 'l': 
                 cla_cmplx_w = strdup(optarg); 
+                break;
+            case 'c': 
+                blockno = atoi(optarg); 
+                break;
+            case 'r': 
+                red = strtof(optarg, 0); 
+                break;
+            case 'g': 
+                green = strtof(optarg, 0); 
+                break;
+            case 'b': 
+                blue = strtof(optarg, 0); 
                 break;
             case '?':
             default:
@@ -350,13 +367,15 @@ int main(int argc, char **argv)
     mpfr_init(re_x);
     mpfr_init(im_y);
 
+    float res[1]; // number of samples .. currently unused
+    int   numres = 1;
+
 
     float prog; // fraction of progress
-    float res;
     //int res;
 
-    int red,green,blue;
     libattopng_t* png = 0;
+    int r,g,b;
 
     // we only want to calculate our block 
     int blocksize = img_h / numblocks;
@@ -393,12 +412,12 @@ int main(int argc, char **argv)
             mpfr_add(im_y, im_start, tmp, MPFR_RNDN);
 
             // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
-            res = calc_pixel_smooth(re_x, im_y); // main calculation!
+            res[0] = calc_pixel_smooth(re_x, im_y); // main calculation!
             if(iflag) {
-                map_to_color(res,&red,&green,&blue);
-                libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(red,green,blue)); 
+                map_to_color(res,numres,&r,&g,&b);
+                libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(r,g,b)); 
             }else{
-                printf("d[(%d,%d)] = %f; ",x,y,res);
+                printf("d[(%d,%d)] = %f; ",x,y,res[0]);
                 fflush(stdout);
             }
         } // y
@@ -423,21 +442,23 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void map_to_color(float val, int* red, int* green, int* blue) {
-    // change these values to change color
-    float sc0 = 0.7;
-    float sc1 = 0.0;
-    float sc2 = 0.2;
+
+void map_to_color(float* val, int numres, int* r, int* g, int* b) {
 
     float c1 = 0.;
     float c2 = 0.;
     float c3 = 0.;
 
-    c1 +=  1 + cos( 3.0 + val*0.15 + sc0);
-    c2 +=  1 + cos( 3.0 + val*0.15 + sc1);
-    c3 +=  1 + cos( 3.0 + val*0.15 + sc2);
+    for( int i = 0; i < numres; ++i){
+        c1 +=  1 + cos( 3.0 + val[i]*0.15 + red);
+        c2 +=  1 + cos( 3.0 + val[i]*0.15 + green);
+        c3 +=  1 + cos( 3.0 + val[i]*0.15 + blue);
+    }
+    c1 /= numres;
+    c2 /= numres;
+    c3 /= numres;
 
-    *red    = (int)(255.*((c1/4.) * 3.) / 1.5);
-    *green  = (int)(255.*((c2/4.) * 3.) / 1.5);
-    *blue   = (int)(255.*((c3/4.) * 3.) / 1.5);
+    *r = (int)(255.*((c1/4.) * 3.) / 1.5);
+    *g = (int)(255.*((c2/4.) * 3.) / 1.5);
+    *b = (int)(255.*((c3/4.) * 3.) / 1.5);
 }

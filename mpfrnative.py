@@ -90,12 +90,15 @@ class MPFRNative(Algo):
         cmds      = []
         procs     = []
 
+        c_real = self.context.cmplx_center.real
+        c_imag = self.context.cmplx_center.imag
+        c_w    = self.context.cmplx_width
+
         for i in range(0,self.numprocs):
             fn = self.dir+"mpfr%d.png"%(i)
             filenames.append(fn)
-            cmd_args =  self.exe+" -v -w %d -h %d -n %d -b %d -i %s -p %d -m %d -x \"%s\" -y \"%s\" -l \"%s\""%\
-                                 (img_width, img_height, self.numprocs, i+1, fn, self.precision, self.context.max_iter, \
-                                 str(c_real), str(c_imag), str(c_width) )
+            cmd_args =  self.exe+" -v -w %d -h %d -n %d -c %d -i %s  -x %.20f -y %.20f -l %.20f"%\
+                                 (img_width, img_height, self.numprocs, i+1, fn, c_real, c_imag, c_w )
             cmds.append(cmd_args)
 
         
@@ -186,10 +189,11 @@ class MPFRNative(Algo):
         global magnification
         global num_epochs
 
-        c_width  = hpf(self.context.cmplx_width)
-        c_height = hpf(self.context.cmplx_height)
-        c_real = hpf('-1.769383179195515018213847286085473782905747263654751437465528216527888191264756458836163446389529667304485825781820303157487491238')
-        c_imag = hpf('0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805')
+        # Used for testing
+        # c_width  = hpf(self.context.cmplx_width)
+        # c_height = hpf(self.context.cmplx_height)
+        # c_real = hpf('-1.769383179195515018213847286085473782905747263654751437465528216527888191264756458836163446389529667304485825781820303157487491238')
+        # c_imag = hpf('0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805')
         #c_real = hpf('-1')
         #c_imag = hpf('0')
 
