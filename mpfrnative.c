@@ -246,7 +246,7 @@ int main(int argc, char **argv)
     }
 
     if(cla_c_imag){
-        mpfr_set_str(c_imag, cla_c_imag, precision, MPFR_RNDN);
+        mpfr_set_str(c_imag, cla_c_imag, 10, MPFR_RNDN);
         free(cla_c_imag);
     }else{
         mpfr_set_str(c_imag, str_imag, 10, MPFR_RNDN);

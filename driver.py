@@ -80,6 +80,11 @@ def display():
                     return (real, imag)
 
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:
+                    ALGO = "mpfrnative"
+                    return (real, imag)
+
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_l:
                     ALGO = "ldnative"
                     return (real, imag)
