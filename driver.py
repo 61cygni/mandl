@@ -8,7 +8,8 @@ from decimal import Decimal
 hpf = Decimal
 
 ALGO = "ldnative"
-DISPLAY_WIDTH  = 1024
+BURN = True 
+DISPLAY_WIDTH  = 640
 
 image_w = 1024
 image_h = 768
@@ -38,6 +39,7 @@ def display():
     global c_width
     global c_height
     global ALGO
+    global BURN
     global DISPLAY_WIDTH
     global DISPLAY_HEIGHT
     global image_w
@@ -107,6 +109,11 @@ def display():
                     return (real, imag)
 
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_b:
+                    BURN = True
+                    return (real, imag)
+
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_z:
                     # zoom in
                     epoch = epoch + 1
@@ -117,7 +124,7 @@ def display():
 
             if event.type == pygame.MOUSEBUTTONUP:
                 pos = pygame.mouse.get_pos()   
-                fxoffset = float(pos[0])/1024.
+                fxoffset = float(pos[0])/DISPLAY_WIDTH
                 fyoffset = float(pos[1])/float(new_h)
 
                 print("x %d, y %d"%(pos[0],pos[1]))
@@ -150,10 +157,15 @@ def run():
     global c_height
     global image_w
     global image_h
+    global BURN
+
+    burn_str = ""
+    if BURN:
+        burn_str = "--burn"
 
     while 1:
-        cmd = "python3 fractal.py --verbose=3 --algo=%s --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
-              %(str(ALGO), str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
+        cmd = "python3 fractal.py %s --verbose=3 --algo=%s --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
+              %(burn_str, str(ALGO), str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
         print(" + Driver running comment: "+cmd)
         proc = subprocess.Popen(cmd, shell=True)
         proc.wait()

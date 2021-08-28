@@ -367,12 +367,30 @@ int main(int argc, char **argv)
     mpfr_init(re_x);
     mpfr_init(im_y);
 
-    float res[1]; // number of samples .. currently unused
-    int   numres = 1;
+    float res[5]; // number of samples .. currently unused
+    int   numres = 5;
 
+    mpfr_t fraction_x;
+    mpfr_t fraction_3x;
+    mpfr_t fraction_y;
+    mpfr_t fraction_3y;
+    mpfr_init(fraction_x);
+    mpfr_init(fraction_3x);
+    mpfr_init(fraction_y);
+    mpfr_init(fraction_3y);
+
+    // long double fraction_x = (re_end - re_start) / img_w;
+    // long double fraction_3x = fraction_x / 3.;
+    mpfr_sub(fraction_x, re_end, re_start, MPFR_RNDN);
+    mpfr_div_ui(fraction_x, fraction_x, img_w, MPFR_RNDN);
+    mpfr_div_d(fraction_3x, fraction_x, 3., MPFR_RNDN);
+    // long double fraction_y = (im_end - im_start) / img_h;
+    // long double fraction_3y = fraction_y / 3.;
+    mpfr_sub(fraction_y, im_end, im_start, MPFR_RNDN);
+    mpfr_div_ui(fraction_y, fraction_x, img_h, MPFR_RNDN);
+    mpfr_div_d(fraction_3y, fraction_y, 3., MPFR_RNDN);
 
     float prog; // fraction of progress
-    //int res;
 
     libattopng_t* png = 0;
     int r,g,b;
@@ -391,6 +409,10 @@ int main(int argc, char **argv)
         printf("d = {};\n");
     }
 
+    mpfr_t reg1; // to store points for sampling
+    mpfr_t reg2; // to store points for sampling
+    mpfr_init(reg1);
+    mpfr_init(reg2);
 
     for(int y = 0; y < img_h; ++y){
         if(y < ystart || y > yend)
@@ -411,8 +433,19 @@ int main(int argc, char **argv)
             mpfr_mul(tmp, tmp2, tmp, MPFR_RNDN);
             mpfr_add(im_y, im_start, tmp, MPFR_RNDN);
 
-            // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
             res[0] = calc_pixel_smooth(re_x, im_y); // main calculation!
+            // res[1] = calc_pixel_smooth(re_x + fraction_3x, im_y); 
+            mpfr_add(reg1, re_x, fraction_3x, MPFR_RNDN);
+            res[1] = calc_pixel_smooth(reg1, im_y); 
+            //res[2] = calc_pixel_smooth(re_x - fraction_3x, im_y); 
+            mpfr_sub(reg1, re_x, fraction_3x, MPFR_RNDN);
+            res[2] = calc_pixel_smooth(reg1, im_y); 
+            // res[3] = calc_pixel_smooth(re_x, im_y + fraction_3y); 
+            mpfr_add(reg1, im_y, fraction_3x, MPFR_RNDN);
+            res[3] = calc_pixel_smooth(re_x, reg1); 
+            // res[4] = calc_pixel_smooth(re_x, im_y - fraction_3y); 
+            mpfr_sub(reg1, im_y, fraction_3x, MPFR_RNDN);
+            res[4] = calc_pixel_smooth(re_x, reg1); 
 
             if(iflag) {
                 map_to_color(res,numres,&r,&g,&b);

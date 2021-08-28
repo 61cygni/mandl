@@ -174,11 +174,11 @@ class FractalContext:
 
             if not burn_in_text:
 
-                re_start = hpf(self.c_real - (self.cmplx_width / 2.))
-                re_end =   hpf(self.c_real + (self.cmplx_width / 2.))
+                re_start = hpf(self.c_real - (self.cmplx_width / hpf(2.)))
+                re_end =   hpf(self.c_real + (self.cmplx_width / hpf(2.)))
 
-                im_start = hpf(self.c_imag - (self.cmplx_height / 2.))
-                im_end   = hpf(self.c_imag + (self.cmplx_height / 2.))
+                im_start = hpf(self.c_imag - (self.cmplx_height / hpf(2.)))
+                im_end   = hpf(self.c_imag + (self.cmplx_height / hpf(2.)))
 
                 burn_in_text = u"%d re len %.20e im len %.20e center %.20f + %.20f i" %\
                     (self.num_epochs, re_end - re_start, im_end - im_start, self.c_real, self.c_imag)
