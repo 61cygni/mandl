@@ -29,7 +29,7 @@ scaling = .1
 epoch = 0
 
 
-EXPLORER_VER = "0.01"
+DRIVER_VER = "0.01"
 
 def display():
     global real
@@ -152,9 +152,9 @@ def run():
     global image_h
 
     while 1:
-        cmd = "python3 fractal.py --verbose=3 --algo=%s --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --center=\"%s\" " \
-              %(str(ALGO), str(c_width), str(c_height),image_w,image_h,str(complex(real,imag)))
-        print(" + Explorer running comment: "+cmd)
+        cmd = "python3 fractal.py --verbose=3 --algo=%s --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
+              %(str(ALGO), str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
+        print(" + Driver running comment: "+cmd)
         proc = subprocess.Popen(cmd, shell=True)
         proc.wait()
         pygame.quit()
@@ -163,7 +163,7 @@ def run():
 
 if __name__ == "__main__":
 
-    print("++ explorer.py version %s" % (EXPLORER_VER))
+    print("++ driver.py version %s" % (DRIVER_VER))
     
     # parse_options()
 

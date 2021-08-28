@@ -553,9 +553,9 @@ def parse_options():
         elif opt in ['--cmplx-h']:
             fractal_ctx.cmplx_height = hpf(arg)
         elif opt in ['--real']:
-            fractal_ctx.c_real = Decimal(arg)
+            fractal_ctx.c_real = hpf(arg)
         elif opt in ['--imag']:
-            fractal_ctx.c_imag = Decimal(arg)
+            fractal_ctx.c_imag = hpf(arg)
         elif opt in ['-h', '--img-h']:
             fractal_ctx.img_height = int(arg)
         elif opt in ['--scaling-factor']:

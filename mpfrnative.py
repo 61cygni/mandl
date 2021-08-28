@@ -98,8 +98,8 @@ class MPFRNative(Algo):
         for i in range(0,self.numprocs):
             fn = self.dir+"mpfr%d.png"%(i)
             filenames.append(fn)
-            cmd_args =  self.exe+" -v -w %d -h %d -n %d -c %d -i %s  -x %s -y %s -l %.20f"%\
-                                 (img_width, img_height, self.numprocs, i+1, fn, str(c_real), str(c_imag), c_w )
+            cmd_args =  self.exe+" -v -w %d -h %d -n %d -c %d -i %s  -x %s -y %s -l %s"%\
+                                 (img_width, img_height, self.numprocs, i+1, fn, str(c_real), str(c_imag), str(c_w) )
             cmds.append(cmd_args)
 
         

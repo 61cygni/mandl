@@ -413,6 +413,7 @@ int main(int argc, char **argv)
 
             // res = calc_pixel(&re_x, &im_y, precision); // main calculation!
             res[0] = calc_pixel_smooth(re_x, im_y); // main calculation!
+
             if(iflag) {
                 map_to_color(res,numres,&r,&g,&b);
                 libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(r,g,b)); 
