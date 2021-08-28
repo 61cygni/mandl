@@ -19,6 +19,8 @@ import sys
 import math
 import importlib
 
+import decimal
+
 import numpy as  np
 
 import moviepy.editor as mpy
@@ -29,7 +31,10 @@ from PIL import Image, ImageDraw, ImageFont
 import fractalcache   as fc
 import fractalpalette as fp
 
+
 FRACTAL_VER = "0.1"
+
+hpf = decimal.Decimal
 
 
 class FractalContext:
@@ -41,27 +46,17 @@ class FractalContext:
 
         self.ver = FRACTAL_VER # used to version cash
 
-        if not ctxf:
-            self.ctxf = float
-        else:
-            self.ctxf = ctxf
-        if not ctxc:
-            self.ctxc = complex
-        else:    
-            self.ctxc = ctxc 
-        if not mp:
-            self.mp = math
-
         self.img_width  = 0  # int : Width of Image in pixels
         self.img_height = 0  # int
 
-        self.cmplx_width  = self.ctxf(0) # width of visualization in complex plane
-        self.cmplx_height = self.ctxf(0) 
+        self.cmplx_width  = hpf(0) # width of visualization in complex plane
+        self.cmplx_height = hpf(0) 
 
         self.magnification = 1.0 # track how far we've zoomed in 
 
-        # point we're going to dive into 
-        self.cmplx_center = None 
+        # center of image
+        self.c_real = None
+        self.c_Imag = None
 
         # should be in the algos
         self.max_iter      = 0      # int max iterations before bailing
@@ -105,16 +100,15 @@ class FractalContext:
         # Calculate box in complex plane from center point
         # --
 
-        re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
-        re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
+        re_start = hpf(self.c_real - (self.cmplx_width / hpf(2.)))
+        re_end =   hpf(self.c_real + (self.cmplx_width / hpf(2.)))
 
-        im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
-        im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
+        im_start = hpf(self.c_imag - (self.cmplx_height / hpf(2.)))
+        im_end   = hpf(self.c_imag + (self.cmplx_height / hpf(2.)))
 
         if self.verbose > 0:
-            print("FractalContext starting epoch %d re range %f %f im range %f %f center %f + %f i .... " %\
-                  (self.num_epochs, re_start, re_end, im_start, im_end, self.cmplx_center.real, self.cmplx_center.imag),
-                  end = " ")
+            print("FractalContext starting epoch %d re range %f %f im range %f %f center %s + %s i .... " %\
+                  (self.num_epochs, re_start, re_end, im_start, im_end, str(self.c_real), str(self.c_imag)), end = " ")
 
 
         # Used to create a histogram of the frequency of iteration
@@ -180,14 +174,14 @@ class FractalContext:
 
             if not burn_in_text:
 
-                re_start = self.ctxf(self.cmplx_center.real - (self.cmplx_width / 2.))
-                re_end =   self.ctxf(self.cmplx_center.real + (self.cmplx_width / 2.))
+                re_start = hpf(self.c_real - (self.cmplx_width / 2.))
+                re_end =   hpf(self.c_real + (self.cmplx_width / 2.))
 
-                im_start = self.ctxf(self.cmplx_center.imag - (self.cmplx_height / 2.))
-                im_end   = self.ctxf(self.cmplx_center.imag + (self.cmplx_height / 2.))
+                im_start = hpf(self.c_imag - (self.cmplx_height / 2.))
+                im_end   = hpf(self.c_imag + (self.cmplx_height / 2.))
 
                 burn_in_text = u"%d re len %.20e im len %.20e center %.20f + %.20f i" %\
-                    (self.num_epochs, re_end - re_start, im_end - im_start, self.cmplx_center.real, self.cmplx_center.imag)
+                    (self.num_epochs, re_end - re_start, im_end - im_start, self.c_real, self.c_imag)
 
             burn_in_location = (10,10)
             burn_in_margin = 5 
@@ -272,10 +266,10 @@ class FractalContext:
     def __repr__(self):
         return """\
 [FractalContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
-Cmplx H:{ch:.20f} Complx Center:{cc:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
+Cmplx H:{ch:.20f} c_real:{cr:s} c_imag:{ci:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=self.cmplx_width,ch=self.cmplx_height,
-        cc=str(self.cmplx_center),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
+        cr=str(self.c_real),ci=str(self.c_imag),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
 
 class MediaView: 
     """
@@ -296,23 +290,6 @@ class MediaView:
         self.ctx.fps      = fps
 
 
-    def intro_banner(self):
-        # Generate a text clip
-        w,h = self.ctx.img_width, self.ctx.img_height
-        banner_text = u"%dx%d center %s duration=%d fps=%d" %\
-                       (w, h, str(self.ctx.cmplx_center), self.duration, self.fps)
-
-
-        txt = mpy.TextClip(banner_text, font='Amiri-regular',
-                           color='white',fontsize=12)
-
-        txt_col = txt.on_color(size=(w + txt.w,txt.h+6),
-                          color=(0,0,0), pos=(1,'center'), col_opacity=0.6)
-
-        txt_mov = txt_col.set_position((0,h-txt_col.h)).set_duration(4)
-
-        return mpy.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
-
     def create_snapshot(self):    
     
         self.ctx.next_epoch(-1,self.vfilename)
@@ -327,7 +304,8 @@ class MediaView:
         if fractal_ctx.algo_name == "julia":
             if fractal_ctx.algo.julia_list != None:
                 self.ctx.dive = True
-                self.ctx.cmplx_center = complex(0.)
+                self.ctx.c_real = hpf(0)
+                self.ctx.c_imag = hpf(0)
 
         if not self.ctx.dive and not self.ctx.animate:
             set_snapshot_mode()
@@ -402,8 +380,8 @@ def set_preview_mode():
     fractal_ctx.img_width  = 300
     fractal_ctx.img_height = 200
 
-    fractal_ctx.cmplx_width  = 3.
-    fractal_ctx.cmplx_height = 3. * (fractal_ctx.img_height / fractal_ctx.img_width) 
+    fractal_ctx.cmplx_width  = hpf(3.)
+    fractal_ctx.cmplx_height = hpf(3. * (fractal_ctx.img_height / fractal_ctx.img_width) )
 
     fractal_ctx.scaling_factor = .75
 
@@ -422,9 +400,9 @@ def set_snapshot_mode():
     if not fractal_ctx.img_height:     
         fractal_ctx.img_height = 2160 
     if not fractal_ctx.cmplx_width:
-        fractal_ctx.cmplx_width  = 4.
+        fractal_ctx.cmplx_width  = hpf(4.)
     if not fractal_ctx.cmplx_height:
-        fractal_ctx.cmplx_height = 4. * (fractal_ctx.img_height / fractal_ctx.img_width) 
+        fractal_ctx.cmplx_height = hpf(4. * (fractal_ctx.img_height / fractal_ctx.img_width))
 
     if not fractal_ctx.max_iter:
         fractal_ctx.max_iter   = 2048
@@ -432,13 +410,15 @@ def set_snapshot_mode():
         fractal_ctx.escape_rad = 2. 
         #fractal_ctx.escape_rad = 32768. 
 
-    if not fractal_ctx.cmplx_center :
+    if not fractal_ctx.c_real :
         if fractal_ctx.algo_name == "julia":
             print(" * Warning no center specified, setting to 0+0j")
-            fractal_ctx.cmplx_center = complex(0+0j)
+            fractal_ctx.c_real = hpf(0) 
+            fractal_ctx.c_imag = hpf(0) 
         else:    
             print(" * Warning no center specified, setting to -1+0j")
-            fractal_ctx.cmplx_center = complex(-1+0j)
+            fractal_ctx.c_real = hpf(-1.)
+            fractal_ctx.c_imag = hpf(0.)
 
     if view_ctx.duration or view_ctx.fps:
         print(" * Warning : duration and FPS not used in snapshot mode")
@@ -463,9 +443,9 @@ def set_dive_mode():
         else:    
             fractal_ctx.img_height = 2160 
     if not fractal_ctx.cmplx_width:
-        fractal_ctx.cmplx_width  = 4.
+        fractal_ctx.cmplx_width  = hpf(4.)
     if not fractal_ctx.cmplx_height:
-        fractal_ctx.cmplx_height = 4. * (fractal_ctx.img_height / fractal_ctx.img_width) 
+        fractal_ctx.cmplx_height = hpf(4. * (fractal_ctx.img_height / fractal_ctx.img_width))
 
     if not fractal_ctx.max_iter:
         fractal_ctx.max_iter   = 512
@@ -473,9 +453,10 @@ def set_dive_mode():
         fractal_ctx.escape_rad = 2. 
         #fractal_ctx.escape_rad = 32768. 
 
-    if fractal_ctx.cmplx_center == None:
+    if fractal_ctx.c_real == None:
         print(" * Warning, no center specified, setting to -.749706+0.0314565j")
-        fractal_ctx.cmplx_center = complex(-.749696000010025+0.031456625003j)
+        fractal_ctx.c_real = hpf(-.749696000010025)
+        fractal_ctx.c_imag = hpf(0.031456625003)
 
 def parse_options():
     global fractal_ctx
@@ -483,7 +464,7 @@ def parse_options():
     argv = sys.argv[1:]
 
     
-    opts, args = getopt.getopt(argv, "pd:m:f:w:h:c:a:",
+    opts, args = getopt.getopt(argv, "pd:m:f:w:h:a:",
                                ["preview",
                                 "algo=",
                                 "duration=",
@@ -493,7 +474,6 @@ def parse_options():
                                 "res=",
                                 "cmplx-w=",
                                 "cmplx-h=",
-                                "center=",
                                 "scaling-factor=",
                                 "advance=",
                                 "fps=",
@@ -502,7 +482,8 @@ def parse_options():
                                 "verbose=",
                                 "julia-c=",
                                 "julia-walk=",
-                                "center=",
+                                "real=",
+                                "imag=",
                                 "palette-test=",
                                 "color=",
                                 "keyframe=",
@@ -568,11 +549,13 @@ def parse_options():
                 sys.exit(0)
 
         elif opt in ['--cmplx-w']:
-            fractal_ctx.cmplx_width = float(arg)
+            fractal_ctx.cmplx_width = hpf(arg)
         elif opt in ['--cmplx-h']:
-            fractal_ctx.cmplx_height = float(arg)
-        elif opt in ['-c', '--center']:
-            fractal_ctx.cmplx_center= complex(arg)
+            fractal_ctx.cmplx_height = hpf(arg)
+        elif opt in ['--real']:
+            fractal_ctx.c_real = Decimal(arg)
+        elif opt in ['--imag']:
+            fractal_ctx.c_imag = Decimal(arg)
         elif opt in ['-h', '--img-h']:
             fractal_ctx.img_height = int(arg)
         elif opt in ['--scaling-factor']:
@@ -588,8 +571,6 @@ def parse_options():
             fractal_ctx.sleep = int(arg) 
         elif opt in ['--cache']:
             fractal_ctx.cache = fc.FractalCache(fractal_ctx) 
-        elif opt in ['--center']:
-            fractal_ctx.cmplx_center = complex(arg) 
         elif opt in ['--dive']:
             fractal_ctx.dive = True
         elif opt in ['--palette-test']:

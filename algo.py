@@ -1,5 +1,8 @@
 import sys
 
+import decimal
+hpf = decimal.Decimal
+
 class Algo(object):
 
     def __init__(self, context):
@@ -32,15 +35,15 @@ class Algo(object):
 
     def zoom_in(self, iterations=1):
         while iterations:
-            self.context.cmplx_width   *= self.context.scaling_factor
-            self.context.cmplx_height  *= self.context.scaling_factor
+            self.context.cmplx_width   *= hpf(self.context.scaling_factor)
+            self.context.cmplx_height  *= hpf(self.context.scaling_factor)
             self.context.magnification *= self.context.scaling_factor
             self.context.num_epochs += 1
             iterations -= 1
 
     def calc_cur_frame(self, img_width, img_height, re_start, re_end, im_start, im_end):
 
-        print(" + [algo]calculating frame at center %f %fi"%(self.context.cmplx_center.real, self.context.cmplx_center.imag))
+        print(" + [algo]calculating frame at center %.20e %.20ei"%(self.context.c_real, self.context.c_imag))
         print(" + Re_start %f Im_start %f"%(re_start, im_start))
         values = {}
 
@@ -49,11 +52,11 @@ class Algo(object):
         for x in range(0, img_width):
             for y in range(0, img_height):
                 # ap from pixels to complex coordinates
-                Re_x = (re_start) + (x / img_width)  * (re_end - re_start)
-                Im_y = (im_start) + (y / img_height) * (im_end - im_start)
+                Re_x = (re_start) + hpf(x / img_width)  * (re_end - re_start)
+                Im_y = (im_start) + hpf(y / img_height) * (im_end - im_start)
 
                 # Call primary calculation function here
-                m = self.calc_pixel(complex(Re_x, Im_y))
+                m = self.calc_pixel(Re_x, Im_y)
 
                 values[(x,y)] = m 
             print(".",end="")

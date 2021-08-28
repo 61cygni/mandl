@@ -13,6 +13,9 @@
 # -- 
 import math
 
+import decimal
+hpf = decimal.Decimal
+
 import cython
 import numpy  as np
 
@@ -165,8 +168,9 @@ class CSmooth(Algo):
     def set_default_params(self):
 
         # set a more interesting point if we're going to be doing a dive    
-        if self.context.dive and not self.context.cmplx_center: 
-            self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
+        if self.context.dive and not self.context.c_real: 
+            self.context.c_real = hpf(-0.235125)
+            self.context.c_imag = hpf(0.827215)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
@@ -216,10 +220,12 @@ class CSmooth(Algo):
         global magnification
         global num_epochs
 
-        c_width  = self.context.cmplx_width
-        c_height = self.context.cmplx_height
-        c_real = self.context.cmplx_center.real
-        c_imag = self.context.cmplx_center.imag
+        # since this isn't a high precision implementation, cast to native float
+        c_width  = float(self.context.cmplx_width)
+        c_height = float(self.context.cmplx_height)
+        c_real = float(self.context.c_real)
+        c_imag = float(self.context.c_imag)
+
         scaling_factor = self.context.scaling_factor
         magnification = self.context.magnification
         num_epochs = self.context.num_epochs

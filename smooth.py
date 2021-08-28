@@ -37,20 +37,22 @@ class Smooth(Algo):
 
         # set a more interesting point if we're going to be doing a dive    
         if self.context.dive and not self.context.cmplx_center: 
-            self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
+            self.context.cmplx_center = complex(-0.235125,0.827215)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
             self.context.max_iter     = 512
 
-    def calc_pixel(self, c):
+    def calc_pixel(self, real, imag):
+        # we don't do high precision so snap back to native floats
+        c = complex(float(real), float(imag))
 
         if fu.inside_M1_or_M2(c):
             return 0.0
 
         B = self.context.escape_rad 
         l = 0.0
-        z = self.context.ctxc(0)
+        z = complex(0)
 
         for i in range(0, self.context.max_iter):
             z = z*z + c
@@ -72,41 +74,24 @@ class Smooth(Algo):
 
 
     def _map_to_color(self, val):
-        magnification = 1. / self.context.cmplx_width
-        if magnification <= 100:
-            magnification = 100 
-        denom = math.log(math.log(magnification))
 
         c1 = 0.
         c2 = 0.
         c3 = 0.
 
         # (yellow blue 0,.6,1.0)
-        c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
-        c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
-        c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
-        c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
-        c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
-        c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
-        c1int = int(255.*((c1/4.) * 3.) / denom)
-        c2int = int(255.*((c2/4.) * 3.) / denom)
-        c3int = int(255.*((c3/4.) * 3.) / denom)
+        c1 +=  1 + math.cos( 3.0 + val*0.15 + self.color[0]);
+        c2 +=  1 + math.cos( 3.0 + val*0.15 + self.color[1]);
+        c3 +=  1 + math.cos( 3.0 + val*0.15 + self.color[2]);
+
+        c1int = int(255.*((c1/4.) * 3.) / 1.5)
+        c2int = int(255.*((c2/4.) * 3.) / 1.5)
+        c3int = int(255.*((c3/4.) * 3.) / 1.5)
+
         return (c1int,c2int,c3int)
 
     def map_value_to_color(self, val):
-
-        magnification = 1. / self.context.cmplx_width
-        if magnification <= 100:
-            magnification = 100 
-        denom = math.log(math.log(magnification))
-
-        if self.color:
-            c1 = self._map_to_color(val)
-            return c1 
-        else:        
-            #magnification = 1. / self.context.cmplx_width
-            cint = int((val * 3.) / denom)
-            return (cint,cint,cint)
+        return self._map_to_color(val)
         
 
     def animate_step(self, t):

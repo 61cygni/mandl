@@ -68,7 +68,8 @@ class MPFRNative(Algo):
 
         # set a more interesting point if we're going to be doing a dive    
         if self.context.dive and not self.context.cmplx_center: 
-            self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
+            self.context.c_real = hpf(-0.235125)
+            self.context.c_imag = hpf(0.827215)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
@@ -90,15 +91,15 @@ class MPFRNative(Algo):
         cmds      = []
         procs     = []
 
-        c_real = self.context.cmplx_center.real
-        c_imag = self.context.cmplx_center.imag
+        c_real = self.context.c_real
+        c_imag = self.context.c_imag
         c_w    = self.context.cmplx_width
 
         for i in range(0,self.numprocs):
             fn = self.dir+"mpfr%d.png"%(i)
             filenames.append(fn)
-            cmd_args =  self.exe+" -v -w %d -h %d -n %d -c %d -i %s  -x %.20f -y %.20f -l %.20f"%\
-                                 (img_width, img_height, self.numprocs, i+1, fn, c_real, c_imag, c_w )
+            cmd_args =  self.exe+" -v -w %d -h %d -n %d -c %d -i %s  -x %s -y %s -l %.20f"%\
+                                 (img_width, img_height, self.numprocs, i+1, fn, str(c_real), str(c_imag), c_w )
             cmds.append(cmd_args)
 
         

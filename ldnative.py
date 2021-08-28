@@ -44,8 +44,9 @@ class LDNative(Algo):
     def set_default_params(self):
 
         # set a more interesting point if we're going to be doing a dive    
-        if self.context.dive and not self.context.cmplx_center: 
-            self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
+        if self.context.dive and not self.context.c_real: 
+            self.context.c_real = hpf(-0.235125)
+            self.context.c_imag = hpf(-0.235125)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
@@ -60,8 +61,8 @@ class LDNative(Algo):
         cmds      = []
         procs     = []
 
-        c_real = self.context.cmplx_center.real
-        c_imag = self.context.cmplx_center.imag
+        c_real = self.context.c_real
+        c_imag = self.context.c_imag
         c_w    = self.context.cmplx_width
 
         for i in range(0,self.numprocs):
