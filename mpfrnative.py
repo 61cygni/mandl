@@ -161,11 +161,6 @@ class MPFRNative(Algo):
     def animate_step(self, t):
         self.zoom_in()
 
-    def burn_string(self):
-        burn_in_text = u"epoch: %d width %s " %\
-            (self.context.num_epochs, str(magnification))
-        return burn_in_text    
-        
     def zoom_in(self, iterations=1):
         global c_width
         global c_height

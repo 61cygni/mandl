@@ -86,12 +86,14 @@ class FractalContext:
 
         self.palette = None
         self.burn_in = False
+        self.burn_in_front_size = 12
 
         self.sleep   = 0
 
         self.cache   = None
 
         self.verbose = 0 # how much to print about progress
+
 
 
     def calc_cur_frame(self, snapshot_filename = None):        
@@ -133,6 +135,7 @@ class FractalContext:
 
         return values
 
+
     def draw_image_PIL(self, values, snapshot_filename):    
 
         im   = None
@@ -164,31 +167,13 @@ class FractalContext:
             im = values
             draw = ImageDraw.Draw(im)
 
+
+        self.handle_burn_in(draw)    
+
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
 
 
-        if self.burn_in == True:
-
-            burn_in_text = self.algo.burn_string()
-
-            if not burn_in_text:
-
-                re_start = hpf(self.c_real - (self.cmplx_width / hpf(2.)))
-                re_end =   hpf(self.c_real + (self.cmplx_width / hpf(2.)))
-
-                im_start = hpf(self.c_imag - (self.cmplx_height / hpf(2.)))
-                im_end   = hpf(self.c_imag + (self.cmplx_height / hpf(2.)))
-
-                burn_in_text = u"%d re len %.20e im len %.20e center %.20f + %.20f i" %\
-                    (self.num_epochs, re_end - re_start, im_end - im_start, self.c_real, self.c_imag)
-
-            burn_in_location = (10,10)
-            burn_in_margin = 5 
-            burn_in_font = ImageFont.truetype('fonts/cour.ttf', 12)
-            burn_in_size = burn_in_font.getsize(burn_in_text)
-            draw.rectangle(((burn_in_location[0] - burn_in_margin, burn_in_location[1] - burn_in_margin), (burn_in_size[0] + burn_in_margin * 2, burn_in_size[1] + burn_in_margin * 2)), fill="black")
-            draw.text(burn_in_location, burn_in_text, 'white', burn_in_font)
 
         # Code to track the center of the image. Helps to debug zooming, find coordinates etc. leaving in for
         # future debugging help /mc
@@ -200,6 +185,48 @@ class FractalContext:
         #draw.ellipse((x0,y0,x1,y1), fill=(255,0,0), width=3)
 
         return im    
+
+    def handle_burn_in(self, draw):
+        if not self.burn_in:
+            return
+
+        re_start = hpf(self.c_real - (self.cmplx_width / hpf(2.)))
+        re_end =   hpf(self.c_real + (self.cmplx_width / hpf(2.)))
+
+        im_start = hpf(self.c_imag - (self.cmplx_height / hpf(2.)))
+        im_end   = hpf(self.c_imag + (self.cmplx_height / hpf(2.)))
+
+        dive_str = ""
+        if self.dive:
+            dive_str="epoch: %d "%(self.num_epochs)
+
+        burn_in_text_1 = u"%sre len %.20e im len %.20e" %\
+            (dive_str, re_end - re_start, im_end - im_start)
+        burn_in_text_2 = u"center %.20e + %.20e i" %\
+            (self.c_real, self.c_imag)
+
+        location = (10,10)
+        margin = 5 
+
+        burn_in_font = ImageFont.truetype('fonts/cour.ttf', self.burn_in_front_size)
+        burn_in_size = burn_in_font.getsize(burn_in_text_1)
+
+        # create rectangle for 2 lines
+        rec_x1 = location[0] - margin
+        rec_y1 = location[1] - margin
+        rec_x2 = burn_in_size[0]     + margin * 2
+        rec_y2 = burn_in_size[1]*2   + margin * 4
+
+        draw.rectangle(((rec_x1, rec_y1), (rec_x2, rec_y2)), fill="black")
+
+        # First Line
+        draw.text(location, burn_in_text_1, 'white', burn_in_font)
+
+        # second line 
+        location_2 = (location[0], location[1] + burn_in_size[1] + margin*2)
+        burn_in_font = ImageFont.truetype('fonts/cour.ttf', self.burn_in_front_size)
+        burn_in_size = burn_in_font.getsize(burn_in_text_2)
+        draw.text(location_2, burn_in_text_2, 'white', burn_in_font)
 
     def zoom_and_crop_keyframe(self):    
         center_x = self.img_width  / 2
@@ -320,6 +347,18 @@ class MediaView:
         if self.ctx.cache:
             self.ctx.cache.setup()
 
+        # set burn in font size based on image size
+        if self.ctx.img_width <= 480:
+            self.ctx.burn_in_front_size = 8 
+        elif self.ctx.img_width <= 640:
+            self.ctx.burn_in_front_size = 10 
+        elif self.ctx.img_width <= 1024:
+            self.ctx.burn_in_front_size = 14 
+        elif self.ctx.img_width <= 2048:
+            self.ctx.burn_in_front_size = 24 
+        elif self.ctx.img_width <= 4048:
+            self.ctx.burn_in_front_size = 36 
+            
 
     def run(self):
 

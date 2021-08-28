@@ -9,10 +9,10 @@ hpf = Decimal
 
 ALGO = "ldnative"
 BURN = True 
-DISPLAY_WIDTH  = 640
+DISPLAY_WIDTH  = 1024
 
-image_w = 1024
-image_h = 768
+image_w = 640
+image_h = 480
 
 red   = 0.1
 green = 0.2
