@@ -67,7 +67,7 @@ class MPFRNative(Algo):
     def set_default_params(self):
 
         # set a more interesting point if we're going to be doing a dive    
-        if self.context.dive and not self.context.cmplx_center: 
+        if self.context.dive and not self.context.c_real: 
             self.context.c_real = hpf(-0.235125)
             self.context.c_imag = hpf(0.827215)
         if not self.context.escape_rad:        
@@ -160,21 +160,6 @@ class MPFRNative(Algo):
 
     def animate_step(self, t):
         self.zoom_in()
-
-    def zoom_in(self, iterations=1):
-        global c_width
-        global c_height
-        global scaling_factor
-        global magnification
-        global num_epochs
-
-        while iterations > 0:
-            c_width   *= hpf(scaling_factor)
-            c_height  *= hpf(scaling_factor)
-            magnification *= scaling_factor
-            iterations -= 1
-
-            self.context.num_epochs += 1
 
     def setup(self):
         global c_width
