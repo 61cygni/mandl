@@ -14,6 +14,7 @@ import subprocess
 import multiprocessing
 
 from algo import Algo
+from algo import hpf
 
 from PIL import Image
 
@@ -46,7 +47,7 @@ class LDNative(Algo):
         # set a more interesting point if we're going to be doing a dive    
         if self.context.dive and not self.context.c_real: 
             self.context.c_real = hpf(-0.235125)
-            self.context.c_imag = hpf(-0.235125)
+            self.context.c_imag = hpf(0.827215)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        

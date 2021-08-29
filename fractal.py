@@ -166,14 +166,21 @@ class FractalContext:
         else: # assume it's an image
             im = values
             draw = ImageDraw.Draw(im)
+            
+
+        # set keyframe before we do a burnin ... otherwise we see the
+        # old text when we zoom in
+
+        if self.keyframe and self.num_epochs % self.keyframe == 0:
+            self.cur_keyframe = None
+        else:
+            self.cur_keyframe = im
 
 
         self.handle_burn_in(draw)    
 
         #print("Finished iteration RErange %f:%f (re width: %f)"%(RE_START, RE_END, RE_END - RE_START))
         #print("Finished iteration IMrange %f:%f (im height: %f)"%(IM_START, IM_END, IM_END - IM_START))
-
-
 
         # Code to track the center of the image. Helps to debug zooming, find coordinates etc. leaving in for
         # future debugging help /mc
@@ -262,11 +269,6 @@ class FractalContext:
 
         self.algo.pre_image_hook()
         im = self.draw_image_PIL(values, snapshot_filename)
-
-        if self.keyframe and self.num_epochs % self.keyframe == 0:
-            self.cur_keyframe = None
-        else:
-            self.cur_keyframe = im
 
 
         # -- 

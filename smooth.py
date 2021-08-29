@@ -16,6 +16,7 @@ import math
 import fractalutil as fu
 
 from algo import Algo
+from algo import hpf
 
 class Smooth(Algo):
     
@@ -36,8 +37,9 @@ class Smooth(Algo):
     def set_default_params(self):
 
         # set a more interesting point if we're going to be doing a dive    
-        if self.context.dive and not self.context.cmplx_center: 
-            self.context.cmplx_center = complex(-0.235125,0.827215)
+        if self.context.dive and not self.context.c_real: 
+            self.context.c_real = hpf(-0.235125)
+            self.context.c_imag = hpf(0.827215)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
