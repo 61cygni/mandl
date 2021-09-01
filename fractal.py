@@ -36,6 +36,8 @@ FRACTAL_VER = "0.1"
 
 hpf = decimal.Decimal
 
+decimal.getcontext().prec = 500 
+
 
 class FractalContext:
     """
@@ -174,7 +176,7 @@ class FractalContext:
         if self.keyframe and self.num_epochs % self.keyframe == 0:
             self.cur_keyframe = None
         else:
-            self.cur_keyframe = im
+            self.cur_keyframe = im.copy()
 
 
         self.handle_burn_in(draw)    

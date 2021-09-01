@@ -3,13 +3,14 @@
 import pygame
 import subprocess
 
-from decimal import Decimal
+from decimal import *
 
 hpf = Decimal
+getcontext().prec = 500 
 
 ALGO = "ldnative"
 BURN = True 
-DISPLAY_WIDTH  = 1024
+DISPLAY_WIDTH  = 640
 
 image_w = 640
 image_h = 480
