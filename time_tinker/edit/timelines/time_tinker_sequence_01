@@ -1,0 +1,303 @@
+{
+    "algorithmName": "mandelbrot_smooth",
+    "framerate": 23.976,
+    "frameWidth": 1024,
+    "frameHeight": 768,
+    "mathSupport": "DiveMathSupportFlintCustom:196",
+    "timelineSpans": [
+        {
+            "time": "0",
+            "duration": "75033",
+            "keyframes": [
+                [
+                    "0",
+                    "max_escape_iterations",
+                    "int",
+                    "512",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "0",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581720138687 +/- 8.31e-16] + [0.254713057701388 +/- 5.83e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "0",
+                    "meshImagWidth",
+                    "float",
+                    "3.000000000000000000000000000000000000000000000000000000000",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "0",
+                    "meshRealWidth",
+                    "float",
+                    "4.000000000000000000000000000000000000000000000000000000000",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "9373",
+                    "max_escape_iterations",
+                    "int",
+                    "1232",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "9373",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581720138687 +/- 7.11e-16] + [0.254713057701388 +/- 4.95e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "9373",
+                    "meshImagWidth",
+                    "float",
+                    "[5.07810357813e-10 +/- 5.41e-22]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "9373",
+                    "meshRealWidth",
+                    "float",
+                    "[6.77080477085e-10 +/- 5.15e-22]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "18747",
+                    "max_escape_iterations",
+                    "int",
+                    "624",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "18747",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859 +/- 8.48e-16] + [0.254713061348462 +/- 5.89e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "18747",
+                    "meshImagWidth",
+                    "float",
+                    "[1.387704739643e-8 +/- 6.19e-21]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "18747",
+                    "meshRealWidth",
+                    "float",
+                    "[1.850272986191e-8 +/- 3.92e-21]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "28121",
+                    "max_escape_iterations",
+                    "int",
+                    "864",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "28121",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859 +/- 8.48e-16] + [0.254713061348462 +/- 5.89e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "28121",
+                    "meshImagWidth",
+                    "float",
+                    "[4.68350349630e-10 +/- 4.65e-22]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "28121",
+                    "meshRealWidth",
+                    "float",
+                    "[6.24467132839e-10 +/- 5.96e-22]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "37495",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "37495",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095643 +/- 7.44e-43] + [0.254713061348462420839633952640232889299955 +/- 7.08e-43]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "37495",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "37495",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "46869",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "46869",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440092378 +/- 6.63e-43] + [0.254713061348462420839633952640232889304777 +/- 2.97e-43]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "46869",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "46869",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "56243",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "56243",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440098717 +/- 8.10e-43] + [0.254713061348462420839633952640232889304970 +/- 6.69e-43]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "56243",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "56243",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "65617",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "65617",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095452 +/- 7.51e-43] + [0.254713061348462420839633952640232889302462 +/- 5.71e-43]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "65617",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "65617",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "74991",
+                    "max_escape_iterations",
+                    "int",
+                    "5376",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "74991",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095452138042847910946 +/- 4.84e-58] + [0.254713061348462420839633952640232889302461665571684355096 +/- 3.49e-58]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "74991",
+                    "meshImagWidth",
+                    "float",
+                    "[2.5332336614901e-54 +/- 6.70e-68]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "74991",
+                    "meshRealWidth",
+                    "float",
+                    "[3.3776448819868e-54 +/- 8.79e-68]",
+                    "root-to",
+                    "root-to"
+                ]
+            ]
+        }
+    ]
+}

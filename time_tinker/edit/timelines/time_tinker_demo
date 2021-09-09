@@ -1,0 +1,983 @@
+{
+    "algorithmName": "mandelbrot_smooth",
+    "framerate": 23.976,
+    "frameWidth": 1024,
+    "frameHeight": 768,
+    "mathSupport": "DiveMathSupportFlintCustom:196",
+    "timelineSpans": [
+        {
+            "time": "0",
+            "duration": "75033",
+            "keyframes": [
+                [
+                    "0",
+                    "max_escape_iterations",
+                    "int",
+                    "1234",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "0",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581720937148 +/- 3.12e-16] + [0.254713063224225 +/- 2.79e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "0",
+                    "meshImagWidth",
+                    "float",
+                    "3.000000000000000000000000000000000000000000000000000000000",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "0",
+                    "meshRealWidth",
+                    "float",
+                    "4.000000000000000000000000000000000000000000000000000000000",
+                    "root-to",
+                    "root-to"
+                ],
+
+# 9000 waypoint end of start, begin of decel
+                [
+                    "9000",
+                    "max_escape_iterations",
+                    "int",
+                    "1232",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "9000",
+                    "meshImagWidth",
+                    "float",
+                    "[1.387704739643e-8 +/- 6.19e-21]",
+                    "root-to",
+                    "root-to-ease-in"
+                ],
+                [
+                    "9000",
+                    "meshRealWidth",
+                    "float",
+                    "[1.850272986191e-8 +/- 3.92e-21]",
+                    "root-to",
+                    "root-to-ease-in"
+                ],
+
+
+# 12119 First halt, backwards begins
+                [
+                    "12119",
+                    "max_escape_iterations",
+                    "int",
+                    "1234",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "12119",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581720937148 +/- 3.12e-16] + [0.254713063224225 +/- 2.79e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "12119",
+                    "meshImagWidth",
+                    "float",
+                    "[5.07810357813e-10 +/- 5.41e-22]",
+                    "root-to-ease-in",
+                    "root-from-ease-out"
+                ],
+                [
+                    "12119",
+                    "meshRealWidth",
+                    "float",
+                    "[6.77080477085e-10 +/- 5.15e-22]",
+                    "root-to-ease-in",
+                    "root-from-ease-out"
+                ],
+
+
+# Second stop, zoomed out 15355, accel/decel back towards dive
+# Center point copied in from higher precision keyframe later.
+                [
+                    "15355",
+                    "max_escape_iterations",
+                    "int",
+                    "1232",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "15355",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581720937148 +/- 3.12e-16] + [0.254713063224225 +/- 2.79e-16]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "15355",
+                    "meshImagWidth",
+                    "float",
+                    "[1.387704739643e-8 +/- 6.19e-21]",
+                    "root-from-ease-out",
+                    "root-to-ease-out"
+                ],
+                [
+                    "15355",
+                    "meshRealWidth",
+                    "float",
+                    "[1.850272986191e-8 +/- 3.92e-21]",
+                    "root-from-ease-out",
+                    "root-to-ease-out"
+                ],
+
+
+# Waypoint, back to full speed
+                [
+                    "18492",
+                    "max_escape_iterations",
+                    "int",
+                    "1234",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "18492",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095643 +/- 7.44e-43] + [0.254713061348462420839633952640232889299955 +/- 7.08e-43]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "18492",
+                    "meshImagWidth",
+                    "float",
+                    "[4.68350349630e-10 +/- 4.65e-22]",
+                    "root-to-ease-out",
+                    "root-to"
+                ],
+                [
+                    "18492",
+                    "meshRealWidth",
+                    "float",
+                    "[6.24467132839e-10 +/- 5.96e-22]",
+                    "root-to-ease-out",
+                    "root-to"
+                ],
+
+# Just setting values, so we can modify them in another span layer?!
+# Not exactly ideal, but also not outright crazy.
+                [
+                    "21895",
+                    "meshRealTilt",
+                    "float",
+                    "0.0",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "21895",
+                    "meshImagTilt",
+                    "float",
+                    "0.0",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "26600",
+                    "meshRealTilt",
+                    "float",
+                    "0.0",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "26600",
+                    "meshImagTilt",
+                    "float",
+                    "0.0",
+                    "linear",
+                    "linear"
+                ],
+
+
+
+# Fast snap up.
+# 34708
+                [
+                    "34708",
+                    "meshRealTilt",
+                    "float",
+                    "0.0",
+                    "step",
+                    "quadratic-to"
+                ],
+
+                [
+                    "34833",
+                    "meshRealTilt",
+                    "float",
+                    "2.0",
+                    "quadratic-to",
+                    "linear"
+                ],
+
+
+
+# Fast snap down.
+# 37744
+                [
+                    "37744",
+                    "meshRealTilt",
+                    "float",
+                    "2.0",
+                    "linear",
+                    "quadratic-to-from"
+                ],
+                [
+                    "37994",
+                    "meshRealTilt",
+                    "float",
+                    "-2.0",
+                    "quadratic-to-from",
+                    "linear"
+                ],
+
+
+# Settle back to flat over 2 bars
+                [
+                    "40981",
+                    "meshRealTilt",
+                    "float",
+                    "-2.0",
+                    "linear",
+                    "quadratic-to"
+                ],
+
+                [
+                    "44117",
+                    "meshRealTilt",
+                    "float",
+                    "0.0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+
+
+# Waypoint, about to stop
+                [
+                    "47454",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "47454",
+                    "meshImagWidth",
+                    "float",
+                    "[4.59834888727e-36 +/- 3.62e-48]",
+                    "root-to",
+                    "root-to-ease-in"
+                ],
+                [
+                    "47454",
+                    "meshRealWidth",
+                    "float",
+                    "[6.131131849697e-36 +/- 8.88e-49]",
+                    "root-to",
+                    "root-to-ease-in"
+                ],
+
+
+#(top mid)
+#                    "[-0.912581723893859340429749910373421440095643 +/- 7.44e-43] + #[0.254713061348462420839633952640232889299955 +/- 7.08e-43]j",
+#
+#(bottom right)
+#                    "[-0.912581723893859340429749910373421440092378 +/- 6.63e-43] + #[0.254713061348462420839633952640232889304777 +/- 2.97e-43]j",
+#
+#(bottom left)
+#                    "[-0.912581723893859340429749910373421440098717 +/- 8.10e-43] + #[0.254713061348462420839633952640232889304970 +/- 6.69e-43]j",
+#
+#
+#(center)
+#                    "[-0.912581723893859340429749910373421440095452138042847910946 +/- 4.84e-58] + #[0.254713061348462420839633952640232889302461665571684355096 +/- 3.49e-58]j",
+
+
+# Full stop.
+# Now, centered on the top-of-3 triangle points as the next segment's dive center
+                [
+                    "50524",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "50524",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095643 +/- 7.44e-43] + [0.254713061348462420839633952640232889299955 +/- 7.08e-43]j",
+                    "linear",
+                    "quadratic-to-from"
+                ],
+                [
+                    "50524",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to-ease-in",
+                    "root-to"
+                ],
+                [
+                    "50524",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to-ease-in",
+                    "root-to"
+                ],
+
+
+# bottom right
+                [
+                    "51491",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440092378 +/- 6.63e-43] + [0.254713061348462420839633952640232889304777 +/- 2.97e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# bottom left
+                [
+                    "52259",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440098717 +/- 8.10e-43] + [0.254713061348462420839633952640232889304970 +/- 6.69e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# top middle
+                [
+                    "53060",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095643 +/- 7.44e-43] + [0.254713061348462420839633952640232889299955 +/- 7.08e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# bottom right
+                [
+                    "53827",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440092378 +/- 6.63e-43] + [0.254713061348462420839633952640232889304777 +/- 2.97e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# bottom left
+                [
+                    "54217",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440098717 +/- 8.10e-43] + [0.254713061348462420839633952640232889304970 +/- 6.69e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# top middle
+                [
+                    "54667",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095643 +/- 7.44e-43] + [0.254713061348462420839633952640232889299955 +/- 7.08e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+# bottom right
+                [
+                    "55087",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440092378 +/- 6.63e-43] + [0.254713061348462420839633952640232889304777 +/- 2.97e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# bottom left
+                [
+                    "55507",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440098717 +/- 8.10e-43] + [0.254713061348462420839633952640232889304970 +/- 6.69e-43]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# center
+                [
+                    "55507",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095452138042847910946 +/- 4.84e-58] + [0.254713061348462420839633952640232889302461665571684355096 +/- 3.49e-58]j",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+
+# Triangle mid point
+# future center copied in from later keyframe
+                [
+                    "55829",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "55829",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095452138042847910946 +/- 4.84e-58] + [0.254713061348462420839633952640232889302461665571684355096 +/- 3.49e-58]j",
+                    "quadratic-to-from",
+                    "linear"
+                ],
+                [
+                    "55829",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-from-ease-in"
+                ],
+                [
+                    "55829",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-from-ease-in"
+                ],
+                [
+                    "55829",
+                    "palette_scheme_index",
+                    "int",
+                    "0",
+                    "step",
+                    "step"
+                ],
+
+
+# Waypoint, before breathe-in
+                [
+                    "59600",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-from-ease-in"
+                ],
+                [
+                    "59600",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-from-ease-in"
+                ],
+
+# Breathe-in frame (this is the furthest-out point, before re-accelling in)
+                [
+                    "59733",
+                    "meshImagWidth",
+                    "float",
+                    "[2.418404214230e-38 +/- 9.31e-51]",
+                    "root-from-ease-in",
+                    "root-to"
+                ],
+                [
+                    "59733",
+                    "meshRealWidth",
+                    "float",
+                    "[3.224538952307e-38 +/- 7.38e-51]",
+                    "root-from-ease-in",
+                    "root-to"
+                ],
+                [
+                    "59733",
+                    "palette_scheme_index",
+                    "int",
+                    "1",
+                    "step",
+                    "step"
+                ],
+
+
+
+# Full speed to end
+                [
+                    "59866",
+                    "max_escape_iterations",
+                    "int",
+                    "3408",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "59866",
+                    "meshImagWidth",
+                    "float",
+                    "[2.276182699200e-38 +/- 4.41e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "59866",
+                    "meshRealWidth",
+                    "float",
+                    "[3.034910265600e-38 +/- 4.27e-51]",
+                    "root-to",
+                    "root-to"
+                ],
+
+
+                [
+                    "65806",
+                    "palette_scheme_index",
+                    "int",
+                    "2",
+                    "step",
+                    "step"
+                ],
+                [
+                    "66239",
+                    "palette_scheme_index",
+                    "int",
+                    "0",
+                    "step",
+                    "step"
+                ],
+                [
+                    "66676",
+                    "palette_scheme_index",
+                    "int",
+                    "1",
+                    "step",
+                    "step"
+                ],
+
+
+# End point
+
+                [
+                    "74991",
+                    "max_escape_iterations",
+                    "int",
+                    "5376",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "74991",
+                    "meshCenter",
+                    "complex",
+                    "[-0.912581723893859340429749910373421440095452138042847910946 +/- 4.84e-58] + [0.254713061348462420839633952640232889302461665571684355096 +/- 3.49e-58]j",
+                    "linear",
+                    "linear"
+                ],
+                [
+                    "74991",
+                    "meshImagWidth",
+                    "float",
+                    "[2.5332336614901e-54 +/- 6.70e-68]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "74991",
+                    "meshRealWidth",
+                    "float",
+                    "[3.3776448819868e-54 +/- 8.79e-68]",
+                    "root-to",
+                    "root-to"
+                ],
+                [
+                    "74991",
+                    "palette_scheme_index",
+                    "int",
+                    "1",
+                    "step",
+                    "step"
+                ]
+            ]
+        },
+        {
+            "time": "21895",
+            "duration": "4705",
+            "keyframes": [
+
+# Spiral distort of tilt angles.  Should be pretty simple to calculate, and
+# sure is a pain to specify manually.
+
+                [
+                    "21895",
+                    "meshRealTilt_modifyPlus",
+                    "float",
+                    "0.0",
+                    "linear",
+                    "quadratic-to-from"
+                ],
+                [
+                    "21895",
+                    "meshImagTilt_modifyPlus",
+                    "float",
+                    "0.0",
+                    "linear",
+                    "quadratic-to-from"
+                ],
+
+
+# First cycle at 24798, so each 1/4 rotation is ~ (2903/4) = ~725
+
+# Get-going takes an 1/8th rotation up, half-the way
+                [
+                    "22257",
+                    "meshRealTilt_modifyPlus",
+                    "float",
+                    "1.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# First 1/4 rotation at ~21895+725= 22620
+                [
+                    "22620",
+                    "meshImagTilt_modifyPlus",
+                    "float",
+                    "2.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# 2nd 1/4 rotation at ~21895+(2*725)= 23345
+                [
+                    "23345",
+                    "meshRealTilt_modifyPlus",
+                    "float",
+                    "-2.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# 3rd 1/4 rotation at ~21895+(3*725)= 24070
+                [
+                    "24070",
+                    "meshImagTilt_modifyPlus",
+                    "float",
+                    "-2.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# 4th 1/4 rotation at ~21895+(4*725)= 24795
+                [
+                    "24795",
+                    "meshRealTilt_modifyPlus",
+                    "float",
+                    "2.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# 5th 1/4 rotation at ~21895+(5*725)= 25520
+                [
+                    "25520",
+                    "meshImagTilt_modifyPlus",
+                    "float",
+                    "1.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# 6th 1/4 rotation at ~21895+(6*725)= 25520
+                [
+                    "25520",
+                    "meshRealTilt_modifyPlus",
+                    "float",
+                    "-1.0",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# Let's add another 1/8th rotation stop as overshoot before settling.
+# ~21895+(6.25*725)= 26426
+                [
+                    "26426",
+                    "meshImagTilt_modifyPlus",
+                    "float",
+                    "-0.5",
+                    "quadratic-to-from",
+                    "quadratic-to-from"
+                ],
+
+# Back to centered at end
+                [
+                    "26600",
+                    "meshRealTilt_modifyPlus",
+                    "float",
+                    "0.0",
+                    "quadratic-to-from",
+                    "linear"
+                ],
+                [
+                    "26600",
+                    "meshImagTilt_modifyPlus",
+                    "float",
+                    "0.0",
+                    "quadratic-to-from",
+                    "linear"
+                ]
+            ]
+        },
+        {
+            "time": "60667",
+            "duration": "5813",
+            "keyframes": [
+
+# All these escape iteration definitions are modifications timed with the music.
+# Seems like the extra midpoint is excessive here, but it's not the worst
+# thing to have ramp-up and ramp-down control, so maybe it's fine.
+#
+# Using +160ms as the timing for the peak.
+                [
+                    "60667",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "61007",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-400",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "61330",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+                [
+                    "62335",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "62495",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-400",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "62702",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+                [
+                    "63503",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "63663",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-500",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "63870",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+
+                [
+                    "66538",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "66698",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-500",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "65705",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+                [
+                    "66673",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "66833",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-500",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "67040",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+                [
+                    "68041",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "68201",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-500",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "69041",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+                [
+                    "69910",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "70070",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-500",
+                    "linear",
+                    "quadratic-to"
+                ],
+                [
+                    "71077",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "quadratic-to",
+                    "step"
+                ],
+
+                [
+                    "71078",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "linear"
+                ],
+                [
+                    "72245",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-600",
+                    "linear",
+                    "step"
+                ],
+
+                [
+                    "73013",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "-250",
+                    "step",
+                    "step"
+                ],
+
+                [
+                    "73480",
+                    "max_escape_iterations_modifyPlus",
+                    "int",
+                    "0",
+                    "step",
+                    "step"
+                ]
+            ]
+        }
+
+    ]
+}
