@@ -54,303 +54,23 @@ from mandeldistance import MandelDistance
 from julia_solo import JuliaSolo
 from julia_smooth import JuliaSmooth 
 
-#from smooth import Smooth
-
 MANDL_VER = "0.1"
-
-class FractalContext:
-    """
-    The context for a single dive
-    """
-
-    def __init__(self, math_support=fm.DiveMathSupport()):
-        self.math_support = math_support
-
-        self.img_width  = 0 # int : Wide of Image in pixels
-        self.img_height = 0 # int
-
-        self.cmplx_width = self.math_support.createFloat(0.0)
-        self.cmplx_height = self.math_support.createFloat(0.0)
-        self.cmplx_center = self.math_support.createComplex(0.0) # center of image in complex plane
-
-        self.max_iter      = 0  # int max iterations before bailing
-        self.escape_rad    = 2. # float radius mod Z hits before it "escapes" 
-
-        self.scaling_factor = 0.0 #  float amount to zoom each epoch
-
-        self.set_zoom_level = 0   # Zoom in prior to the dive
-        self.clip_start_frame = -1
-        self.clip_frame_count = 1 
-        self.write_video = True
-
-        self.smoothing      = False # bool turn on color smoothing
-        self.snapshot       = False # Generate a single, high res shotb
-
-        self.julia_list   = None # Used just for timeline construction
-
-        self.palette = None
-
-        # Shifting from the FractalContext being the oracle of frame information, to the Timeline being the oracle.
-        # Rather than keeping 'current frame' info in the context, we just keep the timeline, and
-        # query it for frame-specific parameters to render with.
-        self.timeline = None
-
-        self.project_name = 'default_project'
-        self.shared_cache_path = 'shared_cache'
-        self.build_cache = False
-        self.invalidate_cache = False
-
-        self.algorithm_map = {'julia' : Julia, 
-                'mandelbrot_solo' : MandelbrotSolo,
-                'mandelbrot_smooth' : MandelbrotSmooth,
-                'mandeldistance' : MandelDistance,
-                'smooth': Smooth}
-        self.algorithm_name = None
-        self.algorithm_extra_params = {} # Keeps command-line params for later use
-
-        self.verbose = 0 # how much to print about progress
-
-    def render_frame_number(self, frame_number):
-        extra_params = {}
-        if self.algorithm_name in self.algorithm_extra_params:
-            extra_params = self.algorithm_extra_params[self.algorithm_name]
-
-        #dive_mesh realizes more info is needed, so stashes it into its extraParams
-        # Gotta retrieve that in calculateResults, right?
-        # So, extra_params needs to be looked at, and algo params need to be set by the values, right?
-        # Algorithm gets instantiated with all its parts in place...
-        # We've gotta allow mesh's extra params to add to and override the overall algorithm's extra params?
-
-        dive_mesh = self.timeline.getMeshForFrame(frame_number)
-        #print("extra params from mesh: %s" % str(dive_mesh.extraParams))
-        extra_params.update(dive_mesh.extraParams) # Allow per-frame info to overwrite algorithm info?
-
-        display_frame_number = frame_number
-        if self.clip_start_frame != -1:
-            display_frame_number += self.clip_start_frame
-
-        #print("extra params for \"%s\" instantiation: %s" % (self.algorithm_name, str(extra_params)))
-        #print(".") # Just to keep the time-per-frame calculations from being overwritten in the terminal
-        frame_algorithm = self.algorithm_map[self.algorithm_name](dive_mesh=dive_mesh, frame_number=display_frame_number, output_folder_name=self.project_name, extra_params=extra_params)
-
-        frame_algorithm.run()
-        return frame_algorithm.output_image_file_name
-
-    def __repr__(self):
-        return """\
-[FractalContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:s}
-Cmplx H:{ch:s} Complx Center:{cc:s} Scaling:{s:f} Max iter:{mx:d}]\
-""".format(
-        w=self.img_width,h=self.img_height,cw=str(self.cmplx_width),ch=str(self.cmplx_height),
-        cc=str(self.cmplx_center),s=self.scaling_factor,mx=self.max_iter); 
-
-class MediaView: 
-    """
-    Handle displaying to gif / mp4 / screen etc.  
-    """
-    def make_frame(self, t):
-        return np.array(self.ctx.render_frame_number(self.frame_number_from_time(t)))
-
-    def __init__(self, duration, fps, ctx):
-        self.duration  = duration
-        self.fps       = fps
-        self.ctx       = ctx
-        self.banner    = False 
-        self.vfilename = None 
-
-    def frame_number_from_time(self, t):
-        return math.floor(self.fps * t) 
-
-    def time_from_frame_number(self, frame_number):
-        return frame_number / self.fps
-
-    def intro_banner(self):
-        # Generate a text clip
-        w,h = self.ctx.img_width, self.ctx.img_height
-        banner_text = u"%dx%d center %s duration=%d fps=%d" %\
-                       (w, h, str(self.ctx.cmplx_center), self.duration, self.fps)
-
-
-        txt = mpy.TextClip(banner_text, font='Amiri-regular',
-                           color='white',fontsize=12)
-
-        txt_col = txt.on_color(size=(w + txt.w,txt.h+6),
-                          color=(0,0,0), pos=(1,'center'), col_opacity=0.6)
-
-        txt_mov = txt_col.set_position((0,h-txt_col.h)).set_duration(4)
-
-        return mpy.CompositeVideoClip([self.clip,txt_mov]).subclip(0,self.duration)
-
-    def create_snapshot(self):    
-    
-        if not self.vfilename:
-            self.vfilename = "snapshot.gif"
-        
-        self.ctx.next_epoch(-1,self.vfilename)
-
-
-    # --
-    # Do any setup needed prior to running the calculatiion loop 
-    # --
-
-    def setup(self):
-
-        print(self)
-        #print(self.ctx)
-
-
-#    def runTimeline(self, timeline):
-#        movieClip = mpy.VideoClip(self.make_frame, 
-
-    def run(self):
-
-        if self.ctx.snapshot == True:
-            self.create_snapshot()
-            return
-
-        self.ctx.timeline =  self.construct_simple_timeline()
-        # Duration may be less than overall, if this is a sub-clip, so
-        # figure out what our REAL duration is.
-        frame_file_names = []
-        timeline_frame_count = self.ctx.timeline.getTotalSpanFrameCount()
-        for curr_frame_number in range(timeline_frame_count):
-            frame_file_names.append(self.ctx.render_frame_number(curr_frame_number))
-
-        timeline_duration = self.time_from_frame_number(timeline_frame_count)
-
-        self.clip = mpy.ImageSequenceClip(frame_file_names, fps = self.ctx.timeline.framerate)
-
-        if self.ctx.write_video == True:
-            if self.banner:
-                self.clip = self.intro_banner()
-    
-    #        if not self.vfilename:
-    #            self.clip.preview(fps=1) #fps 1 is really all that works
-            if self.vfilename.endswith(".gif"):
-                #print("fps: %s" % str(self.fps))
-                #self.clip.write_gif(self.vfilename, fps=self.fps)
-                print("fps: %s" % str(self.ctx.timeline.framerate))
-                self.clip.write_gif(self.vfilename, fps=self.ctx.timeline.framerate)
-            elif self.vfilename.endswith(".mp4"):
-                self.clip.write_videofile(self.vfilename,
-                                      fps=self.fps, 
-                                      audio=False, 
-                                      codec="mpeg4")
-            else:
-                print("Error: file extension not supported, must be gif or mp4")
-                sys.exit(0)
-
-
-    def construct_simple_timeline(self):
-        """
-        Transitional. 
-
-        Basically, let's construct a timeline from one set of start/end points,
-        as defined by the current context.
-        """
-        overall_zoom_factor = self.ctx.scaling_factor
-        overall_frame_count = self.duration * self.fps  
-        # Integers only, but be generous and round up?
-        if math.floor(overall_frame_count) != overall_frame_count:
-            overall_frame_count = math.floor(overall_frame_count) + 1
-
-        clip_start_frame = 0
-        last_frame_number = overall_frame_count - 1
-        if self.ctx.clip_start_frame != -1:
-            # if start frame is defined, then rely on frame count
-            # also being valid
-            clip_start_frame = self.ctx.clip_start_frame;
-            last_frame_number = clip_start_frame + self.ctx.clip_frame_count - 1  
-
-        # So we know the overall trajectory of window zoom, and we know
-        # the frames we're actually trying to render.
-        rendered_frame_count = last_frame_number - clip_start_frame + 1
-
-        print("clip_start_frame: %d rendered_frame_count: %d" % (clip_start_frame, rendered_frame_count))
-
-        if last_frame_number > overall_frame_count:
-            raise ValueError("Can't construct timeline of %d frames, starting at frame %d, for a sequence of only %d frames (%f seconds at %f fps) (%d)" % (rendered_frame_count, clip_start_frame, overall_frame_count, self.duration, self.fps, last_frame_number))
-
-        if clip_start_frame == 0:
-            start_width_real = self.ctx.cmplx_width
-            start_width_imag = self.ctx.cmplx_height
-        else:
-            # Start frame is 1 or greater, the exponent here should be okay.
-            start_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, clip_start_frame)
-            start_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, clip_start_frame)
-
-        end_width_real = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_width, overall_zoom_factor, last_frame_number)
-        end_width_imag = self.ctx.math_support.scaleValueByFactorForIterations(self.ctx.cmplx_height, overall_zoom_factor, last_frame_number)
-
-        print("Timeline ranges: {%s,%s} -> {%s,%s} in %d frames" % (str(start_width_real), str(start_width_imag), str(end_width_real), str(end_width_imag), rendered_frame_count))
-
-        timeline = DiveTimeline(projectFolderName=self.ctx.project_name, algorithm_name=self.ctx.algorithm_name, framerate=self.fps, frameWidth=self.ctx.img_width, frameHeight=self.ctx.img_height, mathSupport=self.ctx.math_support, sharedCachePath=self.ctx.shared_cache_path)
-         
-        if timeline.algorithm_name == 'julia':
-            # Just evenly divide the waypoints across the time for a simple timeline
-            keyframeCount = len(self.ctx.julia_list)
-            # 2 keyframes over 10 frames = 10 frames per keyframe
-            keyframeSpacing = math.floor(rendered_frame_count / (keyframeCount - 1)) 
-            if keyframeSpacing < 1:
-                raise ValueError("Can't construct julia walk with more waypoints than animation frames")
-
-            span = DiveTimelineSpan(timeline, rendered_frame_count)
-            span.addNewWindowKeyframe(0, start_width_real, start_width_imag)
-            span.addNewWindowKeyframe(rendered_frame_count - 1, end_width_real, end_width_imag)
-            span.addNewUniformKeyframe(0)
-            span.addNewUniformKeyframe(rendered_frame_count - 1)
-
-            span.addNewCenterKeyframe(0, self.ctx.cmplx_center)
-            span.addNewCenterKeyframe(rendered_frame_count - 1, self.ctx.cmplx_center)
-
-            currKeyframeFrameNumber = 0
-            for currJuliaCenter in self.ctx.julia_list:
-                # Recognize when we're at the last item, and jump that keyframe to the final frame
-                if currKeyframeFrameNumber + keyframeSpacing > rendered_frame_count - 1:
-                    currKeyframeNumber = rendered_frame_count - 1
-                
-                span.addNewComplexParameterKeyframe(currKeyframeFrameNumber, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
-                currKeyframeFrameNumber += keyframeSpacing
-
-            timeline.timelineSpans.append(span)
-
-        else:
-            #print("Trying to make span of %d frames" % frame_count)
-            span = timeline.addNewSpanAtEnd(rendered_frame_count, self.ctx.cmplx_center, start_width_real, start_width_imag, end_width_real, end_width_imag)
-    
-            #perspectiveFrame = math.floor(frame_count * .5)
-            #span.addNewTiltKeyframe(perspectiveFrame, 4.0, 1.0) 
-
-        return timeline
-
-    def __repr__(self):
-        return """\
-[MediaView duration {du:f} FPS:{f:s} Output:{vf:s}]\
-""".format(du=self.duration,f=str(self.fps),vf=str(self.vfilename))
-
 
 class DiveTimeline: 
     """
-    Representation of an edit timeline. This maps parameters to specific frame numbers.
-    A timeline also is the keeper of framerate for a frame sequence. (I think?)
-
-    For now, the timeline also maintains the calculation cache for every frame, though
-    this may eventually be the responsibility of a 'Project'
+    Representation of an edit timeline. This maps parameters to specific 
+    times, which can be used for generating all the frames of a sequence.
+ 
+    The first span is a special 'main' span which defines the run time
+    of the timeline, regardless of the properties of any other spans.
 
     Overview of the sequencing classes
     ----------------------------------
     DiveTimeline
     DiveTimelineSpan (Basis for setting keyframes)
     DiveSpanKeyframe
-    - DiveSpanCenterKeyframe
-    - DiveSpanWindowKeyframe
-    - DiveSpanUniformKeyframe
-    - DiveSpanTiltKeyframe
+    - DiveSpanCustomKeyframe (not implemented yet)
    
-    There are currently only 3 'tracks' of keyframes (for complex 
-    center, window base sizes, and perspective).  Keyframes 
-    currently all live on integer frame numbers.
-
     # TODO: Seems like algorithm should be a per-span property, instead of
     # per-timeline, doesn't it?
     """
@@ -365,10 +85,16 @@ class DiveTimeline:
                 #'smooth': Smooth,
         }
 
-    def __init__(self, projectFolderName, algorithm_name, framerate, frameWidth, frameHeight, mathSupport):
+    @staticmethod
+    def build_from_json_and_params(json, params):
+        newTimeline = DiveTimeline(params['project_name'], json['algorithmName'], float(json['framerate']), int(json['frameWidth']), int(json['frameHeight']), None)
+        newTimeline.__setstate__(json)
+        return newTimeline 
+
+    def __init__(self, projectFolderName, algorithmName, framerate, frameWidth, frameHeight, mathSupport):
         
         self.projectFolderName = projectFolderName
-        self.algorithm_name = algorithm_name
+        self.algorithmName = algorithmName
 
         self.framerate = float(framerate)
         self.frameWidth = int(frameWidth)
@@ -379,220 +105,336 @@ class DiveTimeline:
         # No definition made yet for edit gaps, so let's just enforce adjacency of ranges for now.
         self.timelineSpans = []
 
+    def getFramesInDuration(self, duration):
+        # Use 6 decimal places for rounding down, but otherwise, round up.
+        # 1 second *  24 frames / second = 24 frames
+        # .041 seconds * 24 frames / second = .984 frames (should be 1)
+        # .042 seconds * 24 frames / second = 1.008 frames (should be 2)
+        # .041666 * 24 frames / second = .999984 frames (should be 1)
+        # .04166666 * 24 frames / second = .99999984 frames (should be 1)
+        # .04166667 * 24 frames / second = 1.00000008 frames (should be 1)
+        # .0416667 * 24 frames / second = 1.0000008 frames (should be 2)
+        rawCount = (duration / 1000) * self.framerate 
+        framesCount = int(rawCount)
+        remainderCount = rawCount - framesCount
+
+        if remainderCount != 0.0 and round(remainderCount,6) != 0.0:
+            framesCount += 1
+
+        return framesCount
+
+    def getTimeForFrameNumber(self, frameNumber):
+        # Want to return max time when within 1 frame, right?  To be nice.
+        # When 9 frames, the frames are 0-8
+        # That's 9 positions, with 8 deltas.
+        rawTime = frameNumber * 1000 * (1 / self.framerate)
+        return int(rawTime)
+
+    def getMainSpan(self):
+        if len(self.timelineSpans) == 0:
+            return None
+        else:
+            return self.timelineSpans[0]
+
     def getTotalSpanFrameCount(self):
-        seenFrameCount = 0
-        for currSpan in self.timelineSpans:
-            seenFrameCount += currSpan.frameCount
-        return seenFrameCount
+        # Duration 
+        # Span durations are exclusive, so a duration of 100 means it covers 0-99.
+        mainSpan = self.getMainSpan()
+        if mainSpan != None:
+            return self.getFramesInDuration(mainSpan.duration)
+        else:
+            return 0
 
-    def addNewSpanAtEnd(self, frameCount, center, startWidthReal, startWidthImag, endWidthReal, endWidthImag):
-        """
-        Constructs a new span, and adds it to the end of the existing span list
-
-        Also adds center keyframes (that is, keyframes at the end of the span, which
-        set the values for the complex center of the image), and window width keyframes 
-        to the start and end of the new span.
-
-        Apparently also adding perspective keyframes too.
-        """
-        span = DiveTimelineSpan(self, frameCount)
-        span.addNewCenterKeyframe(0, center, 'quadratic-to', 'quadratic-to')
-        span.addNewCenterKeyframe(frameCount - 1, center, 'quadratic-to', 'quadratic-to')
-        span.addNewWindowKeyframe(0, startWidthReal, startWidthImag)
-        span.addNewWindowKeyframe(frameCount - 1, endWidthReal, endWidthImag)
-
-        # Setting uniform perspective this way kinda taped on as a solution, but not yet 
-        # sure how to more gracefully set up perspective keyframes.
-        span.addNewUniformKeyframe(0)
-        span.addNewUniformKeyframe(frameCount-1)
-
+    def addNewSpan(self, time, duration):
+        span = DiveTimelineSpan(self, time, duration)
         self.timelineSpans.append(span)
+        return span         
 
-        return span
-
-    def getSpanForFrameNumber(self, frameNumber):
-        """
-        Seems like I should cache or memoize this, to keep from searching for every frame,
-        or at least binary search it, but I'm allergic to optimizing before profiling, 
-        so 'slow' search it is for now.
-        
-        10 frames -> {0,9}
-        3 frames -> {10,12}
-        10 frames -> {13,22}
-        """
-        nextSpanFirstFrame = 0
+    def getSpansForTime(self, targetTime):
+        overlappingSpans = []
         for currSpan in self.timelineSpans:
-            nextSpanFirstFrame += currSpan.frameCount
-            if frameNumber < nextSpanFirstFrame:
-                currSpan.lastObservedStartFrame = nextSpanFirstFrame - currSpan.frameCount
-                return currSpan
-
-        return None # Went past the end without finding a valid span, so it's too high a frame number
-
-    def getMeshForFrame(self, frameNumber):
+            if currSpan.time <= targetTime and (currSpan.time + currSpan.duration) >= targetTime:
+                overlappingSpans.append(currSpan)
+        return overlappingSpans
+ 
+    def getMeshForTime(self, targetTime):
         """
         Calculate a discretized 2d plane of complex points based on spans and keyframes in this timeline.
 
-        # Haven't revisited this logic since building the MeshGenerator objects...
         Order of operations:
-         1.) base_complex_center
-         2.) distortions on base_complex_center (probably never really want this, but hey, it makes sense here)
-         3.) MeshGenerator distortions?
-         4.) overall distortions on the calculated 2D mesh
-
-         Procedurally calculate the discretized 2D plane of complex points, based on all
-         the known keyframes and modifiers for a given frame number...
-
-         # complexCenter, complexWidth, imaginaryWidth 
-         
+         1.) base window definitions 
+         2.) distortions on generators
+         3.) overall distortions on the calculated 2D mesh
         """
-        # First step is to figure out which span the target frame belongs to
-        targetSpan = self.getSpanForFrameNumber(frameNumber)
-        if not targetSpan:
-            raise IndexError("Frame number '%d' is out of range for this timeline" % frameNumber)
+        targetSpans = self.getSpansForTime(targetTime)
 
-        # Within this span, find the closest upstream and closest downstream keyframes
-        # Pretty sure we require least 2 keyframes defined for every span (start and end), so 
-        # this should work out.
-        localFrameNumber = frameNumber - targetSpan.lastObservedStartFrame
-        (previousCenterKeyframe, nextCenterKeyframe) = targetSpan.getKeyframesClosestToFrameNumber('center', localFrameNumber) 
-        #print("centers %s -> %s" % (str(previousCenterKeyframe.center), str(nextCenterKeyframe.center)))
+        # Enforce that the 'main' span (the first span) at least, was returned 
+        if len(targetSpans) == 0 or targetSpans[0] != self.timelineSpans[0]:
+            raise IndexError("Time '%d' (milliseconds) is out of range for this timeline" % targetTime)
 
-        meshCenterValue = targetSpan.interpolateCenterValueBetweenKeyframes(localFrameNumber, previousCenterKeyframe, nextCenterKeyframe)
-        #print("  interpolatedCenter: %s" % meshCenterValue)
+        # Build up the set of parameter values, as interpolated between nearest
+        # surrounding keyframes.
+        # Take one entire span at a time, before moving to the next span.
+        # Deny a second span setting an already existing parameter directly.
+        # To allow a following span to adjust the setting, its target must be 
+        # named as 'parameterName_modifiyPlus' or 'parameterName_modifyTimes'.
+        plusSuffix = "_modifyPlus"
+        timesSuffix = "_modifyTimes"
 
-        (previousWindowKeyframe, nextWindowKeyframe) = targetSpan.getKeyframesClosestToFrameNumber('window', localFrameNumber) 
-        #print("windows %s,%s -> %s,%s" % (str(previousWindowKeyframe.realWidth), str(previousWindowKeyframe.imagWidth), str(nextWindowKeyframe.realWidth), str(nextWindowKeyframe.imagWidth)))
+        parameterValues = {}
+        for currSpan in targetSpans:
+            spanParamValues = currSpan.getParamValuesAtTime(targetTime, parameterValues)
+            for newParamName in spanParamValues:
+                #print(f"Looking at parameter name \"{newParamName}\"")
+                if newParamName in parameterValues:
+                    raise ValueError(f"Spans can't overwrite existing parameters, so can't set the value of \"{newParamName}\" from \"{parameterValues[newParamName]}\" to \"{spanParamValues[newParamName]}\".  You might be trying to modify an existing value, in which case it could be done with a parameter named \"{newParamName}_modifyPlus\".")
+              
+                elif newParamName.endswith(plusSuffix):
+                    realParamName = newParamName[:-len(plusSuffix)]
+                    #print(f"PLUS maps to \"{realParamName}\"")
+                    if realParamName not in parameterValues:
+                        print(f"WARNING - span's attempt to modify \"{realParamName}\" failed, because it wasn't previously defined")
+                    else:
+                        parameterValues[realParamName] += spanParamValues[newParamName]
+                elif newParamName.endswith(timesSuffix):
+                    realParamName = newParamName[:-len(timesSuffix)]
+                    #print(f"TIMES maps to \"{realParamName}\"")
+                    if realParamName not in parameterValues:
+                        print(f"WARNING - span's attempt to modify \"{realParamName}\" failed, because it wasn't previously defined")
+                    else:
+                        parameterValues[realParamName] *= spanParamValues[newParamName]
+                else:
+                    #print(f"just assigning param \"{newParamName}\"")
+                    parameterValues[newParamName] = spanParamValues[newParamName]
 
-        (baseWidthReal, baseWidthImag) = targetSpan.interpolateWindowValuesBetweenKeyframes(localFrameNumber, previousWindowKeyframe, nextWindowKeyframe)
+        # Use the parameter values needed for constructing the mesh window,
+        # and REMOVE them from the parameter list, leaving only 'extra' parameters.
+        #
+        # I suppose just trying to access non-existent params here will be enough
+        # to trigger a runtime warning if they weren't defined, so not adding
+        # any extra guards for now.
+        meshCenter = parameterValues['meshCenter']
+        del(parameterValues['meshCenter'])
 
-        #print("  interpolatedWidths: %s, %s" % (str(baseWidthReal), str(baseWidthImag)))
+        meshRealWidth = parameterValues['meshRealWidth']
+        del(parameterValues['meshRealWidth'])
 
-        (previousPerspectiveKeyframe, nextPerspectiveKeyframe) = targetSpan.getKeyframesClosestToFrameNumber('perspective', localFrameNumber)
+        meshImagWidth = parameterValues['meshImagWidth']
+        del(parameterValues['meshImagWidth'])
 
-        # More complicated with perspective keyframes, right?
-        # Which mesh generator do we use - Uniform or Tilt?
+        # Not strictly required, and 0.0 tilt (uniform) is assumed if not specified.
+        meshRealTilt = 0.0
+        meshImagTilt = 0.0
+        if 'meshRealTilt' in parameterValues:
+            meshRealTilt = parameterValues['meshRealTilt']
+            del(parameterValues['meshRealTilt'])
+        if 'meshImagTilt' in parameterValues:
+            meshImagTilt = parameterValues['meshImagTilt']
+            del(parameterValues['meshImagTilt'])
+        
+        realMeshGenerator = None
+        imagMeshGenerator = None
 
-        # Might have to interpolate the (widthFactor,heightFactor) of a tilt keyframe...
-        # If both keyframes are uniform, then we don't actually interpolate
-        # Hacky isisntance, but whatcha gonna do?
-        previousIsUniform = isinstance(previousPerspectiveKeyframe, DiveSpanUniformKeyframe)
-        nextIsUniform = isinstance(nextPerspectiveKeyframe, DiveSpanUniformKeyframe)
-        if previousIsUniform and nextIsUniform:
-            # Might feel like "baseImagWidth" is a typo (because it's distributed vertically), but
-            # it's the 'imaginary width', even though we use it as the vertical element in the final mesh
-            realMeshGenerator = mesh.MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal)
-            imagMeshGenerator = mesh.MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag)
+        #print(f"parameters near the end of getMeshForTime(): \"{parameterValues}\"")
+
+        if meshRealTilt == 0.0:
+            realMeshGenerator = mesh.MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenter.real, baseWidth=meshRealWidth)
         else:
-            (widthTiltFactor, heightTiltFactor) = self.interpolateTiltFactorsBetweenPerspectiveKeyframes(localFrameNumber, previousPerspectiveKeyframe, nextPerspectiveKeyframe)
+            realMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenter.real, baseWidth=meshRealWidth, tiltAngle=float(meshRealTilt))
 
-            # Tilt factor is the multiplier applied to the range.
-            realMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='width', valuesCenter=meshCenterValue.real, baseWidth=baseWidthReal, tiltFactor=widthTiltFactor)
-            imagMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenterValue.imag, baseWidth=baseWidthImag, tiltFactor=heightTiltFactor)
- 
-        extraFrameParams = {}
-        parameterKeyframePairs = targetSpan.getParameterKeyframePairsClosestToFrameNumber('complex', localFrameNumber)
-        # parameterKeyframePairs['paramName'] -> [(previousKeyframe, nextKeyframe) , (previousKeyframe, nextKeyframe)...]
-        for currParamName, currKeyframePairs in parameterKeyframePairs.items():
-            for (leftKeyframe, rightKeyframe) in currKeyframePairs:
-                extraFrameParams[currParamName] = targetSpan.interpolateComplexBetweenParameterKeyframes(localFrameNumber, leftKeyframe, rightKeyframe) 
-            
-        parameterKeyframePairs = targetSpan.getParameterKeyframePairsClosestToFrameNumber('float', localFrameNumber)
-        # parameterKeyframePairs['paramName'] -> [(previousKeyframe, nextKeyframe) , (previousKeyframe, nextKeyframe)...]
-        for currParamName, currKeyframePairs in parameterKeyframePairs.items():
-            for (leftKeyframe, rightKeyframe) in currKeyframePairs:
-                extraFrameParams[currParamName] = self.interpolateFloatBetweenParameterKeyframes(localFrameNumber, leftKeyframe, rightKeyframe) 
+        if meshImagTilt == 0.0:
+            imagMeshGenerator = mesh.MeshGeneratorUniform(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenter.imag, baseWidth=meshImagWidth)
+        else:
+            imagMeshGenerator = mesh.MeshGeneratorTilt(mathSupport=self.mathSupport, varyingAxis='height', valuesCenter=meshCenter.imag, baseWidth=meshImagWidth, tiltAngle=float(meshImagTilt))
+        
+        #print(f"Making mesh with realWidth {meshRealWidth} and imagWidth {meshImagWidth}")   
+        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, realMeshGenerator, imagMeshGenerator, self.mathSupport, parameterValues)
 
-        diveMesh = mesh.DiveMesh(self.frameWidth, self.frameHeight, realMeshGenerator, imagMeshGenerator, self.mathSupport, extraFrameParams)
-        #print (diveMesh)
+        #print(diveMesh)
         return diveMesh
 
-    def interpolateTiltFactorsBetweenPerspectiveKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
+    def __getstate__(self):
+        """ Pickle encoding helper, generates simply encoded keyframes. """
+        pickleInfo = self.__dict__.copy()
+
+        # Not storing project folder in timeline file, because
+        # that's parameters and param file's responsibility
+        del(pickleInfo['projectFolderName'])
+
+        # Going to encode both the class name of the MathSupport, and
+        # the 'precision' it was apparently set at, making a string
+        # like "DiveMathSupportFlint:2048".
+        mathSupportString = type(self.mathSupport).__name__ + ":" + str(self.mathSupport.precision())
+        pickleInfo['mathSupport'] = mathSupportString
+       
+        convertedSpans = []
+        for currSpan in self.timelineSpans:
+            convertedSpans.append(currSpan.__getstate__())
+        pickleInfo['timelineSpans'] = convertedSpans
+
+        return pickleInfo
+
+    def __setstate__(self, state):
         """
-        First part of this repeats some hacky isinstance stuff.
+        (Just like in divemesh.py...)
+         A new MathSupport sublass is instantiated during un-pickling.
+        This can be a problem if you're relying on specific precision settings, 
+        because the only MathSupport configuration that's handled here
+        is setting the precision from the encode classname:precision string.
 
-        But this time, we know they BOTH won't be uniform, else we never would try to
-        interpolate between them.
+        It *is* important to set the precision before loading any numbers, or
+        else the numbers may be clipped to lower precision than what they 
+        were saved at.
         """
-        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
-            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
+        mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
+                "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+                "DiveMathSupport":fm.DiveMathSupport}
 
-        # Hacky isisntance, but whatcha gonna do?
-        leftIsUniform = isinstance(leftKeyframe, DiveSpanUniformKeyframe)
-        rightIsUniform = isinstance(rightKeyframe, DiveSpanUniformKeyframe)
+        (mathSupportClassName, precisionString) = state['mathSupport'].split(':')
+        #print("mathSupport reads as: %s" % mathSupportClassName)
 
-        leftFrameNumber = leftKeyframe.lastObservedFrameNumber
-        rightFrameNumber = rightKeyframe.lastObservedFrameNumber
+        self.mathSupport = mathSupportClasses[mathSupportClassName]()
+        self.mathSupport.setPrecision(int(precisionString))
+        #print("mathSupport is: %s" % str(self.mathSupport))
+        #print(f"timeline's mathSupport set to {self.mathSupport.digitsPrecision()} digits")
 
-        # Use 1.0 as default widthFactor and heightFactor for uniform keyframes.
-        if leftIsUniform:
-            transitionType = rightKeyframe.transitionIn
-            leftWidthValue = 1.0
-            leftHeightValue = 1.0
-            rightWidthValue = rightKeyframe.widthFactor
-            rightHeightValue = rightKeyframe.heightFactor 
-        elif rightIsUniform:
-            transitionType = leftKeyframe.transitionOut
-            leftWidthValue = leftKeyframe.widthFactor
-            leftHeightValue = leftKeyframe.heightFactor
-            rightWidthValue = 1.0
-            rightHeightValue = 1.0
-        else: # both are not uniform
-            # TODO: probably should enforce same transition type or crash here, but
-            # I don't feel like it at the moment.
-            transitionType = leftKeyframe.transitionOut
-            leftWidthValue = leftKeyframe.widthFactor
-            leftHeightValue = leftKeyframe.heightFactor
-            rightWidthValue = rightKeyframe.widthFactor
-            rightHeightValue = rightKeyframe.heightFactor
+        #self.projectFolderName = state['projectFolderName']
+        self.algorithmName = state['algorithmName']
+        self.framerate = float(state['framerate'])
+        self.frameWidth = int(state['frameWidth'])
+        self.frameHeight = int(state['frameHeight'])
 
-        widthTiltFactor = self.mathSupport.interpolate(transitionType, leftFrameNumber, leftWidthValue, rightFrameNumber, rightWidthValue, frameNumber)
-        heightTiltFactor = self.mathSupport.interpolate(transitionType, leftFrameNumber, leftHeightValue, rightFrameNumber, rightHeightValue, frameNumber)
+        for storedSpanInfo in state['timelineSpans']:
+            newSpan = self.addNewSpan(storedSpanInfo['time'], storedSpanInfo['duration'])
+            newSpan.__setstate__(storedSpanInfo)
 
-        return(widthTiltFactor, heightTiltFactor)
-
-# Maybe these belong in timeline span?
-#    def getFrameNumberForTimecode(self, timecode):
-#        return math.floor(
-#    def getTimecodeForFrameNumber(self, frame_number):
-
-    def __repr__(self):
-        return """\
-[DiveTimeline Project:{proj} framerate:{f}]\
-""".format(proj=self.title,f=self.framerate)
 
 class DiveTimelineSpan:
     """
-    # ?(Can be used to observe/calculate n-1 zoom factors.)?
+
     """
-    def __init__(self, timeline, frameCount):
+    def __init__(self, timeline, timePosition, duration):
         self.timeline = timeline
-        self.frameCount = int(frameCount)
+        self.time = int(timePosition)
+        self.duration = int(duration)
 
-        # Only a single 'track' for each keyframe type to begin with, represented
-        # just as a keyframe lookup for each track.  Being able to stack multiples of
-        # similar-typed keyframes will probably be helpful in the long run.
-        self.centerKeyframes = {}
-        self.windowKeyframes = {}
-        self.perspectiveKeyframes = {}
+        # Only a single 'track' for each keyframe type, so each named
+        # parameter can only have one keyframe for one time stamp within
+        # a single span.  Spans can layer though.
+        self.parameterKeyframes = defaultdict(dict)
+        # parameterKeyframes['meshRealWidth'][2300] = keyframeObject
 
-        self.complexParameterKeyframes = defaultdict(dict)
-        self.floatParameterKeyframes = defaultdict(dict)
-        # parameterKeyframes['julia_center'][25] = complex(0,0)
-        # parameterKeyframes['julia_center'][40] = complex(0,0)
+    def getParamValuesAtTime(self, targetTime, currentParameters):
+        """
+        The returned set of parameters are only the parameters from this 
+        span, and do not automatically include values from the
+        currentParameters input.
+        
+        Current parameters are used only as additional information for calculations.
+        """
+        answerParameters = {}
+    
+        keyframesList = self.getKeyframesClosestToTime(targetTime)
+    
+        for (parameterName, previousKeyframe, nextKeyframe) in keyframesList:
+            # TODO: Would like to enforce matching transitions, rather than
+            # just using one keyframe's transition type.  But, that kinda requires
+            # a more compassionate implementation of adding keyframes which validates
+            # surrounding types and values.
+            if isinstance(previousKeyframe, DiveSpanCustomKeyframe) and isinstance(nextKeyframe, DiveSpanCustomKeyframe):
+                # Keyframes are 'call-a-function' type
+    
+                # I guess, only the first keyframe's function is used?
+                # When keyframes were retrieved, their time position was stashed.
+                # Calculate how far along the target time is between the keyframes
+                targetPercentBetweenKeyframes = ((target - prev.time) / (next.time - prev.time))
+                answerParameters[parameterName] = previousKeyframe.calculateValueForTime(targetTime, targetPercentBetweenKeyframes, currentParameters)
+            else:
+                #  Keyframes are 'values-to-interpolate' type
+                answerParameters[parameterName] = self.interpolateBetweenKeyframes(targetTime, previousKeyframe, nextKeyframe)
+   
+        print(answerParameters)
+ 
+        return answerParameters
+    
+    def getKeyframesClosestToTime(self, targetTime):
+        answerKeyframes = []
+        # answerKeyframes[(paramName, previousKeyframe, nextKeyframe),...]
 
-        # Currently, not allowing keyframes to exist outside of the span, even though
-        # that is often helpful for defining pleasing transitions.
-        # Currently, also not allowing keyframes to exist at non-frame targets, which
-        # might lead to some alignment frustrations, because sub-frame calculations
-        # are probably kinda important.
+        # parameterKeyframes['meshRealWidth'][2300] = keyframeObject
+        for currParamName, keyframesByTime in self.parameterKeyframes.items(): 
+            #print(f"Looking at {currParamName}")
 
-        self.lastObservedStartFrame = 0 # To stash frame offset when extracted from Timeline
+            # Direct hit 
+            if targetTime in keyframesByTime:
+                targetKeyframe = keyframesByTime[targetTime]
+                targetKeyframe.lastObservedTime = targetTime
+                answerKeyframes.append((currParamName, targetKeyframe, targetKeyframe))
+                continue
+
+            previousKeyframe = None
+            nextKeyframe = None
+            for currTime in sorted(keyframesByTime.keys()):
+                if currTime <= targetTime:
+                    previousKeyframe = keyframesByTime[currTime]
+                    previousKeyframe.lastObservedTime = currTime
+                if currTime > targetTime:
+                    nextKeyframe = keyframesByTime[currTime]
+                    nextKeyframe.lastObservedTime = currTime
+                    break # Past the sorted range, so done looking
+  
+            if previousKeyframe != None and nextKeyframe != None:
+                answerKeyframes.append((currParamName, previousKeyframe, nextKeyframe))
+
+        #print("found: %s" % str(answerKeyframes))
+        return answerKeyframes
+
+    def interpolateBetweenKeyframes(self, targetTime, leftKeyframe, rightKeyframe):
+        """
+        Relies heavily on the stashed/cached 'lastObservedTime' of a keyframe
+        """
+        print("interpolating %s -> %s at time %s" % (str(leftKeyframe), str(rightKeyframe), str(targetTime)))
+
+        if targetTime < leftKeyframe.lastObservedTime or targetTime > rightKeyframe.lastObservedTime:
+            raise IndexError("Time '%d' isn't between 2 keyframes at '%d' and '%d'" % (targetTime, leftKeyframe.lastObservedTime, rightKeyframe.lastObservedTime))
+
+        # Let's just be lenient for now?
+        ## Enforce that left keyframe's transitionOut should match right
+        ##  keyframe's transitionIn
+        #if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
+        #    raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
+        transitionType = leftKeyframe.transitionOut
+        mathSupport = self.timeline.mathSupport
+
+        if leftKeyframe.dataType == 'float':
+            # Recognize when left and right are the same, and dont' calculate anything.
+            if leftKeyframe == rightKeyframe:
+                return leftKeyframe.value
+
+            return mathSupport.interpolate(transitionType, leftKeyframe.lastObservedTime, leftKeyframe.value, rightKeyframe.lastObservedTime, rightKeyframe.value, targetTime)
+        elif leftKeyframe.dataType == 'complex':
+            # Recognize when left and right are the same, and dont' calculate anything.
+            if leftKeyframe == rightKeyframe:
+                return leftKeyframe.value
+            interpolatedReal = mathSupport.interpolate(transitionType, leftKeyframe.lastObservedTime, leftKeyframe.value.real, rightKeyframe.lastObservedTime, rightKeyframe.value.real, targetTime)
+            interpolatedImag = mathSupport.interpolate(transitionType, leftKeyframe.lastObservedTime, leftKeyframe.value.imag, rightKeyframe.lastObservedTime, rightKeyframe.value.imag, targetTime)
+            return mathSupport.createComplex(interpolatedReal, interpolatedImag)
+        elif leftKeyframe.dataType == 'int':
+            # Recognize when left and right are the same, and dont' calculate anything.
+            if leftKeyframe == rightKeyframe:
+                return int(leftKeyframe.value)
+
+            return int(float(mathSupport.interpolate(transitionType, leftKeyframe.lastObservedTime, leftKeyframe.value, rightKeyframe.lastObservedTime, rightKeyframe.value, targetTime)))
+        else:
+            raise ValueError(f"Can't perform interpolation for data type \"{leftKeyframe.dataType}\"")
+
 
     ####
-    # TODO: All of these helper functions need to perform a modification of upstream and downsatream
-    # keyframes when forcing addition, to make sure the transition types are all in order.
-    # When creating a new keyframe, default is to inherit the lead-in and lead-out interpolators of the existing span.
+    # TODO: All of these helper functions need to perform a modification 
+    # of upstream and downstream keyframes when forcing addition, to make
+    # sure the transition types are all in order.
+    # When creating a new keyframe, default is to inherit the lead-in and 
+    # lead-out interpolators of the existing span.
     #
     # So, if it's:
     #  |           (lin)             |  (default all linear)
@@ -606,761 +448,100 @@ class DiveTimelineSpan:
     #  |  +(log-to)K(log-from)       |
     #  | (log-to)  K    (log-from)   |
     #
-    # When trying to fill the range, both adjacent keyframes will agree (because it's a span property).
-    # I think this means when setting a keyframe, the upstream and downstream keyframes are ALWAYS SET
-    # to be consistent with the newly inserted keyframe. (either that, or create single-point-of-reference span structure?)
-    #
-    # BaseRangeSpan(startKey, endKey, type=lin)
-    # +Keyframe(log-from) =>
-    # BaseRangeSpan(startKey, keyframe, type=lin) + BaseRangeSpan(keyframe, endkey, type=log-from)
-    #
-    # Now, some asshole wants to define a 'speed' for a section...
-    # This will drag some keyframes along, up to a point, where it can.
-    # It might even just warn if reverse is observed?
-    #  
-    # Looks like we need special handling for when setting a keyframe on top of an existig keyframe, right?
-    # If existing keyframe at the new keyframe frane number, and new keyframe is unspecified, then
-    # keep the interpolators as-is.
 
-    def addNewCenterKeyframe(self, frameNumber, centerValue, transitionIn='quadratic-to', transitionOut='quadratic-to'):
-        # TODO: should probably gracefully handle stomping an existing keyframe, right?
-        newKeyframe = DiveSpanCenterKeyframe(self, centerValue, transitionIn, transitionOut)
-        self.centerKeyframes[frameNumber] = newKeyframe
+    def addNewParameterKeyframe(self, targetTime, dataType, name, value, transitionIn='linear', transitionOut='linear'):
+        newKeyframe = DiveSpanKeyframe(self, dataType, value, transitionIn, transitionOut)
+        self.parameterKeyframes[name][targetTime] = newKeyframe 
         return newKeyframe
 
-    def addNewWindowKeyframe(self, frameNumber, realWidth, imagWidth, transitionIn='root-to', transitionOut='root-to'):
-        newKeyframe = DiveSpanWindowKeyframe(self, realWidth, imagWidth, transitionIn, transitionOut)
-        self.windowKeyframes[frameNumber] = newKeyframe
-        return newKeyframe
+    def renderKeyframesAsStringList(self):
+        # First shovel all values into the array, then sort by time
+        # and re-assign the time to also be a string.
+        answerList = []
+        for currParamName, keyframesByTime in self.parameterKeyframes.items():
+            for currTime, currKeyframe in keyframesByTime.items():
+                # TODO: should have at least 2 types of keyframes, one for
+                # values, and one for functions, but starting with JUST values...
+                answerList.append([currTime, currParamName, currKeyframe.dataType, str(currKeyframe.value), currKeyframe.transitionIn, currKeyframe.transitionOut])
 
-    def addNewUniformKeyframe(self, frameNumber, transitionIn='quadratic-to', transitionOut='quadratic-to'):
-        newKeyframe = DiveSpanUniformKeyframe(self, transitionIn, transitionOut)
-        self.perspectiveKeyframes[frameNumber] = newKeyframe
-        return newKeyframe
+        answerList = sorted(answerList)
+        for currItem in answerList:
+            currItem[0] = str(currItem[0])
 
-    def addNewTiltKeyframe(self, frameNumber, widthFactor, heightFactor, transitionIn='quadratic-to-from', transitionOut='quadratic-to-from'):
-        newKeyframe = DiveSpanTiltKeyframe(self, widthFactor, heightFactor, transitionIn, transitionOut)
-        self.perspectiveKeyframes[frameNumber] = newKeyframe
-        return newKeyframe
+        return answerList
 
-    def addNewComplexParameterKeyframe(self, frameNumber, name, value, transitionIn='linear', transitionOut='linear'):
-        # TODO: Would like to be unable to assign keyframes with identical
-        # names to both the complex and float parameter sets.
-        newKeyframe = DiveSpanParameterKeyframe(self, value, transitionIn, transitionOut)
-        self.complexParameterKeyframes[name][frameNumber] = newKeyframe
-        # parameterKeyframes['julia_center'][40] = complex(0,0)
-        return newKeyframe
+    def setKeyframesFromStringList(self, keyframesList):
+        # Completely overwrite any existing keyframes
+        self.parameterKeyframes = defaultdict(dict)
 
-    def addNewFloatParameterKeyframe(self, frameNumber, name, value, transitionIn='linear', transitionOut='linear'):
-        newKeyframe = DiveSpanParameterKeyframe(self, value, transitionIn, transitionOut)
-        self.floatParameterKeyframes[name][frameNumber] = newKeyframe
-        # parameterKeyframes['a_value'][40] = 1.234
-        return newKeyframe
+        mathSupport = self.timeline.mathSupport
+        # TODO: Again, should have at least 2 types of keyframes, one for
+        # values, and one for functions, but starting with JUST values...
+        for (timeString, paramName, dataType, valueString, transitionIn, transitionOut) in keyframesList:
+            loadedValue = None
+            if dataType == 'float':
+                loadedValue = mathSupport.createFloat(valueString)
+            elif dataType == 'complex':
+                loadedValue = mathSupport.createComplex(valueString)
+            elif dataType == 'int':
+                loadedValue = int(valueString)
 
-    def getKeyframesClosestToFrameNumber(self, keyframeType, frameNumber):
-        """
-        Returns a tuple of keyframes, which are the nearest left and right keyframes for the frameNumber.
-        When the frameNumber directly has a keyframe, the same keyframe is returned for both values.
+            self.parameterKeyframes[paramName][int(float(timeString))] = DiveSpanKeyframe(self, dataType, loadedValue, transitionIn, transitionOut) 
 
-        Important to remember to bless the 'lastObservedFrameNumber' into the keyframe.
-        """
-        typeOptions = ['center', 'window', 'perspective']
-        if keyframeType not in typeOptions:
-            raise ValueError("keyframeType must be one of (%s)" % ", ".join(typeOptions))
+    def __getstate__(self):
+        """ Pickle encoding helper, generates all string arrays and hashes. """
+        spanState = {}
+        spanState['time'] = str(self.time)
+        spanState['duration'] = str(self.duration)
+        spanState['keyframes'] = self.renderKeyframesAsStringList()
+        return spanState
 
-        if frameNumber >= self.frameCount:
-            raise IndexError("Requested %s keyframe frame number '%d' is out of range for a span that's '%d' frames long" % (keyframeType, frameNumber, self.frameCount))
-
-        keyframeHash = None
-        if keyframeType == 'perspective':
-            keyframeHash = self.perspectiveKeyframes
-        elif keyframeType == 'window':
-            keyframeHash = self.windowKeyframes
-        else: # keyframeType == 'center':
-            keyframeHash = self.centerKeyframes
-
-        # Direct hit 
-        # (really should have non-integer locations for keyframes, shouldn't we?)
-        if frameNumber in keyframeHash:
-            targetKeyframe = keyframeHash[frameNumber]
-            targetKeyframe.lastObservedFrameNumber = frameNumber
-            return (targetKeyframe, targetKeyframe)
-
-        previousKeyframe = None
-        nextKeyframe = None
-        for currFrameNumber in sorted(keyframeHash.keys()):
-            if currFrameNumber <= frameNumber:
-                previousKeyframe = keyframeHash[currFrameNumber]
-                previousKeyframe.lastObservedFrameNumber = currFrameNumber
-            if currFrameNumber > frameNumber:
-                nextKeyframe = keyframeHash[currFrameNumber]
-                nextKeyframe.lastObservedFrameNumber = currFrameNumber
-                break # Past the sorted range, so done looking
-
-        return (previousKeyframe, nextKeyframe)
-
-    def getParameterKeyframePairsClosestToFrameNumber(self, keyframeType, frameNumber):
-        typeOptions = ['float', 'complex']
-        if keyframeType not in typeOptions:
-            raise ValueError("keyframeType must be one of (%s)" % ", ".join(typeOptions))
-
-        if frameNumber >= self.frameCount:
-            raise IndexError("Requested %s keyframe frame number '%d' is out of range for a span that's '%d' frames long" % (keyframeType, frameNumber, self.frameCount))
-
-        outerKeyframeHash = None
-        if keyframeType == 'complex':
-            outerKeyframeHash = self.complexParameterKeyframes
-        else: #keyframeType == 'float':
-            outerKeyframeHash = self.floatParameterKeyframes
-
-
-        answerKeyframes = defaultdict(list) 
-        # answerKeyframes['paramName'] -> [(previousKeyframe, nextKeyframe) , (previousKeyframe, nextKeyframe)...]
-
-        for currParamName, keyframeHash in outerKeyframeHash.items():
-            #print("Looking at %s" % currParamName)
-            # Direct hit 
-            if frameNumber in keyframeHash:
-                targetKeyframe = keyframeHash[frameNumber]
-                targetKeyframe.lastObservedFrameNumber = frameNumber
-                answerKeyframes[currParamName].append((targetKeyframe, targetKeyframe))
-                continue
-    
-            previousKeyframe = None
-            nextKeyframe = None
-            for currFrameNumber in sorted(keyframeHash.keys()):
-                if currFrameNumber <= frameNumber:
-                    previousKeyframe = keyframeHash[currFrameNumber]
-                    previousKeyframe.lastObservedFrameNumber = currFrameNumber
-                if currFrameNumber > frameNumber:
-                    nextKeyframe = keyframeHash[currFrameNumber]
-                    nextKeyframe.lastObservedFrameNumber = currFrameNumber
-                    break # Past the sorted range, so done looking
-  
-            if previousKeyframe != None and nextKeyframe != None:
-                answerKeyframes[currParamName].append((previousKeyframe, nextKeyframe))
-
-        #print("found: %s" % str(answerKeyframes))
-        return answerKeyframes
-
-    def interpolateCenterValueBetweenKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
-        """
-        Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
-        """
-        #print("interpolating %s -> %s at frame %s" % (str(leftKeyframe), str(rightKeyframe), str(frameNumber)))
-
-        # Recognize when left and right are the same, and dont' calculate anything.
-        if leftKeyframe == rightKeyframe:
-            return leftKeyframe.center
-
-        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
-            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
-
-        # May want to consider 'close' rather than equal for the center equivalence check.
-        if leftKeyframe.center == rightKeyframe.center:
-            return leftKeyframe.center
-
-        # Enforce that left keyframe's transitionOut should match right keyframe's transitionIn
-        if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
-            raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
-        transitionType = leftKeyframe.transitionOut
-
-        # Python scopes seep like this, right? Just use the value later?
-        #
-        # And I kept all these separate, because I'm prety sure there will be more
-        # interpolation-specific parameters needed when all's said and done.
-        interpolatedReal = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.real, frameNumber)
-        interpolatedImag = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.center.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.center.imag, frameNumber)
-
-        return self.timeline.mathSupport.createComplex(interpolatedReal, interpolatedImag)
-
-    def interpolateWindowValuesBetweenKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
-        """
-        Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
-        """
-        # Recognize when left and right are the same, and dont' calculate anything.
-        if leftKeyframe == rightKeyframe:
-            return (leftKeyframe.realWidth, leftKeyframe.imagWidth)
-
-        # Enforce that left keyframe's transitionOut should match right keyframe's transitionIn
-        if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
-            raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
-
-        transitionType = leftKeyframe.transitionOut
-        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
-            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
-
-        interpolatedRealWidth = leftKeyframe.realWidth
-        interpolatedImagWidth = leftKeyframe.imagWidth
-
-        # And I kept all these separate, because I'm prety sure there will be more
-        # interpolation-specific parameters needed when all's said and done.
-        interpolatedRealWidth = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.realWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.realWidth, frameNumber)
-        interpolatedImagWidth = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.imagWidth, rightKeyframe.lastObservedFrameNumber, rightKeyframe.imagWidth, frameNumber)
-
-        #print("window interpolates from: (%s,%s) to: (%s,%s) as: (%s,%s)" % (leftKeyframe.realWidth, leftKeyframe.imagWidth, rightKeyframe.realWidth, rightKeyframe.imagWidth, interpolatedRealWidth, interpolatedImagWidth))
-
-        return (interpolatedRealWidth, interpolatedImagWidth)
-
-    def interpolateComplexBetweenParameterKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
-        """
-        Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
-        """
-        #print("interpolating %s -> %s at frame %s" % (str(leftKeyframe), str(rightKeyframe), str(frameNumber)))
-
-        # Recognize when left and right are the same, and dont' calculate anything.
-        if leftKeyframe == rightKeyframe:
-            return leftKeyframe.value
-
-        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
-            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
-
-        # May want to consider 'close' rather than equal for the center equivalence check.
-        if leftKeyframe.value == rightKeyframe.value:
-            return leftKeyframe.value
-
-        # Enforce that left keyframe's transitionOut should match right keyframe's transitionIn
-        if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
-            raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
-        transitionType = leftKeyframe.transitionOut
-
-        # Python scopes seep like this, right? Just use the value later?
-        #
-        # And I kept all these separate, because I'm prety sure there will be more
-        # interpolation-specific parameters needed when all's said and done.
-        interpolatedReal = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.value.real, rightKeyframe.lastObservedFrameNumber, rightKeyframe.value.real, frameNumber)
-        interpolatedImag = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedFrameNumber, leftKeyframe.value.imag, rightKeyframe.lastObservedFrameNumber, rightKeyframe.value.imag, frameNumber)
-
-        return self.timeline.mathSupport.createComplex(interpolatedReal, interpolatedImag)
-
-    def interpolateFloatBetweenParameterKeyframes(self, frameNumber, leftKeyframe, rightKeyframe):
-        """
-        Relies heavily on the stashed/cached 'lastObservedFrameNumber' value of a keyframe
-        """
-        #print("interpolating %s -> %s at frame %s" % (str(leftKeyframe), str(rightKeyframe), str(frameNumber)))
-
-        # Recognize when left and right are the same, and dont' calculate anything.
-        if leftKeyframe == rightKeyframe:
-            return leftKeyframe.value
-
-        if frameNumber < leftKeyframe.lastObservedFrameNumber or frameNumber > rightKeyframe.lastObservedFrameNumber:
-            raise IndexError("Frame number '%d' isn't between 2 keyframes at '%d' and '%d'" % (frameNumber, leftKeyframe.lastObservedFrameNumber, rightKeyframe.lastObservedFrameNumber))
-
-        # May want to consider 'close' rather than equal for the center equivalence check.
-        if leftKeyframe.value == rightKeyframe.value:
-            return leftKeyframe.value
-
-        # Enforce that left keyframe's transitionOut should match right keyframe's transitionIn
-        if leftKeyframe.transitionOut != rightKeyframe.transitionIn:
-            raise ValueError("Keyframe transition types mismatched for frame number '%d'" % frameNumber)
-        transitionType = leftKeyframe.transitionOut
-
-        # Python scopes seep like this, right? Just use the value later?
-        #
-        # And I kept all these separate, because I'm prety sure there will be more
-        # interpolation-specific parameters needed when all's said and done.
-        interpolatedReal = self.timeline.mathSupport.interpolate(transitionType, leftKeyframe.lastObservedKeyframeNumber, leftKeyframe.value, rightKeyframe.lastObservedFrameNumber, rightKeyframe.value, frameNumber)
-
-        return interpolatedReal
-
-
-    def __repr__(self):
-        return """\
-[DiveTimelineSpan {framecount} frames]\
-""".format(framecount=self.frameCount)
+    def __setstate__(self, state):
+        self.time = int(state['time'])
+        self.duration = int(state['duration'])
+        self.setKeyframesFromStringList(state['keyframes'])
 
 class DiveSpanKeyframe:
-    def __init__(self, span, transitionIn='quadratic-to', transitionOut='quadratic-from'):
-        self.span = span 
+    def __init__(self, span, dataType, value, transitionIn='quadratic-to', transitionOut='quadratic-from'):
+        
+        dataTypeOptions = ['float', 'complex', 'int', 'no_type'] 
+        # Probably would like int and bool too?
+        if dataType not in dataTypeOptions:
+            raise ValueError("dataType must be one of (%s)" % ", ".join(dataTypeOptions))
 
-        transitionOptions = ['quadratic-to', 'quadratic-from', 'quadratic-to-from', 'log-to', 'root-to', 'linear']
+# log-from doesn't work yet...
+        transitionOptions = ['quadratic-to', 'quadratic-from', 'quadratic-to-from', 'log-to', 'root-to', 'root-from', 'root-to-ease-in', 'root-to-ease-out', 'root-from-ease-in', 'root-from-ease-out', 'linear', 'step']
         if transitionIn not in transitionOptions:
             raise ValueError("transitionIn must be one of (%s)" % ", ".join(transitionOptions))
         if transitionOut not in transitionOptions:
             raise ValueError("transitionOut must be one of (%s)" % ", ".join(transitionOptions))
-        
+
+        self.span = span 
+        self.dataType = dataType
+        self.value = value
         self.transitionIn = transitionIn
         self.transitionOut = transitionOut
 
-        self.lastObservedFrameNumber = 0 # For stashing frame numbers in
+        self.lastObservedTime = 0 # For stashing times in
 
     def __repr__(self):
-        return """\
-[DiveSpanKeyframe, {inType} -> frame {frame} -> {outType}]\
-""".format(inType=self.transitionIn, frame=self.lastObservedFrameNumber, outType=self.transitionOut)
-
-class DiveSpanCenterKeyframe(DiveSpanKeyframe):
-    def __init__(self, span, center, transitionIn='quadratic-to', transitionOut='quadratic-from'):
-        super().__init__(span, transitionIn, transitionOut)
-        self.center = center
-
-class DiveSpanWindowKeyframe(DiveSpanKeyframe):
-    def __init__(self, span, realWidth, imagWidth, transitionIn='root-to', transitionOut='root-to'):
-        super().__init__(span, transitionIn, transitionOut)
-        self.realWidth = realWidth
-        self.imagWidth = imagWidth
-
-class DiveSpanUniformKeyframe(DiveSpanKeyframe):
-    def __init__(self, span, transitionIn='quadratic-to', transitionOut='quadratic-from'):
-        super().__init__(span, transitionIn, transitionOut)
-
-class DiveSpanTiltKeyframe(DiveSpanKeyframe):
-    def __init__(self, span, widthFactor, heightFactor, transitionIn='quadratic-to', transitionOut='quadratic-from'):
-        super().__init__(span, transitionIn, transitionOut)
-        self.widthFactor = widthFactor
-        self.heightFactor = heightFactor
-
-class DiveSpanParameterKeyframe(DiveSpanKeyframe):
-    def __init__(self, span, value, transitionIn='quadratic-to', transitionOut='quadratic-from'):
-        super().__init__(span, transitionIn, transitionOut)
-        self.value = value
-
-####
-# Big bunch of 'still thinking about' comments here.  Probably should have kept them on my own branch.
-###
-#
-# Conceptual priority of items in a timeline goes something like...
-#
-# Frame Numbers  
-#  Frames are the base grid, so nothing can 'shift' a frame number to a higher or lower value.
-#
-# DiveSpan
-#   Spans define the start and end base values (pre-modifications) of a dive animation
-#
-# DiveSpanCenterKeyframe and DiveSpanWindowKeyframe
-#   Within spans, target values to hit for a frame
-#
-# I think that's the end of the highest-order items.  Modifications up to this point have to
-# all be complete and calculated before the next items can be calculated/analyzed.
-#
-# For window rages, whether set as keyframes, or interpolated between, you can observe
-# the effective zoom factor between any two frames, based on the transition from frame's 
-# values to the next
-
-#
-# Idea behind ZoomFactorKeyframe
-#
-#  Attaches to the timeline based on width ranges.  Still haven't solved several
-#  aspects of this half-baked idea yet.
-#  Main goal is to be able to set a speed factor for a range of frames.
-#
-#  If a keyframe sets an axis 
-#  range for a specific frame number, then the two surrounding frame-spans up to the nearest adjacent
-#  range keyframes need to be stretched or squished so that the product of all the zoom factors
-#  between keyframes achieves the ranges set in the adjacent range keyframes.  Or more simply,
-#  if you add a range keyframe, then the surrounding zoom factors are adjusted so existing 
-#  range keyframe targets aren't changed.
-#  The default ramp type for zoom factor interpolation is linear.  The logic behind this is that
-#  if the factor is linearly monotonically increasing, then the feel is acceleration.  So linear
-#  interpolation of zoom factors results in a ramp of speed between keyframes.  I imagine that more
-#  explicit curve control for zoom factor interpolation will be desirable.
-#
-#  [[Linear interpolation does seem to make it harder to set a constant speed though, doesn't it?]]
-#  [[Does it work to add a keyframe as "set a constant zoom factor between all these frames"?]]
-#
-
-##
-# A - attempt at constructing a 'move this image to this frame' kind of behavior 
-##
-# Take the calculated range values at frame + 4, and shift them to the target frame.
-# Other stuff has to follow along... and attempting to write this is showing me what's left dangling...
-#
-# Quick observation:
-# We'll come at this edit by looking at an existing render, and wanting a modification.
-# The existing render has specific base information at a frame we're observing.
-# This construction should be resilient to upstream base information modifications
-# (i.e. if something 'before' is changed, this edit should still work about the same way)
-
-# And this really has to be range-dependent, despite my trying to dodge that over and over and over.
-# I keep trying to say "the base is rigidly calculated"
-# And keep realizing that speed manipulations for a visible range MUST be dependent on some
-# flexible attachment of the effect to a range of base values.
- 
-# Maybe the deal is, that range manipulations are all calculated in advance, and in the specific order of
-# their declaration?  Like, there's no complicated layering of range manipulations, only
-# a procedural description of all the range manipulations, which is realized into the baked-in
-# base information for every frame, before axes are generated or meshes are manipulated.
-
-# Adding set values non-monotonically, will basically play segments in reverse, right?
-# start = 1.0, end = .0001, 100 frames long
-# +keyframe in place at frame 10 (so frames 1-10 are equivalent to the default base ranges)
-# +keyframe at frame 15, back to 1.0 (so plays start->key->start->end)
-# (also, frames 15-100 are equivalent to what used to happen in frames 1-100)
-#
-# So now, want to set a 'speed' for 15->20
-# Or better, want to set the reverse speed to faster...
-# But I shouldn't be allowed to say "play a frame range faster", should I?
-# Because it's dependent on the interpolated values that it has to hit.
-# But I need to be able to say for this UNINTERRUPTED frame span (could verify on application?!), 
-# Set my zoom factors to BLAH.
-# A speed manipulation is a localized effect, that will change the (?upstream and?) downstream interpolations.
-# The probem is, we maybe need to figure out what those ranges are iteratively, before allowing 
-# it to 'lock' into place?
-
-#targetFrameNumber = 2
-#sampleFromFrameNumber = targetFrameNumber + 4
-#
-# Looks like that when we're sampling the 'current' shape for a future frame number, 
-# we need to force that number into a keyframe, if it's part of an existing manipulation?
-#if mainSpan.frameNumberHasParametricEffects(sampleFromFrameNumber):
-#if mainSpan.frameNumberHasBaseModifiers(sampleFromFrameNumber):
-#    # Creates a 'current values' keyframe, unrolls parametric changes to get to concrete values
-#    mainSpan.addKeyframeInPlace(sampleFromFrameNumber) 
-#
-#addBaseRangeKeyframeInPlace
-#
-#focusRangeWidth, focusRangeHeight = mainSpan.getRangeShapeForFrameNumber(sampleFromFrameNumber)
-
-# When we set a window keyframe, we've changed the 'effective zoom factor' of all upstream and downstream frames.
-# The range of the 'effective speed change' is bounded by the next closest keyframes.
-
-## 
-# B - attempt at constructing a "speed up these 4 frames" kinda behavior
-##
-#
-#targetFrameNumber = 3
-#targetFrameCount = 4
-#startingRangeWidth, startingRangeHeight = mainSpan.getRangeShapeForFrameNumber(targetFrameNumber)
-#endingRangeWidth, endingRangeHeight = mainSpan.getRangeShapeForFrameNumber(targetFrameNumber + targetFrameCount - 1)
-
-# No speed assignments that span across existing base keyframes allowed.
-
-# Seems like this is getting close.
-# The thing is, for a given range (whether forward or backward), I can't manipulate the speed in a way that
-# breaks the base keyframe endpoints.
-#
-# Maybe that's it...
-# No 'speed' assignments possible, only equivalent 'base keyframe' assignments.
-# So I can't say 'play from this base range to that base range faster,
-#
-# Really want speed to ramp as a default, and make it so sudden jumps in speed
-# are more difficult to achieve by default.
-
-# THAT'S RIGHT  - I forgot, that speed modifiers don't hang on frame numbers, but they're applied 
-# on regions within the visible ranges...
-# BUT THAT WON'T WORK as a timeline thing, because if we reverse, then we don't want the 
-# speed modifier to have an effect for all the matching ranges.
-
-# Maybe it's that at a given keyframe, BOTH range targets, and a zoom factor can be applied?
-
-## Maybe "speed change" is a function that does a bunch of math for you?
-#mainSpan.addRangeSpeedKeyframe(startFrameNumber, leadingTransitionFrames=2, trailingTransitionFrames=2, startingZoomFactor * 2, 
-#
-#mainSpan.addRangeSpeedModifier(startFrameNumber, leadingTransitionFrames=2, trailingTransitionFrames=2, startingZoomFactor * 2)
-#
-#internally, it says:
-#firstFrameZoomFactor = mainSpan.getZoomFactorBetweenFrameNumbers(startFrameNumber, startFrameNumber + 1)
-#?rangeKeyframeAxisGenerator()?
-#...generate keyframes for target ranges, based on  this... somehow...
-
-
-
-# --
-# Default settings for the dive. All of these can be overridden from the
-# command line
-# --
-def set_demo1_params(fractal_ctx, view_ctx):
-    print("+ Running in demo mode - loading default mandelbrot dive params")
-    #fractal_ctx.img_width  = 1024
-    #fractal_ctx.img_height = 768 
-    #fractal_ctx.img_width  = 320
-    #fractal_ctx.img_height = 240 
-
-    fractal_ctx.img_width  = 160 
-    fractal_ctx.img_height = 120 
-
-    #fractal_ctx.img_width  = 80 
-    #fractal_ctx.img_height = 60 
-    #fractal_ctx.img_width  = 16 
-    #fractal_ctx.img_height = 12 
-
-    #fractal_ctx.img_width  = 4
-    #fractal_ctx.img_height =  3
-
-    cmplx_width_str = '5.0'
-    cmplx_height_str = '3.5'
-    #cmplx_width_str = '.001'
-    #cmplx_height_str = '.00075'
-    #cmplx_width_str = '2.0'
-    #cmplx_height_str = str(1024*2/768) 
-
-    # For debugging, this window (and a couple zooms after) is where things
-    # tend to go wrong when precision is getting clipped off
-    #cmplx_width_str = '6.736977389253725e-08'
-    #cmplx_height_str = '4.7158841724776074e-08'
-    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
-    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
-
-
-    # This is close t Misiurewicz point M32,2
-    # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
-    #center_real_str = '-1.769383179195515018213'
-    #center_imag_str = '0.00423684791873677221'
-    #fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_real_str, center_imag_str)
-    #center_str = '-1.769383179195515018213+0.00423684791873677221j'
-
-
-    center_real_str = '-1.7693831791955150182138472860854737829057472636547514374655282165278881912647564588361634463895296673044858257818203031574874912384217194031282461951137475212550848062085787454772803303225167998662391124184542743017129214423639793169296754394181656831301342622793541423768572435783910849972056869527305207508191441734781061794290699753174911133714351734166117456520272756159178932042908932465102671790878414664628213755990650460738372283470777870306458882898202604001744348908388844962887074505853707095832039410323454920540534378406083202543002080240776000604510883136400112955848408048692373051275999457470473671317598770623174665886582323619043055508383245744667325990917947929662025877792679499645660786033978548337553694613673529685268652251959453874971983533677423356377699336623705491817104771909424891461757868378026419765129606526769522898056684520572284028039883286225342392455089357242793475261134567912757009627599451744942893765395578578179137375672787942139328379364197492987307203001409779081030965660422490200242892023288520510396495370720268688377880981691988243756770625044756604957687314689241825216171368155083773536285069411856763404065046728379696513318216144607821920824027797857625921782413101273331959639628043420017995090636222818019324038366814798438238540927811909247543259203596399903790614916969910733455656494065224399357601105072841234072044886928478250600986666987837467585182504661923879353345164721140166670708133939341595205900643816399988710049682525423837465035288755437535332464750001934325685009025423642056347757530380946799290663403877442547063918905505118152350633031870270153292586262005851702999524577716844595335385805548908126325397736860678083754587744508953038826602270140731059161305854135393230132058326419325267890909463907657787245924319849651660028931472549400310808097453589135197164989941931054546261747594558823583006437970585216728326439804654662779987947232731036794099604937358361568561860539962449610052967074013449293876425609214167615079422980743121960127425155223407999875999884'
-    center_imag_str = '0.00423684791873677221492650717136799707668267091740375727945943565011234400080554515730243099502363650631353268335965257182300494805538736306127524814939292355930892834392050796724887904921986666045576626946900666103494014904714323725586979789908520656683202658064024115300378826789786394641622035341055102900456305723718684527210377325846307917512628774672005693326232806953822796755832517188873479124361430989485495501124096329421682827330693532171505367455526637382706988583456915684673202462211937384523487065290004627037270912806345336469007546411109669407622004367957958476890043040953462048335322273359167297049252960438077167010004209439515213189081508634843224000870136889065895088138204552309352430462782158649681507477960551795646930149740918234645225076516652086716320503880420325704104486903747569874284714830068830518642293591138468762031036739665945023607640585036218668993884533558262144356760232561099772965480869237201581493393664645179292489229735815054564819560512372223360478737722905493126886183195223860999679112529868068569066269441982065315045621648665342365985555395338571505660132833205426100878993922388367450899066133115360740011553934369094891871075717765803345451791394082587084902236263067329239601457074910340800624575627557843183429032397590197231701822237810014080715216554518295907984283453243435079846068568753674073705720148851912173075170531293303461334037951893251390031841730968751744420455098473808572196768667200405919237414872570568499964117282073597147065847005207507464373602310697663458722994227826891841411512573589860255142210602837087031792012000966856067648730369466249241454455795058209627003734747970517231654418272974375968391462696901395430614200747446035851467531667672250261488790789606038203516466311672579186528473826173569678887596534006782882871835938615860588356076208162301201143845805878804278970005959539875585918686455482194364808816650829446335905975254727342258614604501418057192598810476108766922935775177687770187001388743012888530139038318783958771247007926690'
-
-
-# Shorter, for debugging
-#    center_real_str = '-1.76938317919551501821384728608547378290574726365475143746552821652788819126475645883616344638952966730448582578182030315748749123842171940312824619511374752125508480620857874547728033032251679986623911241845427430171292144236397931692967543941816568313013426227935414237685724357839108499720568695273052075081914417347810617942906997531749111337143517341661174565202727561591789320429089324651026717908784146646282137559906504607383722834707778703064588828982026040017443489083888449628870745058537'
-#    center_imag_str = '0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559308928343920507967248879049219866660455766269469006661034940149047143237255869797899085206566832026580640241153003788267897863946416220353410551029004563057237186845272103773258463079175126287746720056933262328069538227967558325171888734791243614309894854955011240963294216828273306935321715053674555266373827069885834569156846732024622119'
-
-
-    #center_str = '-0.05+0.6805j'
-    #fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_str)
-    fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(center_real_str, center_imag_str)
-
-    fractal_ctx.project_name = 'demo1'
-    fractal_ctx.scaling_factor = .8
-    #fractal_ctx.scaling_factor = .5
-
-    fractal_ctx.write_video = False
-
-
-    # Looks like 23.976/8 fps (almost 3fps), duration=60 (which could be 180 frames) 
-    # max-iter=4096 
-    # Bit depth was only ~400
-    # Ended up reaching e-51
-    # Most iteration answers were around 1200-1300?
-
-
-    # Trying to double that... Basically, can just double duration?
-    # And then, can start off at frame 175?
-    #
-    # Looks like 23.976/8 fps (almost 3fps), duration=120 (which could be 360 frames) 
-    # Which is 45 frames per process, for 8 processes.
-    # max-iter=4096 
-    # Let's stack bit depth to accommodate max_iter?
-    # Lower bound I'm going with is: .4438
-    # So bits = 1817? Let's make it a round 1800?
-    # Ended up reaching... 
-    # Most iteration answers were around ?
-
-    # Think I forgot to set bits deep enough?
-    # Blew out at e-57?
-    # Looks like iters were around 1500
-    # Precision was (accidentally?) 400
-   
-    # 550 * 3.32 = 1826
-    # max-iter=4096
-    # Looks like 23.976/8 fps (almost 3fps), 
-    # duration=90 (which could be 270 frames) 
-    # lost all detail at ~227?
-    # iters were hitting 4000
-    # Looks like it hit e-68
-
-    # Ok.
-    # 8192 iter
-    # ~3621 bits => 1125 digits
-    # duration=180 (~540 frames defined, just giving myself runway)
-    # Gonna run frames 200+?
-
-    # Frame 240 is hitting e-72 widths, 4400 iters
-    # Looks like window definition has ~953 digits of unused precision?
-    # Lol.
-
-    # Hit ~e-91 at frame 303
-    # iters sitting around 5300
-
-
-    # Shaving off 400 digits of precision... (to 725 digits = 2407 bits)
-    # Also trying only 6 simultaneous, frames 300-350
-
-    # frame 350 hit ~e-107
-    # Iters around 6300
-
-    # Shaving more precision off - 625 digits
-
-    # Blew out around 385?
-    # Hitting 7900 iters
-    # Hitting e-114, so is using something like 300 positions total?
-
-    # K, for frames 375+, gonna go with...
-    # doubling iters again,
-    # Adding another 100 positions? (went to 825 positions)
-
-    # Finally timed that run
-    # 50 frames (375-425)
-    # 2048*8 max iter (== 16384 iters)
-    # 825 digits (2739 bits)
-    # real    61m38.026s
-    # user    514m30.844s
-    # sys     0m9.203s
-    # Which is ~74 seconds per frame.
-    # ~10,400 iters used
-    # ~e-129 widths
-
-    # Moving endpoint to 320 seconds? (~957 frames?)
-    # Going up to 2048 * 10 (= 20,480 iters)
-    # Looks like the last increment used 15 more digits... 
-    # So, Maybe add 100 positions?
-    # That'll be 925 digits (3071 bits)
-    # real    30m22.199s
-    # user    381m58.938s
-    # sys     0m12.344s
-    # hit e-135 at 450
-    # using 11,000 iters
-
-
-    # Frames 450-475 (no big changes for this segment)
-    # real    38m16.362s
-    # user    445m59.469s
-    # sys     0m12.938s
-    # hit e-143 at 475
-    # using ~14,800 itersA
-    # Looks like this gets to ~10:30 in the edge of infinity dive.
-    # So, out of 2:29:04, that's about 6% of the dive?
-    #
-    # Gonna raise to 41k iterations (2048 * 20)
-    # Gonna bump up to 1500 digits? (4830 bits?)
-    # Trying to take a bigger bite, 475-900?
-
-    # Attempt at batching to 599 failed the first time, 
-    # BUT resulted in:
-    # used 27k iter
-    # e-180 widths
-    # Looks like this was gonna work just fine...
-    
-    # 25 frames hit ~109 minutes (~4.5 minutes per frame)
-    # (1308 minutes user time) = 52 minutes per frame.
-    # Iters hit ~24k
-   
-    # real    142m25.250s
-    # user    1797m10.031s
-    # sys     0m11.922s
-
-
-    #fractal_ctx.max_iter       = 128 
-    #fractal_ctx.max_iter       = 255 
-    #fractal_ctx.max_iter       = 512 # covers ~e-34 or so 
-    #fractal_ctx.max_iter       = 1024 # covers ~e-48 or so
-    fractal_ctx.max_iter       = 2048 
-    #fractal_ctx.max_iter       = 2048 * 15 # ~30k, ok at e-180?
-    #fractal_ctx.max_iter       = int(2048 * 15.5) # ~31k, ok at e-225
-    #fractal_ctx.max_iter       = int(2048 * 16) # ~31k, ok at e-225
-    #fractal_ctx.max_iter       = 2048 * 20 # ~41k, ok at e-391
-    #fractal_ctx.max_iter       = 2048 * 40 # ~82k, ok at e-497
-    #fractal_ctx.max_iter       = 2048 * 34 # ~70k, ok at e-504
-    #fractal_ctx.max_iter       = 2048 * 71 # ~145k, ok at e-752
-    #fractal_ctx.max_iter       = 2048 * 140 # ~286k iter, ok at e-1204
-    #fractal_ctx.max_iter       = 2048 * 300 # ~614k iter, ok at e-1505
-    #fractal_ctx.max_iter       = 2048 * 400 # ~819k iter, ok at e-1806
-    #fractal_ctx.max_iter       = 2048 * 1300 # ~2,662k iter, ok at e-2011
-
-    fractal_ctx.escape_rad     = 2
-    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]['escape_radius'] = fractal_ctx.escape_rad 
-    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]['max_escape_iterations'] = fractal_ctx.max_iter 
-
-    # Basically make this command-line, not demo?
-    #fractal_ctx.clip_start_frame = 7 
-    #fractal_ctx.clip_frame_count = 3 
-
-    fractal_ctx.verbose = 3
-    fractal_ctx.build_cache=False
-
-    # FPS still isn't set quite right, but we'll get it there eventually.
-    #view_ctx.fps            = 23.976 / 4.0 
-    #view_ctx.fps            = 23.976 / 2.0
-    #view_ctx.fps            = 23.976
-    #view_ctx.fps            = 29.97 / 2.0 
-    #view_ctx.fps            = 23.976 / 8.0 
-
-    #view_ctx.duration = math.ceil(6.0 / view_ctx.fps)
-    #view_ctx.duration       = 4.0
-    #view_ctx.duration       = 540.0
-    #view_ctx.duration       = 1500.0
-    #view_ctx.duration       = 30.0
-    #view_ctx.duration       = 2.0
-    #view_ctx.duration       = 0.25
-    #view_ctx.duration       = 2300.0 # A bit more than EoI's dive (6682), this is ~6890 frames, if a .5 zoom factor at 23.976/8 fps.
-
-
-    # 
-    view_ctx.fps            = 23.976 / 2.0 
-    view_ctx.duration       = 180.0 # Just enough to explore?
-
-def set_julia_walk_demo1_params(fractal_ctx, view_ctx):
-    print("+ Running in demo mode - loading default julia walk params")
-    fractal_ctx.img_width  = 1024
-    fractal_ctx.img_height = 768 
-
-    cmplx_width_str = '3.2'
-    cmplx_height_str = '2.5'
-    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(cmplx_width_str)
-    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(cmplx_height_str)
-
-
-    #fractal_ctx.algorithm_extra_params['julia_center'] = fractal_ctx.math_support.createComplex(-.8,.145)
-    fractal_ctx.algorithm_extra_params['julia']['julia_center'] = fractal_ctx.math_support.createComplex(-.8,.145)
-
-    #fractal_ctx.algorithm_extra_params['julia_center'] = fractal_ctx.math_support.createComplex(0,0)
-    fractal_ctx.julia_list = [fractal_ctx.math_support.createComplex(0.355,0.355), fractal_ctx.math_support.createComplex(0.0,0.8), fractal_ctx.math_support.createComplex(0.3355,0.355)] 
-
-    fractal_ctx.cmplx_center = fractal_ctx.math_support.createComplex(0,0)
-
-    fractal_ctx.project_name = 'julia_demo1'
-
-    fractal_ctx.scaling_factor = 1.0
-
-    fractal_ctx.max_iter       = 255
-
-    fractal_ctx.escape_rad     = 2.
-    #fractal_ctx.escape_rad     = 32768. 
-
-    fractal_ctx.verbose = 3
-    fractal_ctx.build_cache = True
-
-    view_ctx.duration       = 4.0
-    #view_ctx.duration = 0.5
-
-    # FPS still isn't set quite right, but we'll get it there eventually.
-    view_ctx.fps            = 23.976 / 8.0 
-    #view_ctx.fps            = 23.976 / 2.0 
-    #view_ctx.fps            = 29.97 / 2.0 
-
-def set_preview_mode(fractal_ctx, view_ctx):
-    print("+ Running in preview mode ")
-
-    fractal_ctx.img_width  = 300
-    fractal_ctx.img_height = 200
-
-    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(3.0)
-    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(2.5)
-
-    fractal_ctx.scaling_factor = .75
-
-    #fractal_ctx.escape_rad     = 4.
-    fractal_ctx.escape_rad     = 32768. 
-
-    view_ctx.duration       = 4
-    view_ctx.fps            = 4
-
-
-def set_snapshot_mode(fractal_ctx, view_ctx, snapshot_filename='snapshot.gif'):
-    print("+ Running in snapshot mode ")
-
-    fractal_ctx.snapshot = True
-    view_ctx.vfilename = snapshot_filename
-
-    fractal_ctx.img_width  = 3000
-    fractal_ctx.img_height = 2000 
-
-    fractal_ctx.max_iter   = 2000
-
-    fractal_ctx.cmplx_width  = fractal_ctx.math_support.createFloat(3.0)
-    fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(2.5)
-
-    fractal_ctx.scaling_factor = .99 # set so we can zoom in more accurately
-
-    #fractal_ctx.escape_rad     = 4.
-    fractal_ctx.escape_rad     = 32768. 
-
-    view_ctx.duration       = 0
-    view_ctx.fps            = 0
-
+        return(f"DiveSpanKeyframe {self.lastObservedTime} {self.dataType} {self.value}, in={self.transitionIn}, out={self.transitionOut}")
+
+class DiveSpanCustomKeyframe(DiveSpanKeyframe):
+    """
+    TODO: Don't use this yet.  
+    Function-based keyframes aren't yet handled by the persistence functions.
+    """
+    def __init__(self, span, targetObject, targetFunction, transitionIn='linear', transitionOut='linear'):
+        super().__init__(span, 'no_type', None, transitionIn, transitionOut)
+        self.targetObject = targetObject
+        self.targetFunction = targetFunction
+
+    def calculateValueForTime(self, targetTime, targetPercentBetweenKeyframes, currentParameters):
+        print("CALCULATION CANCELLED - DEBUGGING DiveSpanCustomKeyframe")
+        # Not even tested yet...
+        #runnableFunction = getattr(self.targetObject, targetFunction)
+        #return runnableFunction(targetTime, targetPercentBetweenKeyframes, currentParameters)
 
 def make_project(params):
     """
@@ -1389,8 +570,8 @@ def make_project(params):
         "exploration_markers_path": "exploration/markers",
         "edit_markers_path": "edit/markers",
         "edit_timelines_path": "edit/timelines",
-        "render_mesh_width": "1024",
-        "render_mesh_height": "768",
+        "render_image_width": "1024",
+        "render_image_height": "768",
         "render_fps": "23.976",
         "render_output_path": "output",
         "render_exports_path": "exports",
@@ -1419,55 +600,9 @@ def parse_options():
     Handles parsing of command line parameters, including those specified
     in Algo implementations.
 
-    For all modes except "--make-project", also load the values 
+    For all modes except "--make-project", also loads the values 
     from params.json into params['project_params']
     """
-
-#def parse_options(fractal_ctx, view_ctx):
- #   argv = sys.argv[1:]
- #   opts, args = getopt.getopt(argv, "pd:m:s:f:w:h:c:a:",
- #                              ["preview",
- #                               "algo=",
- #                               "flint",
- #                               "flintcustom",
- #                               "gmp",
- #                               "demo",
- #                               "demo-julia-walk",
- #                               "duration=",
- #                               "fps=",
- #                               "clip-start-frame=",
- #                               "clip-frame-count=",
- #                               "project-name=",
- #                               "image-frame-path=",
- #                               "shared-cache-path=",
- #                               "build-cache",
- #                               "invalidate-cache",
- #                               "banner",
- #                               "max-iter=",
- #                               "img-w=",
- #                               "img-h=",
- #                               "cmplx-w=",
- #                               "cmplx-h=",
- #                               "center=",
- #                               "scaling-factor=",
- #                               "snapshot=",
- #                               "gif=",
- #                               "mpeg=",
- #                               "verbose=",
- #                               "palette-test=",
- #                               #"color=",
- #                               "color",
- #                               "julia-center=", # Julia
- #                               "julia-list=", # Julia
- #                               "burn", # Hopefully all algorithms?
- #                               "escape_radius", # Mandelbrot, Julia
- #                               "max_escape_iterations", # Mandelbrot, Julia
- #                               "smooth", # Mandelbrot, Julia
- #                               "make-project=",
- ##                               "project=",
- #                               "math-support=",
- #                               ])
-
     params = {} # Most everything here fills this dictionary
 
     options_list = ["math-support=",
@@ -1484,7 +619,7 @@ def parse_options():
                     "expl-center=",
                     "expl-frame-number=",
                     # Timeline-only params
-                    "batch-frame-numbers=",
+                    "batch-frame-file=",
                    ]
 
     # Add *all* the command line options that Algos recognize, even though
@@ -1497,7 +632,6 @@ def parse_options():
         options_list.extend(algorithm_class.options_list())
     # Make param list unique, just for readability
     options_list = list(set(options_list)) 
-
     opts, args = getopt.getopt(sys.argv[1:], "", options_list)
 
     # First-pass at params to set up MathSupport because lots of 
@@ -1519,7 +653,7 @@ def parse_options():
             params['digits_precision'] = int(arg)
     # Important to also set expected precision before parsing param values
     support_precision = params.get('digits_precision', 16) # 16 == native
-    math_support.setPrecision(support_precision)
+    math_support.setPrecision(round(support_precision * 3.32)) # ~3.32 bits per position
     params['math_support'] = math_support
 
     # Second-pass at params, figures out which mode we're operating
@@ -1600,162 +734,43 @@ def parse_options():
 
     elif params['mode'] == 'timeline':
         for opt, arg in opts:
-            if opt in ['--batch-frame-numbers']:
+            if opt in ['--batch-frame-file']:
                 # We're in batch mode, instead of entire-timeline mode,
                 # so get more specific.
                 params['mode'] = 'batch_timeline'
-                params['batch_frame_numbers'] = arg
+                params['batch_frame_file'] = arg
 
     return params
-
-#    # First-pass parameters handled so others can be responsive
-#    # - Math support, so instantiations are properly typed
-#    # - Algorithm name, so additional parameters can be read
-#    for opt, arg in opts:
-#        if opt in ['--gmp']:
-#            fractal_ctx.math_support = fm.DiveMathSupportGmp()
-#        elif opt in ['--flint']:
-#            fractal_ctx.math_support = fm.DiveMathSupportFlint()
-#        elif opt in ['--flintcustom']:
-#            fractal_ctx.math_support = fm.DiveMathSupportFlintCustom()
-#        elif opt in ['-a', '--algo']:
-#            if str(arg) in fractal_ctx.algorithm_map:
-#                fractal_ctx.algorithm_name = str(arg)
-#
-#    if fractal_ctx.algorithm_name is None:
-#        fractal_ctx.algorithm_name = 'mandelbrot'
-#
-#    # Kinda a crazy invocation.  Loads algorithm-specific parameters into
-#    # a dictionary, based on that algorithm's static class parse function.
-#    fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name] = fractal_ctx.algorithm_map[fractal_ctx.algorithm_name].parse_options(opts)
-#    # Theoretically possible we'll eventually want to run this for all
-#    # possible algorithm types, but for now, just loading for the 
-#    # 'active' algorithm.
-#
-#    for opt,arg in opts:
-#        if opt in ['-p', '--preview']:
-#            set_preview_mode(fractal_ctx, view_ctx)
-#        elif opt in ['-s', '--snapshot']:
-#            set_snapshot_mode(fractal_ctx, view_ctx, arg)
-#        elif opt in ['--demo']:
-#            set_demo1_params(fractal_ctx, view_ctx)
-#        elif opt in ['--demo-julia-walk']:
-#            set_julia_walk_demo1_params(fractal_ctx, view_ctx)
-#
-#    palette = fp.FractalPalette() # Will get stashed for the algorithm to use
-#
-#    for opt, arg in opts:
-#        if opt in ['-d', '--duration']:
-#            view_ctx.duration  = float(arg) 
-#        elif opt in ['-f', '--fps']:
-#            view_ctx.fps  = float(arg)
-#        elif opt in ['--clip-start-frame']:
-#            # For construct_simple_timeline, use of --clip-start-frame
-#            # makes --clip-frame-count kinda required
-#            fractal_ctx.clip_start_frame = int(arg)
-#        elif opt in ['--clip-frame-count']:
-#            fractal_ctx.clip_frame_count = int(arg)
-#        elif opt in ['-m', '--max-iter']:
-#            fractal_ctx.max_iter = int(arg)
-#        elif opt in ['-w', '--img-w']:
-#            fractal_ctx.img_width = int(arg)
-#        elif opt in ['-h', '--img-h']:
-#            fractal_ctx.img_height = int(arg)
-#        elif opt in ['--cmplx-w']:
-#            fractal_ctx.cmplx_width = fractal_ctx.math_support.createFloat(arg)
-#        elif opt in ['--cmplx-h']:
-#            fractal_ctx.cmplx_height = fractal_ctx.math_support.createFloat(arg)
-#        elif opt in ['-c', '--center']:
-#            fractal_ctx.cmplx_center= fractal_ctx.math_support.createComplex(arg)
-#        elif opt in ['--scaling-factor']:
-#            fractal_ctx.scaling_factor = float(arg)
-#        elif opt in ['-z', '--zoom']:
-#            fractal_ctx.set_zoom_level = int(arg)
-#
-#        # Worth noting, julia-list is used only for Timeline construction, 
-#        # and isn't an intrisic thing to the Algo.
-#        elif opt in ['--julia-list']:
-#            raw_julia_list = eval(arg)  # expects a list of complex numbers
-#            if len(raw_julia_list) <= 1:
-#                print("Error: List of complex numbers for Julia walk must be at least two points")
-#                sys.exit(0)
-#            julia_list = []
-#            for currCenter in raw_julia_list:
-#                julia_list.append(fractal_ctx.math_support.create_complex(currCenter))
-#            fractal_ctx.julia_list = julia_list
-#        elif opt in ['--palette-test']:
-#            if str(arg) == "gauss":
-#                palette.create_gauss_gradient((255,255,255),(0,0,0))
-#            elif str(arg) == "exp":    
-#                palette.create_exp_gradient((255,255,255),(0,0,0))
-#            elif str(arg) == "exp2":    
-#                palette.create_exp2_gradient((0,0,0),(128,128,128))
-#            elif str(arg) == "list":    
-#                palette.create_gradient_from_list()
-#            else:
-#                print("Error: --palette-test arg must be one of gauss|exp|list")
-#                sys.exit(0)
-#            palette.display()
-#            sys.exit(0)
-##        elif opt in ['--color']:
-##            if str(arg) == "gauss":
-##                palette.create_gauss_gradient((255,255,255),(0,0,0))
-##            elif str(arg) == "exp":    
-##                palette.create_exp_gradient((255,255,255),(0,0,0))
-##            elif str(arg) == "exp2":    
-##                palette.create_exp2_gradient((0,0,0),(128,128,128))
-##            elif str(arg) == "list":    
-##                palette.create_gradient_from_list()
-##            else:
-##                print("Error: --palette-test arg must be one of gauss|exp|list")
-##                sys.exit(0)
-##            fractal_ctx.palette = palette
-#        elif opt in ['--project-name']:
-#            fractal_ctx.project_name = arg
-#        elif opt in ['--shared-cache-path']:
-#            fractal_ctx.shared_cache_path = arg 
-#        elif opt in ['--build-cache']:
-#            fractal_ctx.build_cache = True
-#        elif opt in ['--invalidate-cache']:
-#            fractal_ctx.invalidate_cache = True
-#        elif opt in ['--banner']:
-#            view_ctx.banner = True
-#        elif opt in ['--verbose']:
-#            verbosity = int(arg)
-#            if verbosity not in [0,1,2,3]:
-#                print("Invalid verbosity level (%d) use range 0-3"%(verbosity))
-#                sys.exit(0)
-#            fractal_ctx.verbose = verbosity
-#        elif opt in ['--gif']:
-#            if view_ctx.vfilename != None:
-#                print("Error : Already specific media type %s"%(view_ctx.vfilename))
-#                sys.exit(0)
-#            view_ctx.vfilename = arg
-#        elif opt in ['--mpeg']:
-#            if view_ctx.vfilename != None:
-#                print("Error : Already specific media type %s"%(view_ctx.vfilename))
-#                sys.exit(0)
-#            view_ctx.vfilename = arg
-#
-#    # Stash the palette as an extra parameter
-#    extra_params = fractal_ctx.algorithm_extra_params[fractal_ctx.algorithm_name]
-#    extra_params['palette'] = palette
 
 def run_exploration(params):
     algorithm_name = params['expl_algo']
     project_params = params['project_params']
     project_folder_name = params['project_name']
 
-    timeline = DiveTimeline(projectFolderName=project_folder_name, algorithm_name=algorithm_name, framerate=23.976, frameWidth=project_params['exploration_mesh_width'], frameHeight=project_params['exploration_mesh_height'], mathSupport=params['math_support'])
-    real_width = params['expl_real_width']
-    imag_width = params['expl_imag_width']
-    center = params['expl_center']
+    timeline = DiveTimeline(projectFolderName=project_folder_name, algorithmName=algorithm_name, framerate=23.976, frameWidth=project_params['exploration_mesh_width'], frameHeight=project_params['exploration_mesh_height'], mathSupport=params['math_support'])
+    mesh_real_width = params['expl_real_width']
+    mesh_imag_width = params['expl_imag_width']
+    mesh_center = params['expl_center']
 
-    span = timeline.addNewSpanAtEnd(1, center, real_width, imag_width, real_width, imag_width)
+    # Note: --max-escape-iterations is passed along via algorithm_extra_params
+
+    span_duration = 40
+    main_span = timeline.addNewSpan(0,span_duration)
+
+    main_span.addNewParameterKeyframe(0, 'complex', 'meshCenter', mesh_center, transitionIn='root-to', transitionOut='root-to')
+    main_span.addNewParameterKeyframe(span_duration, 'complex', 'meshCenter', mesh_center, transitionIn='root-to', transitionOut='root-to')
+
+    main_span.addNewParameterKeyframe(0, 'float', 'meshRealWidth', mesh_real_width, transitionIn='root-to', transitionOut='root-to')
+    main_span.addNewParameterKeyframe(span_duration, 'float', 'meshRealWidth', mesh_real_width, transitionIn='root-to', transitionOut='root-to')
+
+    main_span.addNewParameterKeyframe(0, 'float', 'meshImagWidth', mesh_imag_width, transitionIn='root-to', transitionOut='root-to')
+    main_span.addNewParameterKeyframe(span_duration, 'float', 'meshImagWidth', mesh_imag_width, transitionIn='root-to', transitionOut='root-to')
 
     extra_params = params['algorithm_extra_params']
-    dive_mesh=timeline.getMeshForFrame(0)
-    extra_params.update(dive_mesh.extraParams) # Allow per-frame info to overwrite algorithm info?
+    frame_time = timeline.getTimeForFrameNumber(0)
+    dive_mesh=timeline.getMeshForTime(frame_time)
+    # Allow per-frame info to overwrite algorithm info.
+    extra_params.update(dive_mesh.extraParams) 
 
     output_folder_name = os.path.join(project_folder_name, project_params['exploration_output_path'])
 
@@ -1765,42 +780,156 @@ def run_exploration(params):
 
     frame_algorithm.run()
 
-    
-#    if algorithm_name == 'julia':
-#        # Probably better to check for instance-of Julia Algo?
-#        span = DiveTimelineSpan(timeline, 1)
-#        span.addNewWindowKeyframe(0, real_width, imag_width)
-#        span.addNewWindowKeyframe(1, real_width, imag_width)
-#        span.addNewUniformKeyframe(0)
-#        span.addNewUniformKeyframe(1)
-#
-#        span.addNewCenterKeyframe(0, center)
-#        span.addNewCenterKeyframe(1, center) 
-#
-## Let's try to rely on extra params to pass in the julia_center?
-## Should work, since I don't have to interpolate it anywhere?
-##
-##        julia_center = algo_params['julia_center']
-##        span.addNewComplexParameterKeyframe(0, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
-##        span.addNewComplexParameterKeyframe(1, 'julia_center', currJuliaCenter, transitionIn='linear', transitionOut='linear')
-#
-#        timeline.timelineSpans.append(span)
-#
-#    else:
-#        span = timeline.addNewSpanAtEnd(1, center, real_width, imag_width, real_width, imag_width)
-
-
 def run_timeline(params):
-    pass
+    """
+    Parameters come from command-line script 'params' hash, as well
+    as from the 'project_params' sub-hash, which loads the params.json
+    """
+    project_params = params['project_params']
+    project_folder_name = params['project_name']
+    timeline_name = params['timeline_name']
 
+    timeline_file_name = os.path.join(params['project_name'], params['project_params']['edit_timelines_path'], params['timeline_name'])
+    timeline = load_timeline_from_file(timeline_file_name, params)
+
+    main_span = timeline.getMainSpan()
+    frame_count = timeline.getFramesInDuration(main_span.duration) 
+    print(f"duration: {main_span.duration}")
+    print(f"frame count: {frame_count}")
+
+    output_folder_name = os.path.join(project_folder_name, project_params['render_output_path'], timeline_name)
+    if not os.path.exists(output_folder_name):
+        os.makedirs(output_folder_name)
+
+    frame_file_names = []
+    for curr_frame_number in range(frame_count):
+        frame_time = timeline.getTimeForFrameNumber(curr_frame_number)
+        print(f"frame {curr_frame_number} at {frame_time}")
+        dive_mesh = timeline.getMeshForTime(frame_time)    
+        print(f"{dive_mesh.realMeshGenerator.baseWidth} x {dive_mesh.imagMeshGenerator.baseWidth} ({dive_mesh.extraParams['max_escape_iterations']} iter)")
+        # Following is a class instantiation, of a string-specified Algo class
+        algorithm_map = DiveTimeline.algorithm_map()
+        frame_algorithm = algorithm_map[timeline.algorithmName](dive_mesh=dive_mesh, frame_number=curr_frame_number, output_folder_name=output_folder_name, extra_params=dive_mesh.extraParams)
+        frame_algorithm.run()
+
+        frame_file_names.append(frame_algorithm.output_image_file_name)
+
+    export_base_name = f"{timeline_name}.mp4"
+    export_file_name = os.path.join(project_folder_name, project_params['render_exports_path'], export_base_name)
+    clip = mpy.ImageSequenceClip(frame_file_names, fps=timeline.framerate)
+    clip.write_videofile(export_file_name, fps=timeline.framerate, audio=False, codec="mpeg4")
+
+def load_timeline_from_file(timeline_file_name, params):
+    print(f"loading timeline from:\n{timeline_file_name}")
+    with open(timeline_file_name, 'rt') as timeline_handle:
+        timelineJSON = json.load(timeline_handle)
+        timeline = DiveTimeline.build_from_json_and_params(timelineJSON, params)
+    return timeline
+
+####
+#### This block will be useful when timeline is a script loader, not just json
+####
+#    timeline_file_base = u"%s.py" % timeline_name
+#    timeline_file = os.path.join(project_folder_name, project_params['edit_timelines_path'], timeline_file_base)
+#
+#    # Using SourceFileLoader to load a script file from a specified path.
+#    from importlib.machinery import SourceFileLoader
+#    timeline_module = SourceFileLoader('timeline_file', timeline_file).load_module()
+#    timeline = timeline_module.getTimeline(params)
+#
+#    timeline = debugTimelineMaker(params)
+####
+
+def debugTimelineMaker(params):
+    project_folder_name = params['project_name']
+    math_support = params['math_support']
+
+    timeline_name = params['timeline_name']
+
+    project_params = params['project_params']
+
+    framerate = float(project_params.get('render_fps', 23.976))
+    frame_width = int(project_params.get('render_image_width', 160))
+    frame_height = int(project_params.get('render_image_height', 120))
+
+    max_iterations = 255
+
+    timeline = DiveTimeline(project_folder_name, 'mandelbrot_smooth', framerate, frame_width, frame_height, math_support)
+
+    span_duration = 2000 
+    main_span = timeline.addNewSpan(0,span_duration)
+
+    mesh_center = math_support.createComplex('-1.76938+0.00423j')
+    mesh_real_width = math_support.createFloat('1.0')
+    mesh_imag_width = math_support.createFloat(frame_height / frame_width * mesh_real_width) 
+    
+    end_mesh_real_width = mesh_real_width * .01
+    end_mesh_imag_width = mesh_imag_width * .01
+
+    main_span.addNewParameterKeyframe(0, 'complex', 'meshCenter', mesh_center, transitionIn='root-to', transitionOut='root-to')
+    main_span.addNewParameterKeyframe(span_duration, 'complex', 'meshCenter', mesh_center, transitionIn='root-to', transitionOut='root-to')
+
+    main_span.addNewParameterKeyframe(0, 'float', 'meshRealWidth', mesh_real_width, transitionIn='root-to', transitionOut='root-to')
+    main_span.addNewParameterKeyframe(span_duration, 'float', 'meshRealWidth', end_mesh_real_width, transitionIn='root-to', transitionOut='root-to')
+
+    main_span.addNewParameterKeyframe(0, 'float', 'meshImagWidth', mesh_imag_width, transitionIn='root-to', transitionOut='root-to')
+    main_span.addNewParameterKeyframe(span_duration, 'float', 'meshImagWidth', end_mesh_imag_width, transitionIn='root-to', transitionOut='root-to')
+  
+    iterations_delta = 200 
+    main_span.addNewParameterKeyframe(0, 'int', 'max_escape_iterations', max_iterations, transitionIn='linear', transitionOut='linear')
+    main_span.addNewParameterKeyframe(span_duration * .25, 'int', 'max_escape_iterations', max_iterations-iterations_delta, transitionIn='linear', transitionOut='linear')
+    main_span.addNewParameterKeyframe(span_duration * .5, 'int', 'max_escape_iterations', max_iterations, transitionIn='linear', transitionOut='linear')
+    main_span.addNewParameterKeyframe(span_duration * .75, 'int', 'max_escape_iterations', max_iterations-iterations_delta, transitionIn='linear', transitionOut='linear')
+    main_span.addNewParameterKeyframe(span_duration, 'int', 'max_escape_iterations', max_iterations, transitionIn='linear', transitionOut='linear')
+
+    return timeline
+   
 def run_batch_timeline(params):
-    pass
+    """
+    Parameters come from command-line script 'params' hash, as well
+    as from the 'project_params' sub-hash, which loads the params.json
+    """
+    project_params = params['project_params']
+    project_folder_name = params['project_name']
+    timeline_name = params['timeline_name']
+
+    timeline_file_name = os.path.join(params['project_name'], params['project_params']['edit_timelines_path'], params['timeline_name'])
+    timeline = load_timeline_from_file(timeline_file_name, params)
+
+    main_span = timeline.getMainSpan()
+    frame_count = timeline.getFramesInDuration(main_span.duration) 
+    print(f"duration: {main_span.duration}")
+    print(f"frame count: {frame_count}")
+
+    output_folder_name = os.path.join(project_folder_name, project_params['render_output_path'], timeline_name)
+    if not os.path.exists(output_folder_name):
+        os.makedirs(output_folder_name)
+
+    frame_numbers = []
+    batch_frame_file
+    with open(batch_frame_file, 'rt') as batch_handle:
+        for currLine in batch_handle:
+            frameNumbers.append(int(currLine.strip()))
+
+    #frame_file_names = []
+    for curr_frame_number in frame_numbers: 
+        frame_time = timeline.getTimeForFrameNumber(curr_frame_number)
+        print(f"batch frame {curr_frame_number} at {frame_time}")
+        dive_mesh = timeline.getMeshForTime(frame_time)    
+        print(f"{dive_mesh.realMeshGenerator.baseWidth} x {dive_mesh.imagMeshGenerator.baseWidth} ({dive_mesh.extraParams['max_escape_iterations']} iter)")
+        # Following is a class instantiation, of a string-specified Algo class
+        algorithm_map = DiveTimeline.algorithm_map()
+        frame_algorithm = algorithm_map[timeline.algorithmName](dive_mesh=dive_mesh, frame_number=curr_frame_number, output_folder_name=output_folder_name, extra_params=dive_mesh.extraParams)
+        frame_algorithm.run()
+
+        #frame_file_names.append(frame_algorithm.output_image_file_name)
 
 if __name__ == "__main__":
 
     print("++ fractal.py version %s" % (MANDL_VER))
 
     params = parse_options()
+    #print(params)
     mode = params['mode']
     if mode == 'exploration':
         run_exploration(params)
@@ -1812,10 +941,3 @@ if __name__ == "__main__":
         raise ValueError("Run mode is unrecognized - abandoning run")
 
  
-    #fractal_ctx = FractalContext()
-    #view_ctx  = MediaView(16, 16, fractal_ctx)
-    #parse_options(fractal_ctx, view_ctx)
-  
-    #view_ctx.setup()
-    #view_ctx.run()
-

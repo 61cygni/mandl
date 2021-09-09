@@ -16,6 +16,8 @@ from PIL import Image, ImageDraw
 
 from mandelbrot_solo import MandelbrotSolo
 
+from fractalpalette import FractalPaletteWithSchemes
+
 class MandelbrotSmooth(MandelbrotSolo):
 
 # TODO: Yeah, really should be a palette
@@ -42,64 +44,21 @@ class MandelbrotSmooth(MandelbrotSolo):
 
         self.algorithm_name = 'mandelbrot_smooth'
 
-        self.color = (.0,.6,1.0) # blue / yellow
-        #self.color = (.1,.2,.3) # dark
+        # Hacky hard-code for now.
+        # TODO: need to persist palette definitions with the timeline json.
+        self.palette = FractalPaletteWithSchemes([(.0,.6,1.0), # blue-tan 
+            (1.0,.4,.4), # teal-pink
+            (1.0,.2,.4), # green-pink
+            (.4,.2,.6), # green-purple
+        ])
+        self.palette_index = extra_params.get('palette_scheme_index', 0) 
 
     def process_counts(self):
+        print(f"process_counts says mathSupport is {self.dive_mesh.mathSupport.precisionType}")
         smoothing_function = np.vectorize(self.dive_mesh.mathSupport.smoothAfterCalculation)
         self.processed_array = smoothing_function(self.last_values_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
 
     def generate_image(self):
-        (image_height, image_width) = self.processed_array.shape
-        im = Image.new('RGB', (image_width, image_height), (0, 0, 0))
-        draw = ImageDraw.Draw(im)
-
-        # Note: Image's width,height is backwards from numpy's size (rows, cols)
-        for x in range(0, image_width):
-            for y in range(0, image_height):
-                color = self.map_value_to_color(self.processed_array[y,x])
-
-                # Plot the point
-                draw.point([x, y], color) 
-
-        if self.burn_in == True:
-            meta = self.get_metadata()
-            if meta:
-                burn_in_text = u"%d" % (meta['frame_number'])
-                self.burn_text_to_drawing(burn_in_text, draw)
-
-        image_filename_base = u"%d.tiff" % self.frame_number
-        self.output_image_file_name = os.path.join(self.output_folder_name, image_filename_base)
-        im.save(self.output_image_file_name)
-
-    def map_value_to_color(self, val):
-        # TODO: should make this a special rotating palette,
-        # or bound the values before doing a lookup to a palette.
-        if math.isnan(val):
-            return (0,0,0)
-
-        if self.color:
-            # (yellow blue 0,.6,1.0)
-            c1 = 1 + math.cos(3.0 + val*0.15 + self.color[0])
-            c2 = 1 + math.cos(3.0 + val*0.15 + self.color[1])
-            c3 = 1 + math.cos(3.0 + val*0.15 + self.color[2])
-            
-            if c1 <= 0 or math.isnan(c1):
-                c1int = 0
-            else:
-                c1int = int(255.*((c1/4.) * 3.) / 1.5)
-            if c2 <= 0 or math.isnan(c2):
-                c2int = 0
-            else:
-                c2int = int(255.*((c2/4.) * 3.) / 1.5)
-            if c3 <= 0 or math.isnan(c3):
-                c3int = 0
-            else:
-                c3int = int(255.*((c3/4.) * 3.) / 1.5)
-
-            return (c1int,c2int,c3int)
-        else:        
-            c1 = 1 + math.cos(3.0 + val*0.15)
-            cint = int(255.*((c1/4.) * 3.) / 1.5)
-            return (cint,cint,cint)
+        self.palette.set_scheme_index(self.palette_index) 
+        super().generate_image()
 

@@ -168,7 +168,7 @@ class EscapeAlgo(Algo):
 
         # Load, with optional default values
         self.escape_radius = extra_params.get('escape_radius', 2.0)
-        self.max_escape_iterations = extra_params.get('max_escape_iterations', 255)
+        self.max_escape_iterations = int(extra_params.get('max_escape_iterations', 255))
         self.burn_in = extra_params.get('burn_in', False)
         self.palette = extra_params.get('palette', fp.FractalPalette())
 

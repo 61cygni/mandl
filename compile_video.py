@@ -80,6 +80,7 @@ def get_image_sequence_in_directory(params):
         file_names.append(curr_file_name)
 
     return file_names
+
 if __name__ == "__main__":
     print("++ compile_video.py")
 

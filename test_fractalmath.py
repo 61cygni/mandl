@@ -65,6 +65,56 @@ class TestMathSupport(unittest.TestCase):
         # Not endpoint check
         self.assertAlmostEqual(2.5, self.mathSupport.interpolate('linear', startX, startY, endX, endY, 1.25))
 
+    def test_interpolateRootTo(self):
+        startX = 1.0
+        startY = 1.0
+        multiplier = .92 
+        stepsToEnd = 4
+        endX = 2.0
+        endY = startY * (multiplier ** stepsToEnd) 
+
+        # Endpoints check
+        self.assertAlmostEqual(startY, float(self.mathSupport.interpolate('root-to', startX, startY, endX, endY, startX)))
+        self.assertAlmostEqual(endY, float(self.mathSupport.interpolate('root-to', startX, startY, endX, endY, endX))) 
+       
+        # Non-endpoints check 
+        targetX = .75
+        stepsToTestPoint = 3
+        midRangeValue = startY * (multiplier ** stepsToTestPoint)
+        self.assertAlmostEqual(midRangeValue, float(self.mathSupport.interpolate('root-to', startX, startY, endX, endY, targetX)))
+
+        targetX = .5
+        stepsToTestPoint = 2
+        midRangeValue = startY * (multiplier ** stepsToTestPoint)
+        self.assertAlmostEqual(midRangeValue, float(self.mathSupport.interpolate('root-to', startX, startY, endX, endY, targetX)))
+
+    def test_interpolateRootFrom(self):
+        multiplier = .92 
+        stepsToEnd = 4
+        endX = 2.0
+        endY = 1.0
+
+        startX = 1.0
+        startY = endY * (multiplier ** stepsToEnd) 
+
+        # Endpoints check
+        self.assertAlmostEqual(startY, float(self.mathSupport.interpolate('root-from', startX, startY, endX, endY, startX)))
+        self.assertAlmostEqual(endY, float(self.mathSupport.interpolate('root-from', startX, startY, endX, endY, endX))) 
+       
+        # Non-endpoints check 
+
+        # A little logically jumbled, but setting up forward-multiplied
+        # positions, based on the endY starting value.
+        targetX = .75
+        stepsToTestPoint = 1
+        midRangeValue = endY * (multiplier ** stepsToTestPoint)
+        self.assertAlmostEqual(midRangeValue, float(self.mathSupport.interpolate('root-to', startX, startY, endX, endY, targetX)))
+
+        targetX = .5
+        stepsToTestPoint = 2
+        midRangeValue = endY * (multiplier ** stepsToTestPoint)
+        self.assertAlmostEqual(midRangeValue, float(self.mathSupport.interpolate('root-to', startX, startY, endX, endY, targetX)))
+
     def test_mandelbrot(self):
         # Native python isn't accurate past ~120 iterations. 
         # So, we either reduce iterations, and require fewer decimal places to match.

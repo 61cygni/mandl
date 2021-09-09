@@ -40,6 +40,9 @@ class MandelbrotSolo(EscapeAlgo):
     def generate_counts(self):
         math_support = self.dive_mesh.mathSupport
 
+        mathDigits = math_support.digitsPrecision()
+        print(f"Running with {self.max_escape_iterations} iter and {mathDigits} digits")
+
         #mandelbrot_function = np.vectorize(math_support.mandelbrot_beginning)
         mandelbrot_function = np.vectorize(math_support.mandelbrot)
         (self.counts_array, self.last_values_array) = mandelbrot_function(self.mesh_array, self.escape_radius, self.max_escape_iterations)
@@ -54,6 +57,8 @@ class MandelbrotSolo(EscapeAlgo):
 
         # numpyArray.shape returns (rows, columns)
         for y in range(0, self.mesh_array.shape[0]):
+            #print(f"first col {self.counts_array[y,0]}")
+
             for x in range(0, self.mesh_array.shape[1]):
                 # Not using mathSupport's floor() here, because it should just be a normal-scale float
                 if self.counts_array[y,x] < self.max_escape_iterations:

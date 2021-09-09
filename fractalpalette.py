@@ -236,3 +236,54 @@ class FractalPalette:
         clip = mpy.VideoClip(self.make_frame, duration=64)
         clip.preview(fps=1) #fps 1 is really all that works
 ## FractalPalette        
+
+class FractalPaletteWithSchemes(FractalPalette):
+    def __init__(self, scheme_list):
+        super().__init__()
+
+        self.scheme_index = 0
+        self.scheme_list = scheme_list
+
+        # These probably belong in more specific sublcasses, but
+        # no working example yet, so not sure.
+        #self.scheme_multipiers # will be a per-color multiplier for val
+        #self.scheme_offsets # will be a per-color constant for inside the val clculation
+
+    def set_scheme_index(self, new_scheme_index):
+        if new_scheme_index < len(self.scheme_list):
+            self.scheme_index = new_scheme_index
+
+    def map_value_to_color(self, val):
+        """ 
+        Kinda cheating, just overriding instead of switching behaviors. 
+        """
+        if math.isnan(val):
+            return (0,0,0)
+
+        currColorValues = self.scheme_list[self.scheme_index]
+
+        # (yellow blue 0,.6,1.0)
+        c1 = 1 + math.cos(3.0 + val*0.15 + currColorValues[0])
+        c2 = 1 + math.cos(3.0 + val*0.15 + currColorValues[1])
+        c3 = 1 + math.cos(3.0 + val*0.15 + currColorValues[2])
+
+        
+        if c1 <= 0 or math.isnan(c1):
+            c1int = 0
+        else:
+            c1int = int(255.*((c1/4.) * 3.) / 1.5)
+        if c2 <= 0 or math.isnan(c2):
+            c2int = 0
+        else:
+            c2int = int(255.*((c2/4.) * 3.) / 1.5)
+        if c3 <= 0 or math.isnan(c3):
+            c3int = 0
+        else:
+            c3int = int(255.*((c3/4.) * 3.) / 1.5)
+
+        return (c1int,c2int,c3int)
+#    else:        
+#        c1 = 1 + math.cos(3.0 + val*0.15)
+#        cint = int(255.*((c1/4.) * 3.) / 1.5)
+#        return (cint,cint,cint)
+#

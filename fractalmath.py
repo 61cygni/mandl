@@ -56,7 +56,14 @@ class DiveMathSupport:
         #raise NotImplementedError("setPrecision is meaningless for base class, and must be implemented in DiveMathSupport sublcasses") 
 
     def precision(self):
-        return 16 # Heh - pytnon's native float64, right?
+        return 53 # Heh - pytnon's native float64, right?
+
+    def setDigitsPrecision(self, digits):
+        #print(f"Setting precision DIGITS: {digits}")
+        self.setPrecision(round(digits * 3.32))
+
+    def digitsPrecision(self):
+        return round(self.precision() / 3.32)
 
     def createComplex(self, *args):
         """
@@ -99,7 +106,11 @@ class DiveMathSupport:
         return startValue * (overallZoomFactor ** iterations)
 
     def createLinspace(self, paramFirst, paramLast, quantity):
-        """Attempt at a mostly type-agnostic linspace(), seems to work with flint types too"""
+        """
+        Attempt at a mostly type-agnostic linspace(), seems to work with 
+        flint types too.
+        """
+        #print(f"createLinspace {paramFirst}, {paramLast}, {quantity}")
         dataRange = paramLast - paramFirst
         answers = np.zeros((quantity), dtype=object)
 
@@ -116,6 +127,8 @@ class DiveMathSupport:
         was an important for a Python/Decimal version to be able to have a
         type-specific implementation in what was a DiveMeshDecimal function
         """
+        #print(f"createLinspaceAroundValuesCenter {valuesCenter}, {spreadWidth}, {quantity}")
+
         return self.createLinspace(valuesCenter - spreadWidth * 0.5, valuesCenter + spreadWidth * 0.5, quantity)
 
     def interpolate(self, transitionType, startX, startY, endX, endY, targetX, extraParams={}):
@@ -124,18 +137,34 @@ class DiveMathSupport:
         were needed for each type, but we might just be able to pass
         in an extra param hash?
         """
+        print(f"DiveMathSuppport interpolation type {transitionType}")
+
         if transitionType == 'log-to':
             return self.interpolateLogTo(startX, startY, endX, endY, targetX)
         elif transitionType == 'root-to':
             return self.interpolateRootTo(startX, startY, endX, endY, targetX)
+        elif transitionType == 'root-from':
+            return self.interpolateRootFrom(startX, startY, endX, endY, targetX)
+        elif transitionType == 'root-to-ease-in':
+            return self.interpolateRootToEaseIn(startX, startY, endX, endY, targetX)
+        elif transitionType == 'root-to-ease-out':
+            return self.interpolateRootToEaseOut(startX, startY, endX, endY, targetX)
+        elif transitionType == 'root-from-ease-in':
+            return self.interpolateRootFromEaseIn(startX, startY, endX, endY, targetX)
+        elif transitionType == 'root-from-ease-out':
+            return self.interpolateRootFromEaseOut(startX, startY, endX, endY, targetX)
         elif transitionType == 'linear':
             return self.interpolateLinear(startX, startY, endX, endY, targetX)
+        elif transitionType == 'step':
+            return startY # Kinda a special not-actual-interpolation
         elif transitionType == 'quadratic-to':
             return self.interpolateQuadraticEaseOut(startX, startY, endX, endY, targetX)
         elif transitionType == 'quadratic-from':
             return self.interpolateQuadraticEaseIn(startX, startY, endX, endY, targetX)
-        else: # transitionType == 'quadratic-to-from'
+        elif transitionType == 'quadratic-to-from':
             return self.interpolateQuadraticEaseInOut(startX, startY, endX, endY, targetX)
+        else: # transitionType == 'quadratic-to-from'
+            raise ValueError(f"ERROR - Transition type \"{transitionType}\" isn't recognized!")
 
     def interpolateLogTo(self, startX, startY, endX, endY, targetX):
         """
@@ -181,14 +210,108 @@ class DiveMathSupport:
         we want to be able to interpolate between two points using
         the frame count as the root.
         """
+        print(f"root-to attempt")
+        if targetX == endX:
+            print("  end")
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            print("  start or identical")
+            return startY
+        else:
+            root = abs(endX - startX)
+            scaleFactor = (endY / startY) ** (1 / root)
+            debugAnswer = startY * (scaleFactor ** abs(targetX - startX))
+            print(f"  root-to answer {debugAnswer}")
+            return startY * (scaleFactor ** abs(targetX - startX))
+            #root = endX - startX
+            #scaleFactor = (endY / startY) ** (1 / root)
+            #debugAnswer = startY * (scaleFactor ** (targetX - startX))
+            #print(f"  root-to answer {debugAnswer}")
+            #return startY * (scaleFactor ** (targetX - startX))
+
+    def interpolateRootFrom(self, startX, startY, endX, endY, targetX):
         if targetX == endX:
             return endY
         elif targetX == startX or startX == endX or startY == endY:
             return startY
         else:
-            root  = endX - startX
-            scaleFactor = (endY / startY) ** (1 / root)
-            return startY * (scaleFactor ** targetX)
+            print(f"root-froming into (({startX},{startY}),({endX},{endY}))")
+            #debugAnswer = self.interpolateRootTo(startX, endY, endX, startY, targetX)
+            #print(f"root-froming answer {debugAnswer}")
+            #return self.interpolateRootTo(startX, endY, endX, startY, targetX)
+            return self.interpolateRootTo(endX, endY, startX, startY, targetX)
+
+    ########
+    # For the combination interpolations...
+    #
+    # First, map the target position to a quadratic-adjusted
+    # position, then use that adjusted target position as the
+    # input to the 'primary' interpolation
+    ########
+
+    def interpolateRootToEaseIn(self, startX, startY, endX, endY, targetX):
+        """
+        For example, zoom factors are root-to, so use this to settle 
+        into the target zoom (rather than hitting it suddenly). 
+        """
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            targetXRatio = self.interpolateQuadraticEaseIn(startX, 0.0, endX, 1.0, targetX)
+            adjustedTargetX = ((endX - startX) * targetXRatio) + startX
+
+            print(f"root-to-ease-in adjusted target from {targetX} to {adjustedTargetX} mapping into (({startX},{startY}),({endX},{endY}))")
+            return self.interpolateRootTo(startX, startY, endX, endY, adjustedTargetX)
+
+    def interpolateRootToEaseOut(self, startX, startY, endX, endY, targetX):
+        """
+        For example, zoom factors are root-to, so use this to slowly
+        build up speed when zooming in, rather than suddenly starting.
+        """
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            targetXRatio = self.interpolateQuadraticEaseOut(startX, 0.0, endX, 1.0, targetX)
+            adjustedTargetX = ((endX - startX) * targetXRatio) + startX
+            print(f"root-to-ease-out adjusted target from {targetX} at ratio {targetXRatio} to {adjustedTargetX} mapping into (({startX},{startY}),({endX},{endY}))")
+
+            return self.interpolateRootTo(startX, startY, endX, endY, adjustedTargetX)
+
+    def interpolateRootFromEaseIn(self, startX, startY, endX, endY, targetX):
+        """
+        When zooming OUT at a constant speed, the behavior is root-from,
+        so this interpolation settles into the end point. 
+        """
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            targetXRatio = self.interpolateQuadraticEaseIn(startX, 0.0, endX, 1.0, targetX)
+            adjustedTargetX = ((endX - startX) * targetXRatio) + startX
+            print(f"root-from-ease-in adjusted target from {targetX} to {adjustedTargetX} mapping into (({startX},{startY}),({endX},{endY}))")
+
+            return self.interpolateRootFrom(startX, startY, endX, endY, adjustedTargetX)
+    def interpolateRootFromEaseOut(self, startX, startY, endX, endY, targetX):
+        """
+        When zooming OUT at a constant speed, the behavior is root-from,
+        so this interpolation slowly builds up speed from rest (rather
+        than starting suddenly).
+        """
+        if targetX == endX:
+            return endY
+        elif targetX == startX or startX == endX or startY == endY:
+            return startY
+        else:
+            targetXRatio = self.interpolateQuadraticEaseOut(startX, 0.0, endX, 1.0, targetX)
+            adjustedTargetX = ((endX - startX) * targetXRatio) + startX
+            print(f"root-from-ease-out adjusted target from {targetX} to {adjustedTargetX} mapping into (({startX},{startY}),({endX},{endY}))")
+
+            return self.interpolateRootFrom(startX, startY, endX, endY, adjustedTargetX)
 
     def interpolateQuadraticEaseIn(self, startX, startY, endX, endY, targetX):
         """
@@ -288,6 +411,8 @@ class DiveMathSupport:
 
             z = z*z + c
 
+        #print("input: %s" % (str(c)))
+        #print("answer: %s, lastZ: %s" % (str(n), str(z)))
         return (n, z)
 
     def julia(self, c, z0, escapeRadius, maxIter):
@@ -485,6 +610,7 @@ class DiveMathSupportFlint(DiveMathSupport):
         self.precisionType = 'flint'
 
     def setPrecision(self, newPrecision):
+        #print(f"Setting precision: {newPrecision}")
         oldPrecision = self.flint.ctx.prec
         self.flint.ctx.prec = newPrecision
         return oldPrecision
@@ -665,6 +791,32 @@ class DiveMathSupportFlint(DiveMathSupport):
     def floor(self, value):
         return self.flint.arb(value).floor()
 
+#    def createLinspace(self, paramFirst, paramLast, quantity):
+#        """
+#        """
+#        print(f"Flint createLinspace {paramFirst}, {paramLast}, {quantity}")
+#        dataRange = paramLast - paramFirst
+#        answers = np.zeros((quantity), dtype=object)
+#
+#        for x in range(0, quantity):
+#            answers[x] = paramFirst + dataRange * (x / (quantity - 1))
+#            answers[x] = self.flint.arb(answers[x].mid(), 0)
+#        return answers
+#
+#    def createLinspaceAroundValuesCenter(self, valuesCenter, spreadWidth, quantity):
+#        """
+#        """
+#        firstValue = valuesCenter - spreadWidth * 0.5
+#        firstValue = self.flint.arb(firstValue.mid(), 0)
+#
+#        lastValue = valuesCenter + spreadWidth * 0.5
+#        lastValue = self.flint.arb(lastValue.mid(), 0)
+#
+#        print(f"createLinspaceAroundValuesCenter {valuesCenter}, {spreadWidth}, {quantity}")
+#
+#        return self.createLinspace(firstValue, lastValue, quantity)
+#        #return self.createLinspace(valuesCenter - spreadWidth * 0.5, valuesCenter + spreadWidth * 0.5, quantity)
+
     def scaleValueByFactorForIterations(self, startValue, overallZoomFactor, iterations):
         """
         Shortcut calculate the starting point for the last frame's properties, 
@@ -712,9 +864,12 @@ class DiveMathSupportFlint(DiveMathSupport):
         elif targetX == startX or startX == endX or startY == endY:
             return startY
         else:
-            root  = endX - startX
+            root = endX - startX
             scaleFactor = (endY / startY) ** (1 / root)
-            return startY * (scaleFactor ** targetX)
+            print(f"root: {root}\nscaleFactor: {scaleFactor}")
+            debugAnswer = startY * (scaleFactor ** (targetX - startX))
+            print(f"  flint root-to answer {debugAnswer}")
+            return startY * (scaleFactor ** (targetX - startX))
 
     def interpolateQuadraticEaseOut(self, paramStartX, paramStartY, paramEndX, paramEndY, paramTargetX):
         """
@@ -775,6 +930,8 @@ class DiveMathSupportFlint(DiveMathSupport):
             zImagNoErr = self.flint.arb(z.imag.mid(), 0)
             z = self.flint.acb(zRealNoErr, zImagNoErr) 
 
+        #print("input: %s" % (str(c)))
+        #print("answer: %s, lastZ: %s" % (str(n), str(z)))
         return (n, z)
 
     def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
@@ -881,6 +1038,10 @@ class DiveMathSupportFlint(DiveMathSupport):
        return max(min(num, max_value), min_value)
 
 class DiveMathSupportFlintCustom(DiveMathSupportFlint):
+    def __init__(self):
+        super().__init__()
+        self.precisionType = 'flintcustom'
+
     def mandelbrot(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for HIGH maxIter values """
         #print("mandelbrot center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
