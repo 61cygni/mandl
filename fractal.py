@@ -906,10 +906,10 @@ def run_batch_timeline(params):
         os.makedirs(output_folder_name)
 
     frame_numbers = []
-    batch_frame_file
+    batch_frame_file = params['batch_frame_file'] 
     with open(batch_frame_file, 'rt') as batch_handle:
         for currLine in batch_handle:
-            frameNumbers.append(int(currLine.strip()))
+            frame_numbers.append(int(currLine.strip()))
 
     #frame_file_names = []
     for curr_frame_number in frame_numbers: 

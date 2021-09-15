@@ -1,0 +1,16 @@
+{
+    "math_support": "flintcustom",
+    "exploration_mesh_width": "160",
+    "exploration_mesh_height": "120",
+    "exploration_default_algo_name": "mandelbrot_smooth",
+    "exploration_default_zoom_factor": "0.1",
+    "exploration_output_path": "exploration/output",
+    "exploration_markers_path": "exploration/markers",
+    "edit_markers_path": "edit/markers",
+    "edit_timelines_path": "edit/timelines",
+    "render_image_width": "80",
+    "render_image_height": "60",
+    "render_fps": "2.997",
+    "render_output_path": "output",
+    "render_exports_path": "exports"
+}
