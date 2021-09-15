@@ -39,7 +39,7 @@ static float blue  = 0.3;
 // static char *str_cmplx_w = "4.";
 
 // These are good defaults for depth. e-20, renders sufficiently fast. 
-static int precision  = 200; 
+static int precision  = 300; 
 static int max_iter   = 6000;
 static char *str_real = "0.36024044343761436323612524444954530848260780795858575048837581474019534605";
 static char *str_imag = "-0.64131306106480317486037501517930206657949495228230525955617754306444857417";
