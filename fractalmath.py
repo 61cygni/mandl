@@ -9,6 +9,9 @@ import math
 
 import numpy as np
 
+import arb_fractalmath
+import mpfr_fractalmath
+
 #FLINT_HIGH_PRECISION_SIZE = 53 # 53 is how many bits are in float64
 #3.32 bits per digit, on average
 #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
@@ -1042,6 +1045,7 @@ class DiveMathSupportFlintCustom(DiveMathSupportFlint):
         super().__init__()
         self.precisionType = 'flintcustom'
 
+
     def mandelbrot(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for HIGH maxIter values """
         #print("mandelbrot center: %s radius: %s maxIter: %s" % (str(c), str(escapeRadius), str(maxIter)))
@@ -1049,6 +1053,14 @@ class DiveMathSupportFlintCustom(DiveMathSupportFlint):
         (answer, lastZ, remainingPrecision) = c.our_steps_mandelbrot(escapeRadius, maxIter)
         #print("answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
         #print("answer: %s, remainingPrecision: %s" % (str(answer), str(remainingPrecision)))
+        return(answer, lastZ)
+
+    def mandelbrot_arb(self, c, escapeRadius, maxIter):
+        (answer, lastZ, remainingPrecision) = arb_fractalmath.mandelbrot_steps(c, escapeRadius, maxIter)
+        return(answer, lastZ)
+
+    def mandelbrot_mpfr(self, c, escapeRadius, maxIter):
+        (answer, lastZ) = mpfr_fractalmath.mandelbrot_steps(c, escapeRadius, maxIter)
         return(answer, lastZ)
 
     def mandelbrot_check_precision(self, c, escapeRadius, maxIter):
