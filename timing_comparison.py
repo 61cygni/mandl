@@ -12,13 +12,13 @@ from fractalmath import *
 #mandelbrotMaxIter = 255
 #timerRepeatCount = 1000
 
-#decimalPlaces = 100
-#mandelbrotMaxIter = 7000 
-#timerRepeatCount = 100
+decimalPlaces = 100
+mandelbrotMaxIter = 7000 
+timerRepeatCount = 1000
 
-decimalPlaces = 500
-mandelbrotMaxIter = 35000 
-timerRepeatCount = 10
+#decimalPlaces = 500
+#mandelbrotMaxIter = 35000 
+#timerRepeatCount = 10
 
 #decimalPlaces = 1000
 #mandelbrotMaxIter = 150000 
@@ -85,13 +85,21 @@ def decMandelbrotter():
     radius = 2.0
     return decMathSupport.mandelbrot(theCenter, radius, mandelbrotMaxIter)
 
+def linspacer():
+    theCenter = flintCustomMathSupport.createComplex(centerString)
+    radius = 2.0
+    return flintCustomMathSupport.createLinspaceAroundValuesCenter(theCenter, .0005, 2048) 
+    
 def main():
+#    print("linspace")
+#    print(timeit.Timer(linspacer).timeit(number= timerRepeatCount*5))
+
 #    print("pure python (incorrect when iter > 100)")
 #    print(timeit.Timer(pyMandelbrotter).timeit(number= timerRepeatCount))
-    print("flint")
-    print(timeit.Timer(flintMandelbrotter).timeit(number= timerRepeatCount))
-    print("flint custom")
-    print(timeit.Timer(flintCustomMandelbrotter).timeit(number= timerRepeatCount))
+#    print("flint")
+#    print(timeit.Timer(flintMandelbrotter).timeit(number= timerRepeatCount))
+#    print("flint custom")
+#    print(timeit.Timer(flintCustomMandelbrotter).timeit(number= timerRepeatCount))
     print("flint low magnification")
     print(timeit.Timer(flintBeginningMandelbrotter).timeit(number= timerRepeatCount))
     print("arb steps")

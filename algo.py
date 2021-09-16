@@ -98,6 +98,13 @@ class Algo(object):
         self.mesh_array = self.dive_mesh.generateMesh()
 
         mesh_base_name = u"%d.mesh.pik" % self.frame_number
+
+        # Originally relied on the directory structure to exist, but after
+        # clearing intermediates a few times, it got annoying, so let's just
+        # cross our fingers that this all ends up where we hoped it would.
+        if not os.path.exists(self.output_folder_name):
+            os.makedirs(output_folder_name)
+
         mesh_file_name = os.path.join(self.output_folder_name, mesh_base_name)
         with open(mesh_file_name, 'wb') as mesh_handle:
             pickle.dump(self.dive_mesh, mesh_handle)

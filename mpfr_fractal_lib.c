@@ -130,8 +130,16 @@ void mpfr_mandelbrot_steps(long *result, char **last_z_real_str, char **last_z_i
             break;
         } 
 
+        // Looks like ~4 percent increase in speed by using mpfr_sqr where
+        // possible, instead of mpfr_mul (which is interesting, because
+        // arb_sqr just redirects to mul).
+        //
+        // The mpfr docs claim in-place operations work too (where I'm pretty
+        // sure I had bugs trying to use arb_add(a,a,b) functions), and
+        // should be preferred over temporary values... but I haven't run
+        // any comparisons on that, so am not really worried about it?
         mpfr_add(temp_sum_a, last_z_real, last_z_imag, MPFR_RNDN);
-        mpfr_mul(temp, temp_sum_a, temp_sum_a, MPFR_RNDN);
+        mpfr_sqr(temp, temp_sum_a, MPFR_RNDN);
         mpfr_sub(temp_sub_a, temp, zr_squared, MPFR_RNDN);
         mpfr_sub(temp, temp_sub_a, zi_squared, MPFR_RNDN);
 
@@ -140,8 +148,8 @@ void mpfr_mandelbrot_steps(long *result, char **last_z_real_str, char **last_z_i
         mpfr_sub(temp_sub_a, zr_squared, zi_squared, MPFR_RNDN);
         mpfr_add(last_z_real, temp_sub_a, start_real, MPFR_RNDN);
 
-        mpfr_mul(zr_squared, last_z_real, last_z_real, MPFR_RNDN);
-        mpfr_mul(zi_squared, last_z_imag, last_z_imag, MPFR_RNDN);
+        mpfr_sqr(zr_squared, last_z_real, MPFR_RNDN);
+        mpfr_sqr(zi_squared, last_z_imag, MPFR_RNDN);
     }
 
     // Print the value to the print buffer, then create a new string
