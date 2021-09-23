@@ -19,6 +19,7 @@ from numpy.distutils.system_info import default_include_dirs, default_lib_dirs
 #default_include_dirs = default_include_dirs + [numpy.get_include()]
 
 mpfr_include_dirs = default_include_dirs.copy()
+mpfr_include_dirs.append(numpy.get_include())
 #arb_include_dirs.append(".")
 
 #for curr_dir in default_include_dirs:
@@ -38,7 +39,7 @@ extensions = [
     # The combination of the custom fractal library, and it's cython
     # wrapper, is caled "fractalmath_mpfr", and can be imported by that name
     # in a python script.
-    Extension('mpfr_fractalmath', ['mpfr_fractalmath.pyx'], libraries=["mpfr", "mpfrfractalmath"], library_dirs=mpfr_library_dirs, include_dirs=mpfr_include_dirs)
+    Extension('mpfr_fractalmath', ['mpfr_fractalmath.pyx'], libraries=["mpfr", "mpfrfractalmath"], library_dirs=mpfr_library_dirs, include_dirs=mpfr_include_dirs, define_macros=[('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')])
     ]
 
 setup(

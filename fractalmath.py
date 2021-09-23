@@ -16,9 +16,9 @@ import mpfr_fractalmath
 #3.32 bits per digit, on average
 #2200 was therefore, ~662 digits, got 54 frames down at .5 scaling
 
-#FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) # 2200*3.32 = 7304, lol
+#FLINT_HIGH_PRECISION_SIZE = int(2800 * 3.32) 
 #FLINT_HIGH_PRECISION_SIZE = int(2200 * 3.32) # 2200*3.32 = 7304, lol
-#FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32) # 2200*3.32 = 7304, lol
+#FLINT_HIGH_PRECISION_SIZE = int(1800 * 3.32)
 #FLINT_HIGH_PRECISION_SIZE = int(1125 * 3.32) 
 #FLINT_HIGH_PRECISION_SIZE = int(500 * 3.32) 
 #FLINT_HIGH_PRECISION_SIZE = int(400 * 3.32) 
@@ -34,6 +34,26 @@ import mpfr_fractalmath
 #FLINT_HIGH_PRECISION_SIZE = int(30 * 3.32) 
 FLINT_HIGH_PRECISION_SIZE = int(16 * 3.32) 
 
+class DecimalComplex:
+    def __init__(self, realValue, imagValue):
+        super().__init__()
+        self.real = realValue
+        self.imag = imagValue
+
+    def __repr__(self):
+        if self.real == None:
+            realString = "0"
+        else: # self.real != None:
+            realString = str(self.real)
+        if self.imag == None:
+            imagString = "+0" 
+        else: # self.imag != None:
+            if self.imag >= 0.0:
+                imagString = f"+{str(self.imag)}"
+            else:
+                imagString = str(self.imag)
+        return f"({realString}{imagString}j)"
+
 class DiveMathSupport:
     """
     Toolbox for math functions that need to be type-aware, so we
@@ -47,54 +67,159 @@ class DiveMathSupport:
     the Decimal library, and had to keep separate real and imaginary
     components of a complex number ourselves.
 
-    Trying to preserve types where possible, without forcing casting, because sometimes
-    all the math operations will already work for custom numeric types.
+    Trying to preserve types where possible, without forcing casting, 
+    because sometimes all the math operations will already work for 
+    custom numeric types.
     """
     def __init__(self):
         self.precisionType = 'native'
 
+        self.decimal = __import__('decimal') # Only imports if you instantiate this DiveMathSupport subclass.
+        self.defaultPrecisionSize = 53 
+        self.decimal.getcontext().prec = self.bitsToDigits(self.defaultPrecisionSize)
+
+    def digitsToBits(self, digits):
+        return round(digits * 3.3219)
+        
+    def bitsToDigits(self, bits):
+        return round(bits / 3.3219)
+
+    # Decimal precision is in digits natively, so we can handle
+    # the in and out conversions to make bits work the right way too.
     def setPrecision(self, newPrecision):
-        """ Seems meaningless for pure python impelmentation, but seems like calling this shouldn't force a crash either? """
-        pass;
-        #raise NotImplementedError("setPrecision is meaningless for base class, and must be implemented in DiveMathSupport sublcasses") 
-
+        newDigits = self.bitsToDigits(newPrecision)
+        oldPrecision = self.decimal.getcontext().prec
+        self.decimal.getcontext().prec = newDigits
+        return oldPrecision
+        
     def precision(self):
-        return 53 # Heh - pytnon's native float64, right?
+        return self.digitsToBits(self.decimal.getcontext().prec)
 
-    def setDigitsPrecision(self, digits):
-        #print(f"Setting precision DIGITS: {digits}")
-        self.setPrecision(round(digits * 3.32))
+    def setDigitsPrecision(self, newDigits):
+        oldPrecision = self.decimal.getcontext().prec
+        self.decimal.getcontext().prec = newDigits
+        return oldPrecision
 
     def digitsPrecision(self):
-        return round(self.precision() / 3.32)
+        return self.decimal.getcontext().prec
 
     def createComplex(self, *args):
         """
+        Most of the time, keeping separate real and imaginary numbers is
+        going to be more efficient than creating complex representations.
+ 
         Compatible complex types will return values for .real() and .imag()
-
-        Native complex type just passes on all params to complex()
         """
-        # Can't make a native complex from 2 strings though, so when we
-        # detect that, jam them into floats
-        if len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
-            return complex(float(args[0]), float(args[1]))
-        #elif len(args) == 1 and isinstance(args[0], str):
-        #    # Strip parens out of the definition string?
+        if len(args) == 2:
+            return DecimalComplex(self.decimal.Decimal(args[0]), self.decimal.Decimal(args[1]))
+        elif len(args) == 1:
+            if isinstance(args[0], str):
+                partsString = args[0]
+
+                # Trim off surrounding parens, if present
+                if partsString.startswith('('):
+                    partsString = partsString[1:]
+                if partsString.endswith(')'):
+                    partsString = partsString[:-1]
+
+                # Trim off the leading sign
+                firstIsPositive = True
+                if partsString.startswith('+'):
+                    partsString = partsString[1:]
+                elif partsString.startswith('-'):
+                    firstIsPositive = False
+                    partsString = partsString[1:]
+
+                # Trim off the trailing letter 
+                lastIsImag = False
+                if partsString.endswith('j'):
+                    lastIsImag = True
+                    partsString = partsString[:-1]
+
+                # Remaining string might have an internal sign.
+                # If there's no internal sign, then the whole remaining
+                # string is either the real or the complex
+                positiveParts = partsString.split('+')
+                negativeParts = partsString.split('-')
+
+                realIsPositive = True
+                imagIsPositive = True
+                realPart = ""
+                imagPart = ""
+                if len(positiveParts) == 2:
+                    realIsPositive = firstIsPositive
+                    realPart = positiveParts[0]
+                    imagIsPositive = True
+                    imagPart = positiveParts[1]
+                elif len(negativeParts) == 2:
+                    realIsPositive = firstIsPositive
+                    realPart = negativeParts[0]
+                    imagIsPositive = False
+                    imagPart = negativeParts[1]
+                elif len(positiveParts) == 1 and len(negativeParts) == 1:
+                    # No internal + or -, so it should just be a number
+                    if lastIsImag == True:
+                        imagPart = partsString
+                        imagIsPositive = firstIsPositive
+                    else:
+                        realPart = partsString
+                        realIsPositive = firstIsPositive
+                else:
+                    raise ValueError("String parameter \"%s\" not identifiably a complex number, in createComplex()" % args[0])
+
+                preparedReal = '0.0'
+                preparedImag = '0.0'
+                if realPart != "":
+                    if realIsPositive == True:
+                        preparedReal = realPart
+                    else:
+                        preparedReal = "-%s" % realPart
+
+                if imagPart != "":
+                    if imagIsPositive == True:
+                        preparedImag = imagPart
+                    else:
+                        preparedImag = "-%s" % imagPart
+
+                print(f"preparedReal \"{preparedReal}\"")
+                print(f"preparedImag \"{preparedImag}\"")
+                return DecimalComplex(self.decimal.Decimal(preparedReal), self.decimal.Decimal(preparedImag))
+            else:
+                if isinstance(args[0], complex):
+                    return DecimalComplex(self.decimal.Decimal(args[0].real), self.decimal.Decimal(args[0].imag))
+                else:
+                    return DecimalComplex(self.decimal.Decimal(args[0]),self.decimal.Decimal(0))# Just a constant, so make a 0-imaginary value
+        elif len(args) == 0:
+            return DecimalComplex(self.decimal.Decimal(0),self.decimal.Decimal(0))
         else:
-            return complex(*args) 
+            raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
+
+        # Maybe don't need real native 'complex' anywhere now?
+        ## Can't make a native complex from 2 strings though, so when we
+        ## detect that, jam them into floats
+        #if len(args) == 2 and isinstance(args[0], str) and isinstance(args[1], str):
+        #    return complex(float(args[0]), float(args[1]))
+        ##elif len(args) == 1 and isinstance(args[0], str):
+        ##    # Strip parens out of the definition string?
+        #else:
+        #    return complex(*args) 
 
     def createFloat(self, floatValue):
-        return float(floatValue)
+        return self.decimal.Decimal(floatValue)
 
     def stringFromFloat(self, paramFloat):
         return str(paramFloat)
 
     def shorterStringFromFloat(self, paramFloat, places):
-        # I guess for native, just ignore the truncation request?
-        return self.stringFromFloat(paramFloat) 
+        return round(paramFloat, places)
 
     def floor(self, value):
         return math.floor(value)
+
+    def arrayToStringArray(self, paramArray):
+        #stringifier = np.vectorize(str)
+        stringifier = np.vectorize(self.stringFromFloat) # So sublasses work better?
+        return stringifier(paramArray)
 
     def scaleValueByFactorForIterations(self, startValue, overallZoomFactor, iterations):
         """
@@ -117,8 +242,12 @@ class DiveMathSupport:
         dataRange = paramLast - paramFirst
         answers = np.zeros((quantity), dtype=object)
 
+        # Subtly, also likely forcing quantity to Decimal
+        oneLessQuantity = self.createFloat(quantity - 1)
+
+        #print(f"first {paramFirst.__class__}, last {paramLast.__class__}, quantity {quantity.__class__}") 
         for x in range(0, quantity):
-            answers[x] = paramFirst + dataRange * (x / (quantity - 1))
+            answers[x] = paramFirst + dataRange * (x / oneLessQuantity)
 
         return answers
 
@@ -132,7 +261,7 @@ class DiveMathSupport:
         """
         #print(f"createLinspaceAroundValuesCenter {valuesCenter}, {spreadWidth}, {quantity}")
 
-        return self.createLinspace(valuesCenter - spreadWidth * 0.5, valuesCenter + spreadWidth * 0.5, quantity)
+        return self.createLinspace(valuesCenter - spreadWidth * self.createFloat(0.5), valuesCenter + spreadWidth * self.createFloat(0.5), quantity)
 
     def interpolate(self, transitionType, startX, startY, endX, endY, targetX, extraParams={}):
         """
@@ -392,210 +521,413 @@ class DiveMathSupport:
         else:
             return (((targetX - startX)/ (endX - startX)) * (endY - startY)) + startY
 
-    def mandelbrot(self, c, escapeRadius, maxIter):
-        """ 
-        Now that smoothing is handled separately, the native python implementation
-        COULD work for flint as well, except it uses 'complex(0,0)' instead
-        of self.createComplex(0,0).
-        The reason for this is just as below - to reduce one extra function call in 
-        the core calculation.
+    def julia(self, realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIter):
+        currShape = realValues.shape
+        results = np.array(currShape, dtype=object)
+        lastRealValues = np.array(currShape, dtype=object)
+        lastImagValues = np.array(currShape, dtype=object)
+  
+        # numpyArray.shape returns (rows, columns) 
+        for y in range(currShape[0]):
+            for x in range(currShape[1]):
+                (results[y,x], lastRealValues[y,x], lastImagValues[y,x]) = self.juliaSingle(realValues[y,x], imagValues[y,x], realJuliaValue, imagJuliaValue, escapeRadius, maxIter)
 
-        Could just call julia with a zero start here, but seems wiser to
-        not have one extra function call in the core of the calculation?
+        return (results, lastRealValues, lastImagValues)
+
+    def juliaSingle(self, realValue, imagValue, realJuliaValue, imagJuliaValue, escapeRadius, maxIter):
         """
-        z = complex(0,0)
-        n = 0
+        Default behavior is 2D decimal to 2D decimal.
 
-        for currIter in range(maxIter + 1):
-            n = currIter
-
-            if abs(z) > escapeRadius:
-                break
-
-            z = z*z + c
-
-        #print("input: %s" % (str(c)))
-        #print("answer: %s, lastZ: %s" % (str(n), str(z)))
-        return (n, z)
-
-    def julia(self, c, z0, escapeRadius, maxIter):
-        """
         Some interesting c values
         c = complex(-0.8, 0.156)
         c = complex(-0.4, 0.6)
         c = complex(-0.7269, 0.1889)
-
-        Looks like this implementation is able to handle flint types, 
-        now that smoothing is handled separately.
-
-        fabs(z) returns the modulus of a complex number, which is the
-        distance to 0 (on a 2x2 cartesian plane)
-        However, instead we just square both sides of the inequality to
-        avoid the sqrt
-        e.g.: while (float((z.real**2)+(z.imag**2))) <= escapeSquared  and n < maxIter:
-
-        However, for python, it looks like it takes almost 1/2 of the time to do abs(Z)
         """
-        z = z0
-        n = 0
+        radSquared = escapeRadius * escapeRadius
+        result = 0
+
+        # Perhaps no longer relevant, but observations about python math:
+        # fabs(z) returns the modulus of a complex number, which is the
+        # distance to 0 (on a 2x2 cartesian plane), and NORMALLY, we'd
+        # check zRealSquared + zImagSquared against the escape-value-squared,
+        # but in python it looks like it takes almost 1/2 the time to do
+        # abs(Z) (when Z is a complex number), so checking against the
+        # un-squared radius is even faster somehow. 
+
+        realDecimal = self.decimal.Decimal(realValue)
+        imagDecimal = self.decimal.Decimal(imagValue)
+
+        zReal = self.decimal.Decimal(realJuliaValue)
+        zImag = self.decimal.Decimal(imagJuliaValue)
+        zrSquared = zReal * zReal
+        ziSquared = zImag * zImag
 
         for currIter in range(maxIter + 1):
-            n = currIter
+            result = currIter
 
-            if abs(z) > escapeRadius:
+            if (zrSquared + ziSquared) > radSquared:
                 break
 
-            z = z*z + c
+            # Below is 2(z.real*z.imag) + c.imag, but without an extra multiply
+            partSum = zReal * zImag
+            zImag = partSum + partSum + imagDecimal 
 
-        return (n, z)
+            zReal = zrSquared - ziSquared + realDecimal
 
-    def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
-        # TODO: seems like the order of params to smoothAfterCalculation are 
-        # all needlessly scrambled up? 
+            zrSquared = zReal * zReal
+            ziSquared = zImag * zImag
 
+        return (result, zReal, zImag)        
+
+    def mandelbrot(self, realValues, imagValues, escapeRadius, maxIter):
+        currShape = realValues.shape
+
+        results = np.empty(currShape, dtype=object)
+        lastRealValues = np.empty(currShape, dtype=object)
+        lastImagValues = np.empty(currShape, dtype=object)
+  
+        # numpyArray.shape returns (rows, columns) 
+        for y in range(currShape[0]):
+            for x in range(currShape[1]):
+                (results[y,x], lastRealValues[y,x], lastImagValues[y,x]) = self.mandelbrotSingle(realValues[y,x], imagValues[y,x], escapeRadius, maxIter)
+
+        return (results, lastRealValues, lastImagValues)
+ 
+    def mandelbrotSingle(self, realValue, imagValue, escapeRadius, maxIter):
+        """
+        Normally a sub-library would set up appropriate mandelbrot and
+        julia calls, but since native implementation is right here, we
+        have a special case where we know which implementation to use,
+        and can call it directly
+        """
+        return self.juliaSingle(realValue, imagValue, 0, 0, escapeRadius, maxIter)
+
+    def smoothAfterCalculation(self, lastRealValues, lastImagValues, endingIters, maxIter, escapeRadius):
+        """
+        Not at all ideal to iterate over the numpy array, but I can't see a 
+        trivial way to iterate all the arrays in parallel at the moment.
+        Probably a 'pass-the-index' technique of some kind.
+        """
+        currShape = lastRealValues.shape
+
+        results = np.empty(currShape, dtype=object)
+  
+        # numpyArray.shape returns (rows, columns) 
+        for y in range(currShape[0]):
+            for x in range(currShape[1]):
+                results[y,x] = self.smoothAfterCalculationSingle(lastRealValues[y,x], lastImagValues[y,x], endingIters[y,x], maxIter, escapeRadius)
+
+        return results
+ 
+    def smoothAfterCalculationSingle(self, lastReal, lastImag, endingIter, maxIter, escapeRadius):
+        # Below from: 
+        # https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
+        #
+        # // smooth iteration count
+        # //float sn = n - log(log(length(z))/log(B))/log(2.0); 
+        #
+        # // equivalent optimized smooth iteration count
+        # float sn = n - log2(log2(dot(z,z))) + 4.0;  
+        #
+        # But, that seems to be for B = 2.0
+        # I'm trying to use escape radius of 10.0
+        # So, log10(10.0) = 1.0, which kills the denominator inside the logs.
+        # Which brings the expression to 
+        # log(log(length(z))) / log(2.0) 
         if endingIter == maxIter:
-            return float(maxIter)
+            return self.createFloat(maxIter)
         else:
-            # The following code smooths out the colors so there aren't bands
-            # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-            # Note: Results in a float. We think.
-            #if endingIter != 1:
-            #    print("iter was %d" % endingIter)
-            #print("z: \"%s\" max_iter: %d iter: %d" % (endingZ, maxIter, endingIter))
-            #return endingIter + 1 - math.log(math.log2(abs(endingZ)))
-            #return endingIter + 1 - math.log(math.log2(abs(endingZ)) / math.log(2.0))
-            return endingIter + 1 - self.twoLogsHelper(endingZ, escapeRadius) / math.log(2.0)
+            sqMagnitude = self.decimal.Decimal(lastReal) ** 2 + self.decimal.Decimal(lastImag) ** 2 
+            return endingIter - ((sqMagnitude.sqrt().ln().ln()) / (self.decimal.Decimal('2').ln()))  
 
-    def justTwoLogs(self, value):
-        return math.log(math.log(value))
+    def mandelbrotDistanceEstimate(self, realValues, imagValues, escapeRadius, maxIter):
+        currShape = realValues.shape
 
-    def twoLogsHelper(self, value, radius):
+        results = np.empty(currShape, dtype=object)
+        lastRealValues = np.empty(currShape, dtype=object)
+        lastImagValues = np.empty(currShape, dtype=object)
+  
+        # numpyArray.shape returns (rows, columns) 
+        for y in range(currShape[0]):
+            for x in range(currShape[1]):
+                (results[y,x], lastRealValues[y,x], lastImagValues[y,x]) = self.mandelbrotDistanceEstimateSingle(realValues[y,x], imagValues[y,x], escapeRadius, maxIter)
+
+        return (results, lastRealValues, lastImagValues)
+ 
+    def mandelbrotDistanceEstimateSingle(self, realValue, imagValue, escapeRadius, maxIter):
         """
-        The UNoptimized smoothing calculation.
-
-        sn = n - ( ln( ln(abs(value))/ln(radius) ) / ln(2.0))
-
-        Of which, we're just running the upper part here, because the ln(2.0)
-        and subtraction don't need extra precision support.
-        
-        So, this calculates:
-        ln(ln(abs(value))/ln(radius))
+        Wonderfully slow implementation of distance estimate, but we need
+        a fallback/baseline, so here we go.
         """
-        return math.log(math.log(abs(value))/math.log(radius)) 
+        radSquared = escapeRadius * escapeRadius
+        result = 0
 
-    def mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
-# TODO: profile to make sure the exclusion is worth the extra multiplications
-#        c2 = c.real*c.real + c.imag*c.imag
-#        # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
-#        if  256.0*c2*c2 - 96.0*c2 + 32.0*c.real - 3.0 < 0.0: 
-#            return 0.0
-#        # skip computation inside M2 - http://iquilezles.org/www/articles/mset_2bulb/mset2bulb.htm
-#        if 16.0*(c2+2.0*c.real+1.0) - 1.0 < 0.0: 
-#            return 0.0
+        realDecimal = self.decimal.Decimal(realValue)
+        imagDecimal = self.decimal.Decimal(imagValue)
 
-        didEscape = False
-        z = complex(0,0)
-        dz = complex(0,0) # (0+0j) start for mandelbrot, (1+0j) for julia
-        absOfZ = 0.0 # Will re-use the final result for smoothing
-        n = 0
+        zReal = self.decimal.Decimal(0)
+        zImag = self.decimal.Decimal(0)
+        zrSquared = zReal * zReal
+        ziSquared = zImag * zImag
 
+        # Mandelbrot derivative initialize to (0+0j), but julia is (1+0j), FYI
+        dzReal = self.decimal.Decimal(0)
+        dzImag = self.decimal.Decimal(0)
+ 
         for currIter in range(maxIter + 1):
-            n = currIter
-
-            if absOfZ > escapeRadius:
+            result = currIter
+    
+            if (zrSquared + ziSquared) > radSquared:
                 break
 
-            # Z' -> 2·Z·Z' + 1
-            dz = 2.0 * (z*dz) + 1
+            # Z' -> 2·Z·Z' + 1  
+            # FYI: No "+1" for julia, dz is just 2·Z·Z'
+            # (a + bi) * (c + di)
+            # = ac + adi + bci - bd = ac - bd + (ad+bc)i
+            partSum = zReal * dzReal - zImag * dzImag 
+            newDzReal = partSum + partSum + 1 # Don't stomp dz yet
+            dzImag = zReal * dzImag + zImag * dzReal 
+            dzReal = newDzReal # Now safe to stomp
+
             # Z -> Z² + c           
-            z = z*z + c
+            # Below is 2(z.real*z.imag) + c.imag, but without an extra multiply
+            partSum = zReal * zImag
+            zImag = partSum + partSum + imagDecimal 
+            zReal = zrSquared - ziSquared + realDecimal
 
-            absOfZ = abs(z)
+            zrSquared = zReal * zReal
+            ziSquared = zImag * zImag
 
-        if n == maxIter:
-            return (n, 0.0)
-        else:    
-            return (n, absOfZ * math.log(absOfZ) / abs(dz))
+        # Tried to extract the distance smoothing from this a few times, 
+        # but it seems a lot messier to pass around the (needed) derivative
+        # as well, so we just go ahead and return an extra term here, knowing
+        # this theoretically could be better handled in the 'normal' two steps.
+        if result == maxIter:
+            return (result, zReal, zImag)
+        else:
+            realPart = zReal * zReal 
+            imagPart = zImag * zImag 
+            zMagnitude = (realPart + imagPart).sqrt()
+  
+            realPart = dzReal * dzReal
+            imagPart = dzImag * dzImag
+            dzMagnitude = (realPart + imagPart).sqrt()
 
-#        lastIter = 0
-#        for i in range(0, maxIter):
-#            if abs(z) > escapeRadius:
-#               didEscape = True
-#               break
-#
-#            # Z' -> 2·Z·Z' + 1
-#            dz = 2.0 * (z*dz) + 1
-#            # Z -> Z² + c           
-#            z = z*z + c
-#
-#            lastIter += 1
-#
-#        if didEscape == False:
-#            return (lastIter, 0.0)
-#        else:    
-#            absZ = abs(z) # Save an extra multiply
-#            return (lastIter, absZ * math.log(absZ) / abs(dz))
+            ## Can't take logs of zMagnitude when <= 0, 
+            ## and can't divide by zero-valued dzMagnitude.
+            ## (though these shouldn't ever be, because of sqrt?)
+            #if zMagnitude <= 0 or dzMagnitude <= 0:
+            #    return (result, zReal, zImag)
+            #
+            # Current most likely: 
+            #return ((zMagnitude * (zMagnitude.ln()) / dzMagnitude), zReal, zImag)
+            # But need to include the actual result, right?
+            #return (result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude), zReal, zImag)
+            tmpAnswer = result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude)
+            if result > 0:
+                return (tmpAnswer, zReal, zImag)
+            else:
+                return (self.decimal.Decimal(0), zReal, zImag)
 
+            # More math, slightly less blown out?
+            #return ((zMagnitude * zMagnitude).ln() * zMagnitude / dzMagnitude, zReal, zImag)
+            # People seem to like this for 2D:
+            #return (result - self.decimal.Decimal('0.5') * zMagnitude.ln() * zMagnitude / dzMagnitude, zReal, zImag)
 
-    def rescaleForRange(self, rawValue, endingIter, maxIter, scaleRange):
-#        #print("rescale %s for range %s" % (str(rawValue), str(scaleRange)))
-#        if endingIter == maxIter or rawValue <= 0.0:
-#            return 0.0
-#        else:
-#            zoomValue = float(math.pow((1/scaleRange) * rawValue / 0.1, 0.1))
-#            return self.clamp(zoomValue, 0.0, 1.0)
+            # somewhere on: https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/demm
+            #result:=2*log2(sqrt(xy2))*sqrt(xy2)/sqrt(sqr(eDx)+sqr(eDy));
+            #return ((2 * zMagnitude.ln() * zMagnitude / dzMagnitude), zReal, zImag)
+           
+            # Perhaps identical to current most likely, but looks very close anyway 
+            # From https://en.wikibooks.org/wiki/Fractals/Iterations_in_the_complex_plane/demm
+            #R = -K*Math.log(Math.log(R2+I2)*Math.sqrt((R2+I2)/(Dr*Dr+Di*Di))); // compute distance
+            #return (result - (2 * (zReal * zReal + zImag * zImag).ln() * zMagnitude / dzMagnitude), zReal, zImag)
 
-        val = float(rawValue)
-        if val < 0.0:
-            val = 0.0
-        zoo = .1 
-        zoom_level = 1. / scaleRange 
-        d = self.clamp( pow(zoom_level * val/zoo,0.1), 0.0, 1.0 );
-        return float(d)
+    def juliaDistanceEstimate(self, realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIter):
+        currShape = realValues.shape
 
-    def clamp(self, num, min_value, max_value):
-       return max(min(num, max_value), min_value)
+        results = np.empty(currShape, dtype=object)
+        lastRealValues = np.empty(currShape, dtype=object)
+        lastImagValues = np.empty(currShape, dtype=object)
+  
+        # numpyArray.shape returns (rows, columns) 
+        for y in range(currShape[0]):
+            for x in range(currShape[1]):
+                (results[y,x], lastRealValues[y,x], lastImagValues[y,x]) = self.juliaDistanceEstimateSingle(realValues[y,x], imagValues[y,x], realJuliaValue, imagJuliaValue, escapeRadius, maxIter)
 
-    def orig_mandelbrotDistanceEstimate(self, c, escapeRadius, maxIter):
-        """ This seems to be old and a bit buggy.  At the least it's off by one
-        for iters, because it doesn't update n and range quite the same? """
-        c2 = c.real*c.real + c.imag*c.imag
-        # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
-        if  256.0*c2*c2 - 96.0*c2 + 32.0*c.real - 3.0 < 0.0: 
-            return 0.0
-        # skip computation inside M2 - http://iquilezles.org/www/articles/mset_2bulb/mset2bulb.htm
-        if 16.0*(c2+2.0*c.real+1.0) - 1.0 < 0.0: 
-            return 0.0
+        return (results, lastRealValues, lastImagValues)
+ 
+    def juliaDistanceEstimateSingle(self, realValue, imagValue, realJuliaValue, imagJuliaValue, escapeRadius, maxIter):
+        """
+        Wonderfully slow implementation of distance estimate, but we need
+        a fallback/baseline, so here we go.
+        """
+        radSquared = escapeRadius * escapeRadius
+        result = 0
 
-        # iterate
-        di =  1.0;
-        z  = complex(0.0);
-        m2 = 0.0;
-        dz = complex(0.0);
-        for i in range(0,maxIter): 
-            if m2>escapeRadius : 
-              di=0.0 
-              break
+        realDecimal = self.decimal.Decimal(realValue)
+        imagDecimal = self.decimal.Decimal(imagValue)
 
-            # Z' -> 2·Z·Z' + 1
-            dz = 2.0*complex(z.real*dz.real-z.imag*dz.imag, z.real*dz.imag + z.imag*dz.real) + complex(1.0,0.0);
-                
-            # Z -> Z² + c           
-            z = complex( z.real*z.real - z.imag*z.imag, 2.0*z.real*z.imag ) + c;
-                
-            m2 = self.squared_modulus(z) 
+        zReal = self.decimal.Decimal(realJuliaValue)
+        zImag = self.decimal.Decimal(imagJuliaValue)
+        zrSquared = zReal * zReal
+        ziSquared = zImag * zImag
 
-        # distance  
-        # d(c) = |Z|·log|Z|/|Z'|
-        d = 0.5*math.sqrt(self.squared_modulus(z)/self.squared_modulus(dz))*math.log(self.squared_modulus(z));
-        if  di>0.5:
-            d=0.0
-        
-        return d             
-
-    def squared_modulus(self, z):
-        return ((z.real*z.real)+(z.imag*z.imag))
+        # Julia derivative inittialize to (1+0j), but mandelbrot is (0+0j), FYI
+        dzReal = self.decimal.Decimal(1)
+        dzImag = self.decimal.Decimal(0)
+ 
+        for currIter in range(maxIter + 1):
+            result = currIter
     
+            if (zrSquared + ziSquared) > radSquared:
+                break
+
+            # Z' -> 2·Z·Z' + 1  
+            # FYI: There's an extra "+1" for mandelbrot dzReal, but
+            # julia dz is just 2·Z·Z'
+            # (a + bi) * (c + di)
+            # = ac + adi + bci - bd = ac - bd + (ad+bc)i
+            partSum = zReal * dzReal - zImag * dzImag 
+            newDzReal = partSum + partSum # Don't stomp dz yet
+            dzImag = zReal * dzImag + zImag * dzReal 
+            dzReal = newDzReal # Now safe to stomp
+
+            # Z -> Z² + c           
+            # Below is 2(z.real*z.imag) + c.imag, but without an extra multiply
+            partSum = zReal * zImag
+            zImag = partSum + partSum + imagDecimal 
+            zReal = zrSquared - ziSquared + realDecimal
+
+            zrSquared = zReal * zReal
+            ziSquared = zImag * zImag
+
+        # Tried to extract the distance smoothing from this a few times, 
+        # but it seems a lot messier to pass around the (needed) derivative
+        # as well, so we just go ahead and return an extra term here, knowing
+        # this theoretically could be better handled in the 'normal' two steps.
+        if result == maxIter:
+            return (result, zReal, zImag)
+        else:
+            realPart = zReal * zReal 
+            imagPart = zImag * zImag 
+            zMagnitude = (realPart + imagPart).sqrt()
+  
+            realPart = dzReal * dzReal
+            imagPart = dzImag * dzImag
+            dzMagnitude = (realPart + imagPart).sqrt()
+
+            ## Can't take logs of zMagnitude when <= 0, 
+            ## and can't divide by zero-valued dzMagnitude.
+            ## (though these shouldn't ever be, because of sqrt?)
+            #if zMagnitude <= 0 or dzMagnitude <= 0:
+            #    return (result, zReal, zImag)
+            #return ((zMagnitude * (zMagnitude.ln()) / dzMagnitude), zReal, zImag)
+
+            # Lots of commentary/options above in mandelbrot distance estimate,
+            # this is just pasted in to keep in line with whatever was chosen
+            # up there.
+            tmpAnswer = result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude)
+            if result > 0:
+                return (tmpAnswer, zReal, zImag)
+            else:
+                return (self.decimal.Decimal(0), zReal, zImag)
+
+#    def rescaleForRange(self, rawValue, endingIter, maxIter, scaleRange):
+#        ##print("rescale %s for range %s" % (str(rawValue), str(scaleRange)))
+#        #if endingIter == maxIter or rawValue <= 0.0:
+#        #    return 0.0
+#        #else:
+#        #    zoomValue = float(math.pow((1/scaleRange) * rawValue / 0.1, 0.1))
+#        #    return self.clamp(zoomValue, 0.0, 1.0)
+#
+#        val = float(rawValue)
+#        if val < 0.0:
+#            val = 0.0
+#        zoo = .1 
+#        zoom_level = 1. / scaleRange 
+#        d = self.clamp( pow(zoom_level * val/zoo,0.1), 0.0, 1.0 );
+#        return float(d)
+#
+#    def clamp(self, num, min_value, max_value):
+#       return max(min(num, max_value), min_value)
+#
+#    def squared_modulus(self, z):
+#        return ((z.real*z.real)+(z.imag*z.imag))
+    
+class DiveMathSupportMPFR(DiveMathSupport):
+    def __init__(self):
+        super().__init__()
+
+        # Only imports if you instantiate this DiveMathSupport subclass.
+        self.mpfrlib = __import__('mpfr_fractalmath') 
+
+        # Unlike super()'s Decimal which keeps digits of precision, 
+        # mpfr natively keeps bits, so we'll keep bits too, since 
+        # this number is used a lot
+        self.defaultPrecisionSize = 53 
+        self.currPrecision = self.defaultPrecisionSize
+        self.precisionType = 'mpfr'
+
+    # Now that Decimal is native DiveMathSupport, there are actually 
+    # 2 libraries now to keep at the same precision, so also send 
+    # precision changes to super()
+
+    def setPrecision(self, newPrecision):
+        super().setPrecision(newPrecision) # Also set Decimal's precision
+        oldPrecision = self.currPrecision
+        self.currPrecision = newPrecision
+        return oldPrecision
+
+    def precision(self):
+        return self.currPrecision
+
+    def setDigitsPrecision(self, newDigits):
+        super().setDigitsPrecision(newDigits)
+        newPrecision = self.digitsToBits(newDigits)
+        oldPrecision = self.currPrecision
+        self.currPrecision = newPrecision
+        return oldPrecision
+        
+    def digitsPrecision(self):
+        return self.bitsToDigits(self.currPrecision) 
+
+    def julia(self, realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations):
+        """
+        Default behavior is 2D decimal to 2D decimal.
+        """
+        return self.mpfrlib.julia_2d_pydecimal_to_decimal(realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations, self.currPrecision)
+
+    def juliaSingle(self, realValue, imagValue, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations):
+        realValues = np.array((realValue), dtype=object)
+        imagValues = np.array((imagValue), dtype=object)
+        return self.mpfrlib.julia_2d_pydecimal_to_decimal(realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations, self.currPrecision)
+
+    def juliaToString(self, realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations):
+        """ 
+        Returns string types to dodge an extra string-to-decimal conversion.
+        Useful when you know further processing (e.g. smoothing) will happen.
+        """
+        return self.mpfrlib.julia_2d_pydecimal_to_string(realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations, self.currPrecision)
+
+    def mandelbrot(self, realValues, imagValues, escapeRadius, maxIterations):
+        """
+        Default behavior is 2D decimal to 2D decimal.
+        """
+        return self.mpfrlib.mandelbrot_2d_pydecimal_to_decimal(realValues, imagValues, escapeRadius, maxIterations, self.currPrecision)
+
+    def mandelbrotSingle(self, realValue, imagValue, escapeRadius, maxIterations):
+        realValues = np.array((realValue), dtype=object)
+        imagValues = np.array((imagValue), dtype=object)
+        return self.mpfrlib.mandelbrot_2d_pydecimal_to_decimal(realValues, imagValues, escapeRadius, maxIterations, self.currPrecision)
+
+    def mandelbrotToString(self, realValues, imagValues, escapeRadius, maxIterations):
+        """ 
+        Returns string types to dodge an extra string-to-decimal conversion.
+        Useful when you know further processing (e.g. smoothing) will happen.
+        """
+        return self.mpfrlib.mandelbrot_2d_pydecimal_to_string(realValues, imagValues, escapeRadius, maxIterations, self.currPrecision)
+
 
 class DiveMathSupportFlint(DiveMathSupport):
     """
@@ -793,6 +1125,13 @@ class DiveMathSupportFlint(DiveMathSupport):
 
     def floor(self, value):
         return self.flint.arb(value).floor()
+
+    def stringFromARB(self, paramARB):
+        return paramARB.str(radius=False, more=True)
+
+    def arrayToStringArray(self, paramArray):
+        stringifier = np.vectorize(self.stringFromARB)
+        return stringifier(paramArray)
 
 #    def createLinspace(self, paramFirst, paramLast, quantity):
 #        """
@@ -1012,7 +1351,7 @@ class DiveMathSupportFlint(DiveMathSupport):
 #            return float(absZ * absZ.const_log2() / dz.abs_lower())
 
     def rescaleForRange(self, rawValue, endingIter, maxIter, scaleRange):
-#        #print("rescale %s for range %s" % (str(rawValue), str(scaleRange)))
+        #print("rescale %s for range %s" % (str(rawValue), str(scaleRange)))
         val = float(rawValue)
         if val < 0.0:
             val = 0.0
@@ -1037,9 +1376,6 @@ class DiveMathSupportFlint(DiveMathSupport):
         d = self.clamp(pow_result, 0.0, 1.0 );
         return float(d)
 
-    def clamp(self, num, min_value, max_value):
-       return max(min(num, max_value), min_value)
-
 class DiveMathSupportFlintCustom(DiveMathSupportFlint):
     def __init__(self):
         super().__init__()
@@ -1060,8 +1396,25 @@ class DiveMathSupportFlintCustom(DiveMathSupportFlint):
         return(answer, lastZ)
 
     def mandelbrot_mpfr(self, c, escapeRadius, maxIter):
-        (answer, lastZ) = mpfr_fractalmath.mandelbrot_steps(c, escapeRadius, maxIter)
-        return(answer, lastZ)
+        realString = c.real.str(radius=False, more=True)
+        imagString = c.imag.str(radius=False, more=True)
+
+        (answer, lastZReal, lastZImag) = mpfr_fractalmath.mandelbrot_steps(realString, imagString, escapeRadius, maxIter, self.precision())
+
+        #print(f"precision: {self.precision()}")
+
+        #return(answer, self.flint.acb(lastZReal, lastZImag))
+        return(answer, lastZReal) # TODO: Pretty useless, but just testing
+        #return(answer, lastZReals, lastZImags)
+
+    def mandelbrot_mpfr_2d(self, numpyReals, numpyImags, escapeRadius, maxIter):
+
+        #print(f"precision: {self.precision()}")
+
+        (answer, lastZReals, lastZImags) = mpfr_fractalmath.mandelbrot_2d_string_to_string(numpyReals, numpyImags, escapeRadius, maxIter, self.precision())
+ 
+        #(answer, lastZ) = mpfr_fractalmath.mandelbrot_steps(c, escapeRadius, maxIter)
+        return(answer, lastZReals, lastZImags)
 
     def mandelbrot_check_precision(self, c, escapeRadius, maxIter):
         """ Slightly more efficient for HIGH maxIter values """
@@ -1085,251 +1438,4 @@ class DiveMathSupportFlintCustom(DiveMathSupportFlint):
         (answer, lastZ, remainingPrecision) = c.our_mandelbrot(escapeRadius, maxIter)
         #print("beginning answer: %s, lastZ: %s remainingPrecision: %s" % (str(answer), str(lastZ), str(remainingPrecision)))
         return(answer, lastZ, remainingPrecision)
-
-
-class DiveMathSupportGmp(DiveMathSupport):
-    """
-    Overrides to instantiate gmpy2-specific complex types
-
-    Note from the GMP docs - contexts and context managers are not thread-safe!  
-    Modifying the context in one thread will impact all other threads.
-    """
-    def __init__(self):
-        super().__init__()
-
-        self.gmp = __import__('gmpy2') # Only imports if you instantiate this DiveMathSupport subclass.
-        self.defaultPrecisionSize = 53
-        self.gmp.get_context().precision = self.defaultPrecisionSize
-        self.precisionType = 'gmp'
-
-    def setPrecision(self, newPrecision):
-        oldPrecision = self.gmp.get_context().precision
-        self.gmp.get_context().precision = newPrecision
-        return oldPrecision
-
-    def createComplex(self, *args):
-        """
-        gmpy2.mpc() accepts one of:
-        1 string (a native python complex string, with real and/or imag components)
-        1 complex object (python native)
-        1 float (no imaginary component)
-        2 floats
-        2 mpfr (gmp's float type)
-        """
-        if len(args) == 2:
-            realPart = self.gmp.mpfr(args[0])
-            imagPart = self.gmp.mpfr(args[1])
-            return self.gmp.mpc(realPart, imagPart)
-        elif len(args) == 1:
-             return self.gmp.mpc(args[0])
-        elif len(args) == 0:
-            return self.gmp.mpc(0.0)
-        else:
-            raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
-
-    def createFloat(self, floatValue):
-        return self.gmp.mpfr(floatValue)
-
-    def floor(self, value):
-        return self.gmp.floor(value)
-
-    def interpolateLogTo(self, startX, startY, endX, endY, targetX):
-        """
-        Probably want additional log-defining params, but for now, let's just bake in one equation
-        """
-        if targetX == endX:
-            return endY
-        elif targetX == startX or startX == endX or startY == endY:
-            return startY
-        else:
-            aVal = (endY - startY) / (self.gmp.log(endX - startX + 1))
-            return aVal * (self.gmp.log(targetX - startX + 1)) + startY 
-
-    def mandelbrot(self, c, escapeRadius, maxIter):
-        """ 
-        Now that smoothing is handled separately, the native python implementation
-        COULD work for flint as well, except it uses 'complex(0,0)' instead
-        of self.createComplex(0,0).
-        The reason for this is just as below - to reduce one extra function call in 
-        the core calculation.
-
-        Could just call julia with a zero start here, but seems wiser to
-        not have one extra function call in the core of the calculation?
-
-        Really super didn't help to try locally caching function names
-        and using paren syntax - it doubled the runtime.  Trying that was
-        probably just old advice for pre-python3?
-        """
-        z = self.gmp.mpc(0.0)
-        n = 0
-
-        # Because norm() doesn't work for python3-gmp2 v 2.1.0a4 
-        #while float(self.gmp.sqrt(self.gmp.square(z.real) + self.gmp.square(z.imag))) <= escapeRadius and n < maxIter:
-        # looks like abs() gets to the right place, even though there's no explicit abs_lower() in libgmp?
-        for currIter in range(maxIter + 1):
-            n = currIter
-
-            if abs(z) > escapeRadius:
-                break
-
-            z = z*z + c
-
-        return (n, z)
-
-    def smoothAfterCalculation(self, endingZ, endingIter, maxIter, escapeRadius):
-        """
-        This flint-specific implementation only really does flint-y logs in the smoothing.
-        The Decimal-specific implementation needed some extra steps, but I've ditched that one.
-
-        NOTE: this wasn't updated with the new smoothing calcs like
-        the 'native' and 'flint' implementations were
-        """
-        if endingIter == maxIter:
-            return float(maxIter)
-        else:
-            # The following code smooths out the colors so there aren't bands
-            # Algorithm taken from http://linas.org/art-gallery/escape/escape.html
-            # Note: Results in a float. We think.
-            return float(endingIter + 1 - self.gmp.log10(self.gmp.log2(self.gmp.norm(endingZ))) / math.log(2.0))
-            #return float(endingIter + 1 - self.gmp.log10(self.gmp.log10(self.gmp.sqrt(self.gmp.square(endingZ.real) + self.gmp.square(endingZ.imag)))))
-
-class DecimalComplex:
-    def __init__(self, realValue, imagValue):
-        super().__init__()
-        self.real = realValue
-        self.imag = imagValue
-
-    def __repr__(self):
-        return u"DecimalComplex(%s, %s)" % (str(self.real), str(self.imag))
-
-class DiveMathSupportDecimal(DiveMathSupport):
-    def __init__(self):
-        super().__init__()
-
-        self.decimal = __import__('decimal') # Only imports if you instantiate this DiveMathSupport subclass.
-        self.defaultPrecisionSize = 16 
-        self.decimal.getcontext().prec = self.defaultPrecisionSize
-        self.precisionType = 'decimal'
-
-    def setPrecision(self, newPrecision):
-        oldPrecision = self.decimal.getcontext().prec
-        self.decimal.getcontext().prec = newPrecision
-        return oldPrecision
-
-    def precision(self):
-        return self.decimal.getcontext().prec
-
-    def createComplex(self, *args):
-        if len(args) == 2:
-            return DecimalComplex(self.decimal.Decimal(args[0]), self.decimal.Decimal(args[1]))
-        elif len(args) == 1:
-            if isinstance(args[0], str):
-                partsString = args[0]
-
-                # Trim off surrounding parens, if present
-                if partsString.startswith('('):
-                    partsString = partsString[1:]
-                if partsString.endswith(')'):
-                    partsString = partsString[:-1]
-
-                # Trim off the leading sign
-                firstIsPositive = True
-                if partsString.startswith('+'):
-                    partsString = partsString[1:]
-                elif partsString.startswith('-'):
-                    firstIsPositive = False
-                    partsString = partsString[1:]
-
-                # Trim off the trailing letter 
-                lastIsImag = False
-                if partsString.endswith('j'):
-                    lastIsImag = True
-                    partsString = partsString[:-1]
-
-                # Remaining string might have an internal sign.
-                # If there's no internal sign, then the whole remaining
-                # string is either the real or the complex
-                positiveParts = partsString.split('+')
-                negativeParts = partsString.split('-')
-
-                realIsPositive = True
-                imagIsPositive = True
-                realPart = ""
-                imagPart = ""
-                if len(positiveParts) == 2:
-                    realIsPositive = firstIsPositive
-                    realPart = positiveParts[0]
-                    imagIsPositive = True
-                    imagPart = positiveParts[1]
-                elif len(negativeParts) == 2:
-                    realIsPositive = firstIsPositive
-                    realPart = negativeParts[0]
-                    imagIsPositive = False
-                    imagPart = negativeParts[1]
-                elif len(positiveParts) == 1 and len(negativeParts) == 1:
-                    # No internal + or -, so it should just be a number
-                    if lastIsImag == True:
-                        imagPart = partsString
-                        imagIsPositive = firstIsPositive
-                    else:
-                        realPart = partsString
-                        realIsPositive = firstIsPositive
-                else:
-                    raise ValueError("String parameter \"%s\" not identifiably a complex number, in createComplex()" % args[0])
-
-                preparedReal = '0.0'
-                preparedImag = '0.0'
-                if realPart != "":
-                    if realIsPositive == True:
-                        preparedReal = realPart
-                    else:
-                        preparedReal = "-%s" % realPart
-
-                if imagPart != "":
-                    if imagIsPositive == True:
-                        preparedImag = imagPart
-                    else:
-                        preparedImag = "-%s" % imagPart
-
-                return DecimalComplex(self.decimal.Decimal(preparedReal), self.decimal.Decimal(preparedImag))
-            else:
-                if isinstance(args[0], complex):
-                    return DecimalComplex(self.decimal.Decimal(args[0].real), self.decimal.Decimal(args[0].imag))
-                else:
-                    return DecimalComplex(self.decimal.Decimal(args[0]),self.decimal.Decimal(0))# Just a constant, so make a 0-imaginary value
-        elif len(args) == 0:
-            return DecimalComplex(self.decimal.Decimal(0),self.decimal.Decimal(0))
-        else:
-            raise ValueError("Max 2 parameters are valid for createComplex(), but it's best to use one string")
-
-    def mandelbrot(self, c, escapeRadius, maxIter):
-        """
-        Step-wise impementation, sacrificing some theoretical precision for fewer
-        multiplications
-        """
-        radSquared = escapeRadius * escapeRadius
-
-        z = DecimalComplex(self.decimal.Decimal(0), self.decimal.Decimal(0))
-        n = 0
-
-        zrSquared = self.decimal.Decimal(0)
-        ziSquared = self.decimal.Decimal(0)
-
-        for currIter in range(maxIter + 1):
-            n = currIter
-
-            currMagnitude = zrSquared + ziSquared
-            if currMagnitude > radSquared:
-                break
-
-            partSum = z.real + z.imag
-            z.imag = partSum * partSum - zrSquared - ziSquared + c.imag
-            z.real = zrSquared - ziSquared + c.real
-
-            zrSquared = z.real * z.real
-            ziSquared = z.imag * z.imag
-
-        return (n, z)        
-
-
 

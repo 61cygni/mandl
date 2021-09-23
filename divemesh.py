@@ -86,6 +86,7 @@ class DiveMesh:
         """
         mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
                 "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+                "DiveMathSupportMPFR":fm.DiveMathSupportMPFR,
                 "DiveMathSupport":fm.DiveMathSupport}
 
         (mathSupportClassName, precisionString) = state['mathSupport'].split(':')
@@ -100,6 +101,15 @@ class DiveMesh:
     def getCenter(self):
         """ Pretty common to want the mesh center, so assemble it from the generators. """
         return self.mathSupport.createComplex(self.realMeshGenerator.valuesCenter, self.imagMeshGenerator.valuesCenter)
+
+    def generateRealMesh(self):
+        #print(f"Mesh math support is \"{self.mathSupport.precisionType}\" at {self.mathSupport.digitsPrecision()} digits and {self.mathSupport.precision()} bits")
+        return self.realMeshGenerator.generateForDiveMesh(self)
+
+        imagMesh = self.imagMeshGenerator.generateForDiveMesh(self)
+
+    def generateImagMesh(self):
+        return self.imagMeshGenerator.generateForDiveMesh(self)
 
     def generateMesh(self):
         #print(f"Mesh math support is \"{self.mathSupport.precisionType}\" at {self.mathSupport.digitsPrecision()} digits and {self.mathSupport.precision()} bits")
@@ -163,6 +173,7 @@ class MeshGenerator:
         """
         mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
                 "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+                "DiveMathSupportMPFR":fm.DiveMathSupportMPFR,
                 "DiveMathSupport":fm.DiveMathSupport}
 
         (mathSupportClassName, precisionString) = state['mathSupport'].split(':')

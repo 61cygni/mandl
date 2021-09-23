@@ -7,3 +7,5 @@
 
 void mpfr_mandelbrot_steps(long *result, char **last_z_real_str, char **last_z_imag_str, const char *start_real_str, const char *start_imag_str, float radius, const long max_iter, long prec);
 
+void mpfr_julia_steps(long *result, char **last_z_real_str, char **last_z_imag_str, const char *start_real_str, const char *start_imag_str, const char *julia_real_str, const char *julia_imag_str, float radius, const long max_iter, long prec);
+

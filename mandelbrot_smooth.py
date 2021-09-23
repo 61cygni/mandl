@@ -55,8 +55,9 @@ class MandelbrotSmooth(MandelbrotSolo):
 
     def process_counts(self):
         print(f"process_counts says mathSupport is {self.dive_mesh.mathSupport.precisionType}")
-        smoothing_function = np.vectorize(self.dive_mesh.mathSupport.smoothAfterCalculation)
-        self.processed_array = smoothing_function(self.last_values_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
+        self.processed_array = self.dive_mesh.mathSupport.smoothAfterCalculation(self.last_values_real_array, self.last_values_imag_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
+        #smoothing_function = np.vectorize(self.dive_mesh.mathSupport.smoothAfterCalculation)
+        #self.processed_array = smoothing_function(self.last_values_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
 
     def generate_image(self):
         self.palette.set_scheme_index(self.palette_index) 

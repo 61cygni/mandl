@@ -31,6 +31,9 @@ from PIL import Image, ImageDraw
 from algo import EscapeAlgo
 import fractalpalette as fp
 
+# TODO: Temp - debugging
+import timeit
+
 class MandelbrotSolo(EscapeAlgo):
     def __init__(self, dive_mesh, frame_number, output_folder_name, extra_params={}):
         super().__init__(dive_mesh, frame_number, output_folder_name, extra_params)
@@ -40,13 +43,13 @@ class MandelbrotSolo(EscapeAlgo):
     def generate_counts(self):
         math_support = self.dive_mesh.mathSupport
 
+        # TODO: Disable this couple lines of debug info...
         mathDigits = math_support.digitsPrecision()
         print(f"Running with {self.max_escape_iterations} iter and {mathDigits} digits")
 
-        #mandelbrot_function = np.vectorize(math_support.mandelbrot_beginning)
-        mandelbrot_function = np.vectorize(math_support.mandelbrot)
-        (self.counts_array, self.last_values_array) = mandelbrot_function(self.mesh_array, self.escape_radius, self.max_escape_iterations)
+        (self.counts_array, self.last_values_real_array, self.last_values_imag_array) = math_support.mandelbrot(self.mesh_real_array, self.mesh_imag_array, self.escape_radius, self.max_escape_iterations)
 
+        #print(self.counts_array)
         counts_name_base = u"%d.counts.pik" % self.frame_number
         counts_file_name = os.path.join(self.output_folder_name, counts_name_base)
         with open(counts_file_name, 'wb') as counts_handle:
@@ -56,11 +59,11 @@ class MandelbrotSolo(EscapeAlgo):
         hist = defaultdict(int) 
 
         # numpyArray.shape returns (rows, columns)
-        for y in range(0, self.mesh_array.shape[0]):
+        for y in range(0, self.counts_array.shape[0]):
             #print(f"first col {self.counts_array[y,0]}")
-
-            for x in range(0, self.mesh_array.shape[1]):
-                # Not using mathSupport's floor() here, because it should just be a normal-scale float
+            for x in range(0, self.counts_array.shape[1]):
+                # Not using mathSupport's floor() here, because it should 
+                # just be a normal-scale float
                 if self.counts_array[y,x] < self.max_escape_iterations:
                     #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(counts_array[y,x]), str(math.floor(counts_array[y,x]))))
                     hist[math.floor(self.counts_array[y,x])] += 1
@@ -76,7 +79,7 @@ class MandelbrotSolo(EscapeAlgo):
         # Note: Image's width,height is backwards from numpy's size (rows, cols)
         for x in range(0, image_width):
             for y in range(0, image_height):
-                color = self.palette.map_value_to_color(self.processed_array[y,x])
+                color = self.palette.map_value_to_color(float(self.processed_array[y,x]))
 
                 # Plot the point
                 draw.point([x, y], color) 

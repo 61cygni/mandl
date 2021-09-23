@@ -61,6 +61,7 @@ def parse_options():
     # Second-pass at params to set up MathSupport because lots of 
     # things depend on it for names and types.
     mathSupportClasses = {'native': fm.DiveMathSupport,
+        'mpfr': fm.DiveMathSupportMPFR,
         'flint': fm.DiveMathSupportFlint,
         'flintcustom': fm.DiveMathSupportFlintCustom,
         # maybe not complete?# 'gmp': fm.DiveMathSupportGmp,
@@ -100,7 +101,9 @@ def parse_options():
         elif opt in ['--escape-iterations']:
             params['escape_iterations'] = int(arg)
         elif opt in ['--zoom-factor']:
-            params['zoom_factor'] = float(arg) # No extra precision needed
+            # No extra precision needed, but multiplied vs Decimal, so 
+            # using native float, but have to convert when used.
+            params['zoom_factor'] = float(arg) 
         elif opt in ['--algo']:
             params['algo'] = arg
 
@@ -119,15 +122,17 @@ def parse_options():
 
 def nextClicked(event):
     global params
-    params['real_width'] = params['real_width'] * params['zoom_factor']
-    params['imag_width'] = params['imag_width'] * params['zoom_factor']
+    sameTypeZoomFactor = params['math_support'].createFloat(params['zoom_factor'])
+    params['real_width'] = params['real_width'] * sameTypeZoomFactor
+    params['imag_width'] = params['imag_width'] * sameTypeZoomFactor
 
     updateView()
  
 def prevClicked(event):
     global params
-    params['real_width'] = params['real_width'] / params['zoom_factor']
-    params['imag_width'] = params['imag_width'] / params['zoom_factor']
+    sameTypeZoomFactor = params['math_support'].createFloat(params['zoom_factor'])
+    params['real_width'] = params['real_width'] / sameTypeZoomFactor
+    params['imag_width'] = params['imag_width'] / sameTypeZoomFactor
 
     updateView()
 
@@ -274,8 +279,8 @@ def plusClicked(event):
 def minusClicked(event):
     global params
     params['zoom_factor'] = round(params['zoom_factor'] - .01, 2)
-    if params['zoom_factor'] < .1:
-        params['zoom_factor'] = .1
+    if params['zoom_factor'] < .01:
+        params['zoom_factor'] = .01
     updateAdvanceText() 
     plt.draw()
 

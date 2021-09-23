@@ -21,11 +21,6 @@ from fractalmath import *
 from fractal import *
 
 from algo import Algo # Abstract base class import, because we rely on it.
-from mandelbrot_solo import MandelbrotSolo
-from mandelbrot_smooth import MandelbrotSmooth
-from mandeldistance import MandelDistance
-from julia_solo import JuliaSolo
-from julia_smooth import JuliaSmooth 
 
 def parse_options():
     params = {}

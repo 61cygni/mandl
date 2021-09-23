@@ -12,17 +12,17 @@ from fractalmath import *
 #mandelbrotMaxIter = 255
 #timerRepeatCount = 1000
 
-decimalPlaces = 100
-mandelbrotMaxIter = 7000 
-timerRepeatCount = 1000
+#decimalPlaces = 100
+#mandelbrotMaxIter = 7000 
+#timerRepeatCount = 1000
 
 #decimalPlaces = 500
 #mandelbrotMaxIter = 35000 
 #timerRepeatCount = 10
 
-#decimalPlaces = 1000
-#mandelbrotMaxIter = 150000 
-#timerRepeatCount = 10
+decimalPlaces = 1000
+mandelbrotMaxIter = 150000 
+timerRepeatCount = 10
 
 #decimalPlaces = 1500
 #mandelbrotMaxIter = 290000 
@@ -80,6 +80,11 @@ def mpfrMandelbrotter():
     radius = 2.0
     return flintCustomMathSupport.mandelbrot_mpfr(theCenter, radius, mandelbrotMaxIter)
 
+def mpfrMandelbrot2d():
+    theCenter = flintCustomMathSupport.createComplex(centerString)
+    radius = 2.0
+    return flintCustomMathSupport.mandelbrot_mpfr_2d(theCenter, radius, mandelbrotMaxIter)
+
 def decMandelbrotter():
     theCenter = decMathSupport.createComplex(centerString)
     radius = 2.0
@@ -100,12 +105,16 @@ def main():
 #    print(timeit.Timer(flintMandelbrotter).timeit(number= timerRepeatCount))
 #    print("flint custom")
 #    print(timeit.Timer(flintCustomMandelbrotter).timeit(number= timerRepeatCount))
-    print("flint low magnification")
-    print(timeit.Timer(flintBeginningMandelbrotter).timeit(number= timerRepeatCount))
+
+#    print("flint low magnification")
+#    print(timeit.Timer(flintBeginningMandelbrotter).timeit(number= timerRepeatCount))
     print("arb steps")
     print(timeit.Timer(arbMandelbrotter).timeit(number= timerRepeatCount))
     print("mpfr steps")
     print(timeit.Timer(mpfrMandelbrotter).timeit(number= timerRepeatCount))
+    print("mpfr steps 2d")
+    print(timeit.Timer(mpfrMandelbrot2d).timeit(number= timerRepeatCount))
+
 #    print("decimal")
 #    print(timeit.Timer(decMandelbrotter).timeit(number= timerRepeatCount))
 

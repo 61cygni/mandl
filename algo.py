@@ -57,8 +57,12 @@ class Algo(object):
 
         # Algo should fill in these values
         self.mesh_array = None
+        self.mesh_real_array = None
+        self.mesh_imag_array = None
         self.counts_array = None
         self.last_values_array = None
+        self.last_values_real_array = None
+        self.last_values_imag_array = None
         self.processed_array = None
         self.output_image_file_name = None
 
@@ -95,19 +99,19 @@ class Algo(object):
         to handle this differently, or maybe to not save results out
         to file.
         """
-        self.mesh_array = self.dive_mesh.generateMesh()
-
-        mesh_base_name = u"%d.mesh.pik" % self.frame_number
-
         # Originally relied on the directory structure to exist, but after
         # clearing intermediates a few times, it got annoying, so let's just
         # cross our fingers that this all ends up where we hoped it would.
         if not os.path.exists(self.output_folder_name):
             os.makedirs(output_folder_name)
 
+        mesh_base_name = u"%d.mesh.pik" % self.frame_number
         mesh_file_name = os.path.join(self.output_folder_name, mesh_base_name)
         with open(mesh_file_name, 'wb') as mesh_handle:
             pickle.dump(self.dive_mesh, mesh_handle)
+
+        self.mesh_real_array = self.dive_mesh.generateRealMesh()
+        self.mesh_imag_array = self.dive_mesh.generateImagMesh()
 
     def generate_counts(self):
         """ Business end of getting results for a mesh """
@@ -174,7 +178,7 @@ class EscapeAlgo(Algo):
         super().__init__(dive_mesh, frame_number, output_folder_name, extra_params)
 
         # Load, with optional default values
-        self.escape_radius = extra_params.get('escape_radius', 2.0)
+        self.escape_radius = extra_params.get('escape_radius', 10.0)
         self.max_escape_iterations = int(extra_params.get('max_escape_iterations', 255))
         self.burn_in = extra_params.get('burn_in', False)
         self.palette = extra_params.get('palette', fp.FractalPalette())

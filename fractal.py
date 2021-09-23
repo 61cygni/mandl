@@ -288,6 +288,7 @@ class DiveTimeline:
         """
         mathSupportClasses = {"DiveMathSupportFlintCustom":fm.DiveMathSupportFlintCustom,
                 "DiveMathSupportFlint":fm.DiveMathSupportFlint,
+                "DiveMathSupportMPFR":fm.DiveMathSupportMPFR,
                 "DiveMathSupport":fm.DiveMathSupport}
 
         (mathSupportClassName, precisionString) = state['mathSupport'].split(':')
@@ -637,11 +638,9 @@ def parse_options():
     # First-pass at params to set up MathSupport because lots of 
     # things depend on it for names and types.
     math_support_classes = {'native': fm.DiveMathSupport,
+        'mpfr': fm.DiveMathSupportMPFR,
         'flint': fm.DiveMathSupportFlint,
         'flintcustom': fm.DiveMathSupportFlintCustom,
-        # maybe not complete?# 'gmp': fm.DiveMathSupportGmp,
-        # maybe not complete?# 'decimal': fm.DiveMathSupportDecimal,
-        # definitely not built yet.# 'libbf': fm.DiveMathSupportLibbf,
     } 
     math_support = math_support_classes['native']() # Creates an instance
     for opt, arg in opts:
