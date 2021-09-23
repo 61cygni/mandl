@@ -523,9 +523,9 @@ class DiveMathSupport:
 
     def julia(self, realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIter):
         currShape = realValues.shape
-        results = np.array(currShape, dtype=object)
-        lastRealValues = np.array(currShape, dtype=object)
-        lastImagValues = np.array(currShape, dtype=object)
+        results = np.empty(currShape, dtype=object)
+        lastRealValues = np.empty(currShape, dtype=object)
+        lastImagValues = np.empty(currShape, dtype=object)
   
         # numpyArray.shape returns (rows, columns) 
         for y in range(currShape[0]):
@@ -638,7 +638,7 @@ class DiveMathSupport:
             return self.createFloat(maxIter)
         else:
             sqMagnitude = self.decimal.Decimal(lastReal) ** 2 + self.decimal.Decimal(lastImag) ** 2 
-            return endingIter - ((sqMagnitude.sqrt().ln().ln()) / (self.decimal.Decimal('2').ln()))  
+            return self.decimal.Decimal(endingIter) - ((sqMagnitude.sqrt().ln().ln()) / (self.decimal.Decimal('2').ln()))  
 
     def mandelbrotDistanceEstimate(self, realValues, imagValues, escapeRadius, maxIter):
         currShape = realValues.shape

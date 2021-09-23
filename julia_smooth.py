@@ -29,38 +29,39 @@ class JuliaSmooth(JuliaSolo):
         self.color = (.0,.6,1.0) # blue / yellow
 
     def process_counts(self):
-        smoothing_function = np.vectorize(self.dive_mesh.mathSupport.smoothAfterCalculation)
-        self.processed_array = smoothing_function(self.last_values_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
+        self.processed_array = self.dive_mesh.mathSupport.smoothAfterCalculation(self.last_values_real_array, self.last_values_imag_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
+        #smoothing_function = np.vectorize(self.dive_mesh.mathSupport.smoothAfterCalculation)
+        #self.processed_array = smoothing_function(self.last_values_array, self.counts_array, self.max_escape_iterations, self.escape_radius)
 
-    def generate_image(self):
-        # Capturing the transpose of our array, because it looks like I mixed
-        # up rows and cols somewhere along the way.
-        if self.use_smoothing == True:
-            pixel_values_2d = self.cache_frame.frame_info.smooth_values.T
-        else:
-            pixel_values_2d = self.cache_frame.frame_info.raw_values.T
-        #print("shape of things to come: %s" % str(pixel_values_2d.shape))
-
-# TODO: Really, width and height are all kinda incorrect here - 
-# gotta spend some TLC on the array shape and transpose.
-        (image_width, image_height) = pixel_values_2d.shape
-        im = Image.new('RGB', (image_width, image_height), (0, 0, 0))
-        draw = ImageDraw.Draw(im)
-        
-        for x in range(0, image_width):
-            for y in range(0, image_height):
-                color = self.palette.map_value_to_color(pixel_values_2d[x,y])
-
-                # Plot the point
-                draw.point([x, y], color) 
-
-        if self.burn_in == True:
-            meta = self.get_frame_metadata()
-            if meta:
-                burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (meta['frame_number'], meta['mesh_center'], meta['complex_real_width'], meta['complex_imag_width'])
-                self.burn_text_to_drawing(burn_in_text, draw)
-
-        return im    
+#    def generate_image(self):
+#        # Capturing the transpose of our array, because it looks like I mixed
+#        # up rows and cols somewhere along the way.
+#        if self.use_smoothing == True:
+#            pixel_values_2d = self.cache_frame.frame_info.smooth_values.T
+#        else:
+#            pixel_values_2d = self.cache_frame.frame_info.raw_values.T
+#        #print("shape of things to come: %s" % str(pixel_values_2d.shape))
+#
+## TODO: Really, width and height are all kinda incorrect here - 
+## gotta spend some TLC on the array shape and transpose.
+#        (image_width, image_height) = pixel_values_2d.shape
+#        im = Image.new('RGB', (image_width, image_height), (0, 0, 0))
+#        draw = ImageDraw.Draw(im)
+#        
+#        for x in range(0, image_width):
+#            for y in range(0, image_height):
+#                color = self.palette.map_value_to_color(float(pixel_values_2d[x,y]))
+#
+#                # Plot the point
+#                draw.point([x, y], color) 
+#
+#        if self.burn_in == True:
+#            meta = self.get_frame_metadata()
+#            if meta:
+#                burn_in_text = u"%d center: %s\n    realw: %s imagw: %s" % (meta['frame_number'], meta['mesh_center'], meta['complex_real_width'], meta['complex_imag_width'])
+#                self.burn_text_to_drawing(burn_in_text, draw)
+#
+#        return im    
 
     def generate_image(self):
         (image_height, image_width) = self.processed_array.shape
@@ -70,7 +71,7 @@ class JuliaSmooth(JuliaSolo):
         # Note: Image's width,height is backwards from numpy's size (rows, cols)
         for x in range(0, image_width):
             for y in range(0, image_height):
-                color = self.map_value_to_color(self.processed_array[y,x])
+                color = self.map_value_to_color(float(self.processed_array[y,x]))
 
                 # Plot the point
                 draw.point([x, y], color)

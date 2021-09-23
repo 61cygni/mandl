@@ -41,6 +41,9 @@ def parse_options():
                                 "imag-width=",
                                 "zoom-factor=",
                                 "algo=",
+                                # Explicit extra params, should probably
+                                # get/set these like in fractal.py
+                                "julia-center=",
                                 ])
 
     # First-pass at params pulls out the project file, because
@@ -106,6 +109,8 @@ def parse_options():
             params['zoom_factor'] = float(arg) 
         elif opt in ['--algo']:
             params['algo'] = arg
+        elif opt in ['--julia-center']:
+            params['julia_center'] = mathSupport.createComplex(arg)
 
     params['wholeCacheFolder'] = os.path.join(params['project_name'], params['project_params']['exploration_output_path']) 
    
@@ -196,11 +201,32 @@ def runFractalCallForCenter(center):
 
     fractalCallString = f"python3.9 ./fractal.py --project='{projectName}' --exploration --expl-algo={algoName} --burn --math-support={mathSupport.precisionType} --digits-precision={params['digits_precision']} --max-escape-iterations={params['escape_iterations']}  --expl-frame-number={nextFrameNumber} --expl-real-width='{realWidthString}' --expl-imag-width='{imagWidthString}' --expl-center='{centerString}'" 
 
+    # Just hacked on for now...
+    if algoName in ['julia_solo', 'julia_smooth']:
+        juliaCenter = params['julia_center']
+        juliaCenterString = str(juliaCenter)
+        if juliaCenter.imag == 0:
+            trimmed = juliaCenterString
+            if juliaCenterString.endswith(')'):
+                trimmed = juliaCenterString[:-1]
+            if not trimmed.endswith('j'):
+                trimmed = trimmed + "+0j"
+            if juliaCenterString.endswith(')'):
+                juliaCenterString = trimmed + ")"
+            else:
+                juliaCenterString = trimmed     
+        fractalCallString += f" --julia-center='{juliaCenterString}'"  
+
     print("Calling: %s" % fractalCallString)
     subprocess.call([fractalCallString], shell=True)
     print("(Call finished.)")
     print("Exploration invocation for this point:")
     explorationCallString = f"python3.9 ./mesh_explore.py --project='{projectName}' --algo={algoName} --math-support={mathSupport.precisionType} --digits-precision={params['digits_precision']} --escape-iterations={params['escape_iterations']} --next-frame-number={nextFrameNumber} --real-width='{realWidthString}' --imag-width='{imagWidthString}' --zoom-factor={zoomFactor} --center='{centerString}'" 
+
+    # Just hacked on for now...
+    if algoName in ['julia_solo', 'julia_smooth']:
+        explorationCallString += f" --julia-center='{juliaCenterString}'"  
+
     print(explorationCallString)
     print("")
 

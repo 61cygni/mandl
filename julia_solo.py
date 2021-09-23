@@ -30,8 +30,11 @@ class JuliaSolo(JuliaAlgo):
     def generate_counts(self):
         math_support = self.dive_mesh.mathSupport
 
-        julia_function = np.vectorize(math_support.julia)
-        (self.counts_array, self.last_values_array) = julia_function(self.julia_center, self.mesh_array, self.escape_radius, self.max_escape_iterations)
+
+        #julia_function = np.vectorize(math_support.julia)
+        #(self.counts_array, self.last_values_array) = julia_function(self.julia_center, self.mesh_array, self.escape_radius, self.max_escape_iterations)
+
+        (self.counts_array, self.last_values_real_array, self.last_values_imag_array) = math_support.julia(self.mesh_real_array, self.mesh_imag_array, self.julia_center.real, self.julia_center.imag, self.escape_radius, self.max_escape_iterations)
 
         counts_name_base = u"%d.counts.pik" % self.frame_number
         counts_file_name = os.path.join(self.output_folder_name, counts_name_base)
@@ -42,8 +45,8 @@ class JuliaSolo(JuliaAlgo):
         hist = defaultdict(int)
 
         # numpyArray.shape returns (rows, columns)
-        for y in range(0, self.mesh_array.shape[0]):
-            for x in range(0, self.mesh_array.shape[1]):
+        for y in range(0, self.counts_array.shape[0]):
+            for x in range(0, self.counts_array.shape[1]):
                 # Not using mathSupport's floor() here, because it should just be a normal-scale float
                 if self.counts_array[y,x] < self.max_escape_iterations:
                     #print("x: %d, y: %d, val: %s, floor: %s" % (x,y,str(counts_array[y,x]), str(math.floor(counts_array[y,x]))))
