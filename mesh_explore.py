@@ -41,6 +41,8 @@ def parse_options():
                                 "imag-width=",
                                 "zoom-factor=",
                                 "algo=",
+                                # Special read-from-file inovcation
+                                "load-marker-number=",
                                 # Explicit extra params, should probably
                                 # get/set these like in fractal.py
                                 "julia-center=",
@@ -51,6 +53,8 @@ def parse_options():
     for opt, arg in opts:
         if opt in ['--project']:
             params['project_name'] = arg
+        if opt in ['--load-marker-number']:
+            params['load_marker_number'] = arg
 
     # Require that a project has been specified.
     if 'project_name' not in params:
@@ -58,6 +62,7 @@ def parse_options():
 
     # Load project parameters out of the params file
     paramFileName = os.path.join(params['project_name'], 'params.json')
+    print(f"opening \"{paramFileName}\"")
     with open(paramFileName, 'rt') as paramHandle:
         params['project_params'] = json.load(paramHandle)
 
@@ -71,58 +76,109 @@ def parse_options():
         # maybe not complete?# 'decimal': fm.DiveMathSupportDecimal,
         # definitely not built yet.# 'libbf': fm.DiveMathSupportLibbf,
     } 
-    mathSupportName = params['project_params'].get('math_support', 'native')
 
-    for opt, arg in opts:
-        if opt in ['--math-support']:
-            if arg in mathSupportClasses:
-                mathSupportName = arg
-        elif opt in ['--digits-precision']:
-            params['digits_precision'] = int(arg)
-    # Creates an instance
-    mathSupport = mathSupportClasses[mathSupportName]() 
+    # Before getting into normal param load, shortcut when we're asked to
+    # load a marker file
+    if 'load_marker_number' in params:
+        markerNumber = params['load_marker_number']
+        markerFileBase = f"{markerNumber}.marker.pik"
+        markerFileName = os.path.join(params['project_name'], params['project_params']['exploration_markers_path'], markerFileBase)
 
-    # Important to also set expected precision before parsing param values
-    supportPrecision = params.get('digits_precision', 16) # 16 == native
-    mathSupport.setPrecision(round(supportPrecision * 3.32)) # ~3.32 bits per position
-    params['math_support'] = mathSupport
+        marker = None
+        with open(markerFileName, 'rb') as markerHandle:
+            marker = pickle.load(markerHandle)
 
-    # Defaults, overwritable by cmd line args
-    params['algo'] = 'mandelbrot_smooth'
-    params['next_frame_number'] = 1
+        if marker == None:
+            raise ValueError("Failed to load marker number \"{markerNumber}\"")
 
-    # Third pass at params, now that math support is all set up
-    for opt, arg in opts:
-        if opt in ['--center']:
-            params['center'] = mathSupport.createComplex(arg)
-        elif opt in ['--next-frame-number']:
-            params['next_frame_number'] = int(arg)
-        elif opt in ['--real-width']:
-            params['real_width'] = mathSupport.createFloat(arg)
-        elif opt in ['--imag-width']:
-            params['imag_width'] = mathSupport.createFloat(arg)
-        elif opt in ['--escape-iterations']:
-            params['escape_iterations'] = int(arg)
-        elif opt in ['--zoom-factor']:
-            # No extra precision needed, but multiplied vs Decimal, so 
-            # using native float, but have to convert when used.
-            params['zoom_factor'] = float(arg) 
-        elif opt in ['--algo']:
-            params['algo'] = arg
-        elif opt in ['--julia-center']:
-            params['julia_center'] = mathSupport.createComplex(arg)
+        diveMesh = marker.diveMesh 
+        mathSupport = diveMesh.mathSupport
+        params['math_support'] = mathSupport
+        params['digits_precision'] = mathSupport.digitsPrecision()
 
+        realCenter = diveMesh.realMeshGenerator.valuesCenter
+        imagCenter = diveMesh.imagMeshGenerator.valuesCenter
+        params['center'] = mathSupport.createComplex(realCenter, imagCenter)
+        params['real_width'] = diveMesh.realMeshGenerator.baseWidth
+        params['imag_width'] = diveMesh.imagMeshGenerator.baseWidth
+        
+        params['next_frame_number'] = marker.markerNumber
+        params['escape_iterations'] = marker.maxEscapeIterations
+        params['algo'] = marker.algorithmName
+
+        # Guess we ignore the marker's mesh size, because we're using
+        # the project param's exploration size?
+    else:
+        # 'Normal' params, not marker load
+        mathSupportName = params['project_params'].get('math_support', 'native')
+
+        for opt, arg in opts:
+            if opt in ['--math-support']:
+                if arg in mathSupportClasses:
+                    mathSupportName = arg
+            elif opt in ['--digits-precision']:
+                params['digits_precision'] = int(arg)
+        # Creates an instance
+        mathSupport = mathSupportClasses[mathSupportName]() 
+
+        # Important to also set expected precision before parsing param values
+        supportPrecision = params.get('digits_precision', 16) # 16 == native
+        # May have been defaulted, so (re)set the param
+        params['digits_precision'] = supportPrecision 
+
+        mathSupport.setPrecision(round(supportPrecision * 3.32)) # ~3.32 bits per position
+        params['math_support'] = mathSupport
+
+        # Defaults, overwritable by cmd line args
+        params['algo'] = 'mandelbrot_smooth'
+        params['next_frame_number'] = 1
+
+        # Third pass at params, now that math support is all set up
+        for opt, arg in opts:
+            if opt in ['--center']:
+                params['center'] = mathSupport.createComplex(arg)
+            elif opt in ['--next-frame-number']:
+                params['next_frame_number'] = int(arg)
+            elif opt in ['--real-width']:
+                params['real_width'] = mathSupport.createFloat(arg)
+            elif opt in ['--imag-width']:
+                params['imag_width'] = mathSupport.createFloat(arg)
+            elif opt in ['--escape-iterations']:
+                params['escape_iterations'] = int(arg)
+            elif opt in ['--zoom-factor']:
+                # No extra precision needed, but multiplied vs Decimal, so 
+                # using native float, but have to convert when used.
+                params['zoom_factor'] = float(arg) 
+            elif opt in ['--algo']:
+                params['algo'] = arg
+            elif opt in ['--julia-center']:
+                params['julia_center'] = mathSupport.createComplex(arg)
+
+        escapeIterations = params.get('escape_iterations', 255)
+        # May have been defaulted, so (re)set the param
+        params['escape_iterations'] = escapeIterations
+
+        # Heck - defaults for window widths and heights too, matched to the aspect
+        # ratio of the project image.
+        if 'real_width' not in params or 'imag_width' not in params:
+            explorationWidth = mathSupport.createFloat(params['project_params'].get('exploration_mesh_width', 160.0))
+            explorationHeight = mathSupport.createFloat(params['project_params'].get('exploration_mesh_height', 120.0))
+            explorationAspect = explorationWidth / explorationHeight
+            if 'real_width' not in params and 'imag_width' not in params:
+                params['real_width'] = mathSupport.createFloat('3.0')
+                params['imag_width'] = mathSupport.createFloat(params['real_width'] / explorationAspect)
+            elif 'real_width' not in params:
+                params['real_width'] = mathSupport.createFloat(params['imag_width'] * explorationAspect)
+            else: # 'imag_width' not in params:
+                params['imag_width'] = mathSupport.createFloat(params['real_width'] / explorationAspect)
+   
+
+    # Finally, params writing which should happen whether or not we loaded from a marker
     params['wholeCacheFolder'] = os.path.join(params['project_name'], params['project_params']['exploration_output_path']) 
    
     projectDefaultZoom = float(params['project_params'].get('exploration_default_zoom_factor', 0.8))
     params['zoom_factor'] = params.get('zoom_factor', projectDefaultZoom)
-
-    # Whether an incoming parameter or not, make some values available
-    # as parameters.
-    params['digits_precision'] = supportPrecision
-
-    escapeIterations = params.get('escape_iterations', 255)
-    params['escape_iterations'] = escapeIterations
+ 
     return params
 
 def nextClicked(event):

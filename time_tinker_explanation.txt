@@ -35,6 +35,8 @@ python3.9 ./mesh_explore.py --project='time_tinker' --real-width=2.0 --imag-widt
 
 NOTE: As exploring, the current window leaves behind a command invocation that can start the exploration script at the same place again.  This is helpful when working in phases, and also when trying to tinker with specific parameters.
 
+NOTE 2: Currently, the 'markers_to_timeline.py' script doesn't accept markers from mixed math_support types, so stick to just one while exploring.
+
 
 ## Timeline Creation
 
