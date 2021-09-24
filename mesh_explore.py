@@ -302,6 +302,10 @@ def saveMarkerClicked(event):
     marker = MeshMarker(diveMesh, currFrameNumber, params['algo'], params['escape_iterations'])
  
     markerFileName = getMarkerFileNameForFrameNumber(currFrameNumber)
+    if os.path.exists(markerFileName):
+        print(f"ERROR - chickening out at creating a marker file \"{markerFileName}\", because it already exists")
+        return
+
     with open(markerFileName, 'wb') as markerHandle:
         pickle.dump(marker, markerHandle)
 

@@ -271,6 +271,12 @@ class DiveMathSupport:
         """
         print(f"DiveMathSuppport interpolation type {transitionType}")
 
+        startX = self.decimal.Decimal(startX)
+        startY = self.decimal.Decimal(startY)
+        endX = self.decimal.Decimal(endX)
+        endY = self.decimal.Decimal(endY)
+        targetX = self.decimal.Decimal(targetX)
+
         if transitionType == 'log-to':
             return self.interpolateLogTo(startX, startY, endX, endY, targetX)
         elif transitionType == 'root-to':
