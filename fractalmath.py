@@ -650,15 +650,16 @@ class DiveMathSupport:
         currShape = realValues.shape
 
         results = np.empty(currShape, dtype=object)
+        smoothResults = np.empty(currShape, dtype=object)
         lastRealValues = np.empty(currShape, dtype=object)
         lastImagValues = np.empty(currShape, dtype=object)
   
         # numpyArray.shape returns (rows, columns) 
         for y in range(currShape[0]):
             for x in range(currShape[1]):
-                (results[y,x], lastRealValues[y,x], lastImagValues[y,x]) = self.mandelbrotDistanceEstimateSingle(realValues[y,x], imagValues[y,x], escapeRadius, maxIter)
+                (results[y,x], smoothResults[y,x], lastRealValues[y,x], lastImagValues[y,x]) = self.mandelbrotDistanceEstimateSingle(realValues[y,x], imagValues[y,x], escapeRadius, maxIter)
 
-        return (results, lastRealValues, lastImagValues)
+        return (results, smoothResults, lastRealValues, lastImagValues)
  
     def mandelbrotDistanceEstimateSingle(self, realValue, imagValue, escapeRadius, maxIter):
         """
@@ -704,12 +705,16 @@ class DiveMathSupport:
             zrSquared = zReal * zReal
             ziSquared = zImag * zImag
 
+
+       # NOTE: Hey, return result AND smoothed result, right?
+
+
         # Tried to extract the distance smoothing from this a few times, 
         # but it seems a lot messier to pass around the (needed) derivative
         # as well, so we just go ahead and return an extra term here, knowing
         # this theoretically could be better handled in the 'normal' two steps.
         if result == maxIter:
-            return (result, zReal, zImag)
+            return (result, result, zReal, zImag)
         else:
             realPart = zReal * zReal 
             imagPart = zImag * zImag 
@@ -722,18 +727,25 @@ class DiveMathSupport:
             ## Can't take logs of zMagnitude when <= 0, 
             ## and can't divide by zero-valued dzMagnitude.
             ## (though these shouldn't ever be, because of sqrt?)
-            #if zMagnitude <= 0 or dzMagnitude <= 0:
-            #    return (result, zReal, zImag)
+            if zMagnitude <= 0 or dzMagnitude <= 0:
+                return (result, result, zReal, zImag)
             #
             # Current most likely: 
             #return ((zMagnitude * (zMagnitude.ln()) / dzMagnitude), zReal, zImag)
             # But need to include the actual result, right?
             #return (result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude), zReal, zImag)
-            tmpAnswer = result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude)
-            if result > 0:
-                return (tmpAnswer, zReal, zImag)
-            else:
-                return (self.decimal.Decimal(0), zReal, zImag)
+            #tmpAnswer = result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude)
+            tmpAnswer = result + (zMagnitude * (zMagnitude.ln()) / dzMagnitude)
+            return (result, tmpAnswer, zReal, zImag)
+
+#            if result == 0:
+#                return (self.decimal.Decimal(0), zReal, zImag)
+#            else:
+#                tmpAnswer = result - (zMagnitude * (zMagnitude.ln()) / dzMagnitude)
+#                return (tmpAnswer, zReal, zImag)
+            # from https://github.com/JRWynneIII/Mandelbrot/blob/master/serial_mandelbrot.c
+            # (looks the same, however, the surrounding conditions look clearer/better?)
+            #dist=(log(x2+y2)*sqrt(x2+y2))/sqrt(xder*xder+yder*yder); 
 
             # More math, slightly less blown out?
             #return ((zMagnitude * zMagnitude).ln() * zMagnitude / dzMagnitude, zReal, zImag)
@@ -812,6 +824,7 @@ class DiveMathSupport:
         # but it seems a lot messier to pass around the (needed) derivative
         # as well, so we just go ahead and return an extra term here, knowing
         # this theoretically could be better handled in the 'normal' two steps.
+
         if result == maxIter:
             return (result, zReal, zImag)
         else:
@@ -934,6 +947,11 @@ class DiveMathSupportMPFR(DiveMathSupport):
         """
         return self.mpfrlib.mandelbrot_2d_pydecimal_to_string(realValues, imagValues, escapeRadius, maxIterations, self.currPrecision)
 
+    def mandelbrotDistanceEstimate(self, realValues, imagValues, escapeRadius, maxIter):
+        return self.mpfrlib.mandelbrot_distance_2d_pydecimal_to_decimal(realValues, imagValues, escapeRadius, maxIter, self.currPrecision)
+    
+    def juliaDistanceEstimate(self, realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIter):
+        return self.mpfrlib.julia_distance_2d_pydecimal_to_decimal(realValues, imagValues, realJuliaValue, imagJuliaValue, escapeRadius, maxIterations, self.currPrecision)
 
 class DiveMathSupportFlint(DiveMathSupport):
     """
