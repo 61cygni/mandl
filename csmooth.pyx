@@ -7,7 +7,6 @@
 # https://iquilezles.org/www/articles/mset_smooth/mset_smooth.htm
 # https://www.shadertoy.com/view/4df3Rn coloring and smoothing working
 #
-#
 # Seashell cove - -0.745+0.186j
 #
 # -- 
@@ -27,17 +26,22 @@ import fractalutil as fu
 
 from algo import Algo
 
+cdef int c_sample         = 9; # number of samples per pixel
 cdef long double c_width  = 0.
 cdef long double c_height = 0.
-cdef long double c_real  = 0.
-cdef long double c_imag  = 0.
+cdef long double c_real   = 0.
+cdef long double c_imag   = 0.
 cdef float scaling_factor = 0.
 cdef long double magnification = 0.
+
+# Declare offsets for sampling
+cdef int MAX_SAMPLES = 128
+cdef float x_spiral_offset[128]
+cdef float y_spiral_offset[128]
 
 @cython.profile(False)
 cdef inline float csquared_modulus(long double real, long double imag):
     return ((real*real)+(imag*imag))
-
 
 @cython.profile(False)
 cdef inline bint cinside_M1_or_M2(long double real, long double imag):
@@ -75,20 +79,16 @@ cdef inline float ccalc_pixel(long double real, long double imag, int max_iter, 
     return sl
 
 @cython.boundscheck(False)
-cdef cmap_to_color(val, int[:] colors):
-
-    cdef float sc0 = 0.0
-    cdef float sc1 = 0.6
-    cdef float sc2 = 1.0
+cdef cmap_to_color(val, float red, float green, float blue, int[:] colors):
 
     cdef float c1 = 0.
     cdef float c2 = 0.
     cdef float c3 = 0.
 
     for m in val:
-        c1 +=  1 + math.cos( 3.0 + m*0.15 + sc0);
-        c2 +=  1 + math.cos( 3.0 + m*0.15 + sc1);
-        c3 +=  1 + math.cos( 3.0 + m*0.15 + sc2);
+        c1 +=  1 + math.cos( 3.0 + m*0.15 + red);
+        c2 +=  1 + math.cos( 3.0 + m*0.15 + green);
+        c3 +=  1 + math.cos( 3.0 + m*0.15 + blue);
 
     c1 /= len(val)    
     c2 /= len(val)    
@@ -105,7 +105,7 @@ cdef cmap_to_color(val, int[:] colors):
     return
 
 @cython.profile(False)
-def ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
+def old_ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
                     long double im_start, long double im_end, int max_iter, int escape_rad):
     values = {}
 
@@ -115,6 +115,7 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
     cdef long double in_x
     cdef long double in_y
 
+    # sample multiple times 
     fraction_x = (re_end - re_start) / img_width
     fraction_y = (im_end - im_start) / img_height
     fraction_3x = fraction_x / 3.
@@ -150,20 +151,68 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
 
     return values
 
+@cython.profile(False)
+def ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
+                    long double im_start, long double im_end, int max_iter, int escape_rad):
+    values = {}
+
+    cdef long double Re_x
+    cdef long double Im_y
+
+    cdef long double in_x
+    cdef long double in_y
+
+    # calculate langth of space pixel represents 
+    fraction_x = (re_end - re_start) / img_width
+    fraction_y = (im_end - im_start) / img_height
+
+    sample_step = 0
+    if c_sample > 1:
+        sample_step = MAX_SAMPLES / (c_sample-1)
+        
+    for x in range(0, img_width):
+        for y in range(0, img_height):
+            in_x = x
+            in_y = y
+            # ap from pixels to complex coordinates
+            Re_x = (re_start) + (in_x / img_width)  *  (re_end - re_start)
+            Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
+
+            m = []
+            # Call primary calculation function on centern pixel 
+            m.append(ccalc_pixel(Re_x, Im_y, max_iter, escape_rad))
+            if c_sample <= 1:
+                values[(x,y)] = m 
+                continue
+
+            # calculate samples on a spiral moving away 
+            for i in range(0,MAX_SAMPLES,sample_step):
+                m.append(ccalc_pixel(Re_x + (fraction_x * x_spiral_offset[i]) , 
+                                     Im_y + (fraction_y * y_spiral_offset[i]), max_iter, escape_rad))
+
+            values[(x,y)] = m 
+
+    return values
+
 class CSmooth(Algo):
     
     def __init__(self, context):
         super(CSmooth, self).__init__(context) 
         self.color = (.1,.2,.3) 
-        #self.color = (.0,.6,1.0) 
 
 
     def parse_options(self, opts, args):    
+        global c_sample
+
         for opt,arg in opts:
-            if opt in ['--setcolor']: # XXX TODO
-                pass
-                #self.color = (.1,.2,.3)   # dark
-                #self.color = (.0,.6,1.0) # blue / yellow
+            # take color as an RGB tuple (.1,.2,.3)
+            if opt in ['--setcolor']: # take colors 
+                self.color = eval(arg) 
+            elif opt in ['--sample']: # number of samples per pixel 
+                c_sample = int(arg) 
+
+        print('+ color to %s'%(str(self.color)))
+        print('+ number of samples %d'%(c_sample))
 
     def set_default_params(self):
 
@@ -175,7 +224,6 @@ class CSmooth(Algo):
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
             self.context.max_iter     = 512
-
 
     def calc_cur_frame(self, img_width, img_height, x, xx, xxx, xxxx):
         global c_width
@@ -200,7 +248,7 @@ class CSmooth(Algo):
 
     def _map_to_color(self, val):
         c = np.zeros((3), dtype=np.int32)
-        cmap_to_color(val, c)
+        cmap_to_color(val, self.color[0], self.color[1], self.color[2], c)
         return (c[0], c[1], c[2]) 
 
 
@@ -230,6 +278,25 @@ class CSmooth(Algo):
         magnification = self.context.magnification
         num_epochs = self.context.num_epochs
 
+        # calculate x and y offsets for samples
+        print('+ calculating sample offsets ')
+
+        # calculate the offsets for a spiral around the pixel using
+        # the Archimedean spireal equation r = a + b*theta
+        # We use a = .05 and b = .0035
+        # x/y ranges end right below .5 
+        a = .05
+        b = .0035
+        for i in range(0, MAX_SAMPLES):
+            theta = float(i)
+            r = a+ (b * theta) 
+            x_spiral_offset[i] = r * math.cos(theta) 
+            y_spiral_offset[i] = r * math.sin(theta)
+
+        #for i in range(0, MAX_SAMPLES):
+        #    print('x:%f y:%f'%(x_spiral_offset[i], y_spiral_offset[i]))
+            
+            
     def zoom_in(self, iterations=1):
         global c_width
         global c_height

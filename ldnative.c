@@ -31,7 +31,7 @@ static long double cmplx_h = .0; // calculated in body from imgw/imgh
 
 static float red   = 0.1; 
 static float green = 0.2;
-static float blue  = 0.3;
+static float blue  = 0.6;
 
 //static float red   = 0.0;
 //static float green = 0.6;
@@ -258,7 +258,6 @@ int main(int argc, char **argv)
     long double fraction_5y = fraction_y / 5.;
 
 
-
     int r,g,b;
     libattopng_t* png = 0;
 
@@ -281,9 +280,7 @@ int main(int argc, char **argv)
             continue;
         for(int x = 0; x < img_w; ++x){
             // map from pixels to complex coordinates 
-            // Re_x = (re_start) + (x / img_width)  * (re_end - re_start)
             re_x = re_start+((float)x/(float)img_w) * (re_end - re_start);
-            // Im_y = (im_start) + (y / img_height) * (im_end - im_start)
             im_y = im_start + (((float)y/(float)img_h) * (im_end - im_start));
 
 

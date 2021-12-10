@@ -531,6 +531,8 @@ def parse_options():
                                 "color=",
                                 "keyframe=",
                                 "precision=",
+                                "sample=",
+                                "setcolor=",
                                 "numprocs=",
                                 "sleep=",
                                 "dive",
