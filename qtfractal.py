@@ -29,8 +29,8 @@ DEFAULT_ALGO = "ldnative"
 BURN = True 
 
 # Fixed with to display fractal image
-DISPLAY_WIDTH   = 640.
-DISPLAY_HEIGHT  = 480.
+DISPLAY_WIDTH   = 640
+DISPLAY_HEIGHT  = 480
 
 # runtime configurable paremeters
 
@@ -79,6 +79,15 @@ def run():
 
     #real, imag = display()
 
+class SnapshotPopup(QWidget):
+
+    def __init__(self):
+        QWidget.__init__(self)
+
+    def paintEvent(self, e):
+        dc = QPainter(self)
+        dc.drawLine(0, 0, 100, 100)
+        dc.drawLine(100, 0, 0, 100)
 
 # --
 # Main image widget. This loads in the fractal snapshot after it was
@@ -94,24 +103,37 @@ class FractalImgQLabel(QLabel):
         self.setSizePolicy(sizePolicy)
         self.begin = QPoint()
         self.end   = QPoint()
+        self.pos   = QPoint()
         
     def event(self, event):
+
         if event.type() == QEvent.HoverMove:
             x = event.pos().x() 
             y = event.pos().y() 
             status = 'Image (%f,%f)'%(x,y)
             self.parent.parent.statusBar().showMessage(status)
 
+            self.pos = event.pos()
+        
+            self.update()
+
+
         return super().event(event)
 
 
     def paintEvent(self, event):
         super().paintEvent(event)
+
         qp = QPainter(self)
         br = QBrush(QColor(100, 10, 10, 40))  
         qp.setBrush(br)   
         nrect = QRect(self.begin, self.end)
         qp.drawRect(nrect)
+
+        # draw crosshairs
+        qp.setPen(QColor(128, 0, 64, 127))
+        qp.drawLine(0,self.pos.y(),DISPLAY_WIDTH,self.pos.y())
+        qp.drawLine(self.pos.x(),0,self.pos.x(), DISPLAY_HEIGHT)
 
 
     def keyPressEvent(self, event):
@@ -126,8 +148,8 @@ class FractalImgQLabel(QLabel):
 
     def mouseMoveEvent(self, event):
 
-        # if shift is held down, then move the rectangel as is
 
+        # if shift is held down, then move the rectangel as is
         modifiers = QApplication.keyboardModifiers()
         if modifiers == Qt.ShiftModifier:
             rect = QRect(self.begin, self.end)
@@ -161,6 +183,12 @@ class FractalImgQLabel(QLabel):
 
         nrect = QRect(self.begin, self.end)
 
+        size = nrect.size()
+        if size.height() * size.width() < 4:
+            print(" * bounding box not large enough, ignoring")
+            self.update()
+            return
+
         x = nrect.center().x()
         y = nrect.center().y()
 
@@ -185,6 +213,7 @@ class FractalImgQLabel(QLabel):
         c_height =  hpf(float(nrect.height()) / DISPLAY_HEIGHT) * c_height
 
         run()
+
         self.parent.refresh_ui()
 
         self.begin = event.pos()
@@ -255,12 +284,18 @@ class QTFractalMainWindow(QWidget):
         pixmap = QPixmap(self.main_image_name)
         pixmap = pixmap.scaled(DISPLAY_WIDTH, DISPLAY_HEIGHT)
         self.main_image.setPixmap(pixmap)
+        self.main_image.resize(DISPLAY_WIDTH, DISPLAY_HEIGHT)
         self.grid.addWidget(self.main_image, 0, 1)
 
     def run(self):
         self.sync_config_from_ui()
         run()
         self.refresh_ui()
+
+    def snapshot(self):
+        self.snap_pop = SnapshotPopup()
+        self.snap_pop.setGeometry(QRect(100, 100, 400, 200))
+        self.snap_pop.show()
         
 
     def initUI(self):
@@ -282,7 +317,9 @@ class QTFractalMainWindow(QWidget):
 
         btn_run = QPushButton("run")
         btn_run.clicked.connect(self.run)
-        #btn_set = QPushButton("Set name")
+
+        btn_snapshot = QPushButton("snapshot")
+        btn_snapshot.clicked.connect(self.snapshot)
 
         #fullscreen
         #self.main_image.setScaledContents(True)
@@ -350,6 +387,7 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(blue_label ,8, 0)
         grid_config.addWidget(self.blue_edit, 8, 1)
         grid_config.addWidget(btn_run, 9, 0)
+        grid_config.addWidget(btn_snapshot, 9, 1)
 
         # Right side inputs for c_real and c_imag 
         grid_center = QGridLayout()
@@ -394,6 +432,7 @@ class QTFractalMainWindow(QWidget):
 
 
 class menubarex(QMainWindow):
+
     def __init__(self, parent=None):
         super(menubarex, self).__init__(parent)
         self.form_widget = QTFractalMainWindow(self)
