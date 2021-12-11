@@ -52,13 +52,15 @@ c_width  = hpf(5)
 c_height = hpf(0)
 
 # number of samples per pixel
-samples = 9
+samples  = 9
+max_iter = (2 << 10)  
 
 
 def run():
     global real
     global imag
     global samples
+    global max_iter
     global c_width
     global c_height
     global image_w
@@ -71,8 +73,8 @@ def run():
 
     #cmd = "python3 fractal.py %s --verbose=3 --algo=%s --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
     #      %(burn_str, str(algo), red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
-    cmd = "python3 fractal.py %s --verbose=3 --algo=%s --sample=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
-          %(burn_str, str(algo), samples, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
+    cmd = "python3 fractal.py %s --verbose=3 --algo=%s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
+          %(burn_str, str(algo), samples, max_iter, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
     print(" + Driver running comment: "+cmd)
     proc = subprocess.Popen(cmd, shell=True)
     proc.wait()
@@ -176,6 +178,7 @@ class FractalImgQLabel(QLabel):
         global ALGO
         global BURN
         global samples
+        global max_iter
         global DISPLAY_WIDTH
         global DISPLAY_HEIGHT
         global image_w
@@ -237,6 +240,7 @@ class QTFractalMainWindow(QWidget):
 
     def sync_config_from_ui(self):
         global samples
+        global max_iter
         global image_w
         global image_h
         global algo
@@ -246,7 +250,8 @@ class QTFractalMainWindow(QWidget):
 
 
         #set values from UI
-        samples = int(self.samples_text.text())
+        samples  = int(self.samples_text.text())
+        max_iter = int(self.iter_text.text())
         image_w = int(float(self.img_width_text.text()))
         image_h = int(float(self.img_height_text.text())) 
         algo    = self.algo_combo.currentText()
@@ -260,6 +265,7 @@ class QTFractalMainWindow(QWidget):
         global real
         global imag
         global samples
+        global max_iter
         global c_height
         global c_width
         global red
@@ -275,6 +281,7 @@ class QTFractalMainWindow(QWidget):
         self.c_real_edit.setPlainText(str(real))
         self.c_imag_edit.setPlainText(str(imag))
         self.samples_text.setText(str(samples))
+        self.iter_text.setText(str(max_iter))
 
         self.red_edit.setText(str(red))
         self.green_edit.setText(str(green))
@@ -353,6 +360,11 @@ class QTFractalMainWindow(QWidget):
         samples_label     = QLabel("Samples: ")
         self.samples_text = QLineEdit(self) 
 
+        iter_label     = QLabel("Max iter: ")
+        self.iter_text = QLineEdit(self) 
+
+
+
         red_label   = QLabel("Red: ")
         self.red_edit    = QLineEdit(self) 
         green_label = QLabel("Green: ")
@@ -380,14 +392,16 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(self.img_height_text, 4, 1)
         grid_config.addWidget(samples_label ,5, 0)
         grid_config.addWidget(self.samples_text, 5, 1)
-        grid_config.addWidget(red_label ,6, 0)
-        grid_config.addWidget(self.red_edit, 6, 1)
-        grid_config.addWidget(green_label ,7, 0)
-        grid_config.addWidget(self.green_edit, 7, 1)
-        grid_config.addWidget(blue_label ,8, 0)
-        grid_config.addWidget(self.blue_edit, 8, 1)
-        grid_config.addWidget(btn_run, 9, 0)
-        grid_config.addWidget(btn_snapshot, 9, 1)
+        grid_config.addWidget(iter_label ,6, 0)
+        grid_config.addWidget(self.iter_text, 6, 1)
+        grid_config.addWidget(red_label ,7, 0)
+        grid_config.addWidget(self.red_edit, 7, 1)
+        grid_config.addWidget(green_label ,8, 0)
+        grid_config.addWidget(self.green_edit, 8, 1)
+        grid_config.addWidget(blue_label ,9, 0)
+        grid_config.addWidget(self.blue_edit, 9, 1)
+        grid_config.addWidget(btn_run, 10, 0)
+        grid_config.addWidget(btn_snapshot, 10, 1)
 
         # Right side inputs for c_real and c_imag 
         grid_center = QGridLayout()
