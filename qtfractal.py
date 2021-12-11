@@ -134,6 +134,7 @@ class SnapshotPopup(QWidget):
 
 
         #set values from UI
+        algo    = self.algo_combo.currentText()
         samples  = int(self.samples_text.text())
         max_iter = int(self.iter_text.text())
         image_w = int(float(self.img_width_text.text()))
@@ -146,6 +147,13 @@ class SnapshotPopup(QWidget):
 
         filename_label      = QLabel('Filename')
         self.filename_text  = QLineEdit(self)
+
+        algo_label = QLabel('Fractal Algo')
+        self.algo_combo = QComboBox()
+        self.algo_combo.addItem("ldnative")
+        self.algo_combo.addItem("hpnative")
+        self.algo_combo.addItem("mandeldistance")
+        self.algo_combo.addItem("csmooth")
 
         img_width_label = QLabel('Image width')
         img_height_label = QLabel('Image height')
@@ -171,8 +179,10 @@ class SnapshotPopup(QWidget):
 
         # Left side config params
         self.grid_config = QGridLayout()
-        self.grid_config.addWidget(filename_label,2, 0)
-        self.grid_config.addWidget(self.filename_text, 2, 1)
+        self.grid_config.addWidget(filename_label,0, 0)
+        self.grid_config.addWidget(self.filename_text, 0, 1)
+        self.grid_config.addWidget(algo_label ,1, 0)
+        self.grid_config.addWidget(self.algo_combo ,1, 1)
         self.grid_config.addWidget(img_width_label,3, 0)
         self.grid_config.addWidget(self.img_width_text, 3, 1)
         self.grid_config.addWidget(img_height_label,4, 0)
