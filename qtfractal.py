@@ -41,7 +41,7 @@ image_h = DISPLAY_HEIGHT
 
 red   = 0.1
 green = 0.2
-blue  = 0.3
+blue  = 0.6
 
 real = hpf(-.745)
 imag = hpf(.186)
@@ -56,7 +56,12 @@ samples  = 9
 max_iter = (2 << 10)  
 
 
-def run():
+# --
+# Run the command line fractal program. This generates and image we then
+# pull into the UI
+# --
+
+def run(filename):
     global real
     global imag
     global samples
@@ -71,25 +76,123 @@ def run():
     if BURN:
         burn_str = "--burn"
 
-    #cmd = "python3 fractal.py %s --verbose=3 --algo=%s --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
-    #      %(burn_str, str(algo), red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
-    cmd = "python3 fractal.py %s --verbose=3 --algo=%s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" " \
-          %(burn_str, str(algo), samples, max_iter, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag))
+    cmd = "python3 fractal.py %s --verbose=3 --algo=%s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" --gif=%s" \
+          %(burn_str, str(algo), samples, max_iter, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag),filename)
     print(" + Driver running comment: "+cmd)
     proc = subprocess.Popen(cmd, shell=True)
     proc.wait()
 
-    #real, imag = display()
+# --
+# Popup that we use to generate a large snapshot
+# --
 
 class SnapshotPopup(QWidget):
 
     def __init__(self):
         QWidget.__init__(self)
 
-    def paintEvent(self, e):
-        dc = QPainter(self)
-        dc.drawLine(0, 0, 100, 100)
-        dc.drawLine(100, 0, 0, 100)
+        self.filename = './snapshot.gif'
+        self.initUI()
+
+    def run(self):
+        self.sync_config_from_ui()
+        run(self.filename)
+        self.refresh_ui()
+
+    def refresh_ui(self):
+        global image_w
+        global image_h
+        global real
+        global imag
+        global samples
+        global max_iter
+        global c_height
+        global c_width
+        global red
+        global green
+        global blue
+
+        self.filename_text.setText(self.filename)
+        self.img_width_text.setText(str(image_w))
+        self.img_height_text.setText(str(image_h))
+        self.samples_text.setText(str(samples))
+        self.iter_text.setText(str(max_iter))
+
+        self.red_edit.setText(str(red))
+        self.green_edit.setText(str(green))
+        self.blue_edit.setText(str(blue))
+
+    def sync_config_from_ui(self):
+        global samples
+        global max_iter
+        global image_w
+        global image_h
+        global algo
+        global red
+        global blue 
+        global green 
+
+
+        #set values from UI
+        samples  = int(self.samples_text.text())
+        max_iter = int(self.iter_text.text())
+        image_w = int(float(self.img_width_text.text()))
+        image_h = int(float(self.img_height_text.text())) 
+        red     = float(self.red_edit.text())
+        green   = float(self.green_edit.text()) 
+        blue    = float(self.blue_edit.text()) 
+
+    def initUI(self):
+
+        filename_label      = QLabel('Filename')
+        self.filename_text  = QLineEdit(self)
+
+        img_width_label = QLabel('Image width')
+        img_height_label = QLabel('Image height')
+
+        self.img_width_text  = QLineEdit(self)
+        self.img_height_text  = QLineEdit(self)
+
+        samples_label     = QLabel("Samples: ")
+        self.samples_text = QLineEdit(self) 
+
+        iter_label     = QLabel("Max iter: ")
+        self.iter_text = QLineEdit(self) 
+
+        red_label   = QLabel("Red: ")
+        self.red_edit    = QLineEdit(self) 
+        green_label = QLabel("Green: ")
+        self.green_edit  = QLineEdit(self) 
+        blue_label  = QLabel("Blue: ")
+        self.blue_edit   = QLineEdit(self) 
+
+        btn_run = QPushButton("Go!")
+        btn_run.clicked.connect(self.run)
+
+        # Left side config params
+        self.grid_config = QGridLayout()
+        self.grid_config.addWidget(filename_label,2, 0)
+        self.grid_config.addWidget(self.filename_text, 2, 1)
+        self.grid_config.addWidget(img_width_label,3, 0)
+        self.grid_config.addWidget(self.img_width_text, 3, 1)
+        self.grid_config.addWidget(img_height_label,4, 0)
+        self.grid_config.addWidget(self.img_height_text, 4, 1)
+        self.grid_config.addWidget(samples_label ,5, 0)
+        self.grid_config.addWidget(self.samples_text, 5, 1)
+        self.grid_config.addWidget(iter_label ,6, 0)
+        self.grid_config.addWidget(self.iter_text, 6, 1)
+        self.grid_config.addWidget(red_label ,7, 0)
+        self.grid_config.addWidget(self.red_edit, 7, 1)
+        self.grid_config.addWidget(green_label ,8, 0)
+        self.grid_config.addWidget(self.green_edit, 8, 1)
+        self.grid_config.addWidget(blue_label ,9, 0)
+        self.grid_config.addWidget(self.blue_edit, 9, 1)
+        self.grid_config.addWidget(btn_run, 10, 1)
+
+        self.setLayout(self.grid_config)
+        self.refresh_ui()
+        self.update()
+
 
 # --
 # Main image widget. This loads in the fractal snapshot after it was
@@ -215,7 +318,7 @@ class FractalImgQLabel(QLabel):
         c_width  =  hpf(float(nrect.width()) / DISPLAY_HEIGHT)  * c_width
         c_height =  hpf(float(nrect.height()) / DISPLAY_HEIGHT) * c_height
 
-        run()
+        run(self.parent.main_image_name)
 
         self.parent.refresh_ui()
 
@@ -296,7 +399,7 @@ class QTFractalMainWindow(QWidget):
 
     def run(self):
         self.sync_config_from_ui()
-        run()
+        run(self.main_image_name)
         self.refresh_ui()
 
     def snapshot(self):
@@ -352,7 +455,7 @@ class QTFractalMainWindow(QWidget):
         self.c_height_text  = QPlainTextEdit(self)
 
         img_width_label = QLabel('Image width')
-        img_heigh_label = QLabel('Image height')
+        img_height_label = QLabel('Image height')
 
         self.img_width_text  = QLineEdit(self)
         self.img_height_text  = QLineEdit(self)
@@ -388,7 +491,7 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(self.c_height_text, 2, 1)
         grid_config.addWidget(img_width_label,3, 0)
         grid_config.addWidget(self.img_width_text, 3, 1)
-        grid_config.addWidget(img_heigh_label,4, 0)
+        grid_config.addWidget(img_height_label,4, 0)
         grid_config.addWidget(self.img_height_text, 4, 1)
         grid_config.addWidget(samples_label ,5, 0)
         grid_config.addWidget(self.samples_text, 5, 1)
@@ -423,7 +526,7 @@ class QTFractalMainWindow(QWidget):
         self.setLayout(self.grid)
 
 
-        run()
+        run(self.main_image_name)
         self.refresh_ui()
 
         self.show()
