@@ -28,9 +28,12 @@ class MandelDistance(Algo):
         # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
         #self.context.cmplx_center = self.context.ctxc("-0.05+.6805j")
 
-    def calc_pixel(self, c):
+    def calc_pixel(self, c_real, c_imag):
 
-        c2 = c.real*c.real + c.imag*c.imag
+        c = complex(float(c_real), float(c_imag))
+
+        c2 = float(c.real*c.real + c.imag*c.imag)
+
         # skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
         if  256.0*c2*c2 - 96.0*c2 + 32.0*c.real - 3.0 < 0.0: 
             return 0.0
@@ -66,7 +69,7 @@ class MandelDistance(Algo):
 
     def map_value_to_color(self, val):
         zoo = .1 
-        zoom_level = 1. / (self.context.cmplx_width)
+        zoom_level = 1. / float(self.context.cmplx_width)
         d = clamp( pow(zoom_level*val/zoo,0.1), 0.0, 1.0 );
         cint = int(d*255)
 
