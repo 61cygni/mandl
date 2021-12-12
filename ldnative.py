@@ -32,15 +32,15 @@ class LDNative(Algo):
         #self.color = (.0,.6,1.0) 
 
     def parse_options(self, opts, args):    
+
         for opt,arg in opts:
-            if opt in ['--nocolor']:
-                self.color = None 
-            if opt in ['--numprocs']:
+            if opt in ['--setcolor']: # take colors 
+                self.color = eval(arg) 
+            elif opt in ['--numprocs']:
                 self.numprocs = int(arg) 
-            if opt in ['--setcolor']: # XXX TODO
-                pass
-                #self.color = (.1,.2,.3)   # dark
-                #self.color = (.0,.6,1.0) # blue / yellow
+
+        print('+ color to %s'%(str(self.color)))
+        #print('+ number of samples %d'%(c_sample))
 
     def set_default_params(self):
 
@@ -70,8 +70,8 @@ class LDNative(Algo):
             fn = self.dir+"ldm%d.png"%(i)
             filenames.append(fn)
             #cmd_args =  self.exe+" -w %d -h %d -n %d -c %d -i %s -x %.20f -y %.20f -l %.20f"%\
-            cmd_args =  self.exe+"  -v -w %d -h %d -n %d -c %d -i %s -x %.20f -y %.20f -l %.20f"%\
-                                 (img_width, img_height, self.numprocs, i+1, fn, c_real, c_imag, c_w )
+            cmd_args =  self.exe+"  -v -w %d -h %d -n %d -c %d -i %s -x %.20f -y %.20f -l %.20f -r %f -g %f -b %f"%\
+                                 (img_width, img_height, self.numprocs, i+1, fn, c_real, c_imag, c_w, self.color[0], self.color[1], self.color[2])
             cmds.append(cmd_args)
 
         

@@ -12,8 +12,10 @@
 # -- 
 import math
 
-import decimal
-hpf = decimal.Decimal
+from decimal import *
+
+hpf = Decimal
+getcontext().prec = 500 
 
 import cython
 import numpy  as np
@@ -103,53 +105,6 @@ cdef cmap_to_color(val, float red, float green, float blue, int[:] colors):
     colors[2] = c3int
 
     return
-
-@cython.profile(False)
-def old_ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
-                    long double im_start, long double im_end, int max_iter, int escape_rad):
-    values = {}
-
-    cdef long double Re_x
-    cdef long double Im_y
-
-    cdef long double in_x
-    cdef long double in_y
-
-    # sample multiple times 
-    fraction_x = (re_end - re_start) / img_width
-    fraction_y = (im_end - im_start) / img_height
-    fraction_3x = fraction_x / 3.
-    fraction_3y = fraction_y / 3.
-    fraction_5x = fraction_x / 5.
-    fraction_5y = fraction_y / 5.
-
-    for x in range(0, img_width):
-        for y in range(0, img_height):
-            in_x = x
-            in_y = y
-            # ap from pixels to complex coordinates
-            Re_x = (re_start) + (in_x / img_width)  *  (re_end - re_start)
-            Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
-
-            # Call primary calculation function here
-            m = []
-            m.append(ccalc_pixel(Re_x, Im_y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x + fraction_3x, Im_y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x - fraction_3x, Im_y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x, Im_y + fraction_3y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x, Im_y - fraction_3y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x + fraction_3x, Im_y + fraction_3y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x - fraction_3x, Im_y - fraction_3y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x - fraction_3x, Im_y + fraction_3y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x + fraction_3x, Im_y - fraction_3y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x + fraction_5x, Im_y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x - fraction_5x, Im_y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x, Im_y + fraction_5y, max_iter, escape_rad))
-            m.append(ccalc_pixel(Re_x, Im_y - fraction_5y, max_iter, escape_rad))
-
-            values[(x,y)] = m 
-
-    return values
 
 @cython.profile(False)
 def ccalc_cur_frame(int img_width, int img_height, long double re_start, long double re_end,
@@ -289,7 +244,7 @@ class CSmooth(Algo):
         b = .0035
         for i in range(0, MAX_SAMPLES):
             theta = float(i)
-            r = a+ (b * theta) 
+            r = a + (b * theta) 
             x_spiral_offset[i] = r * math.cos(theta) 
             y_spiral_offset[i] = r * math.sin(theta)
 

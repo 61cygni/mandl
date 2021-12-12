@@ -3,16 +3,20 @@
 # Date: Sun Dec 05 22:53:44 PST 2021 
 #
 # TODO:
-# - Add support for max-iter
-# - Get colors working
 # - Fix mandeldistance
 # - add a rollback button to get to the last picture
+# - center on current mouse location picture if mouse pressed some key
+#   held
+#
+# Done :
+#
+# - Add support for max-iter
+# - Get colors working
 # - increase number of sample points per pixel from UI
 #
-# Next Up:
-# - Clean up entire execution path through csmooth
-##
 # --
+
+
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
