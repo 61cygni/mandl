@@ -30,7 +30,7 @@ hpf = Decimal
 getcontext().prec = 500 
 
 DEFAULT_ALGO = "ldnative"
-BURN = True 
+BURN = False 
 
 # Fixed with to display fractal image
 DISPLAY_WIDTH   = 640
@@ -147,6 +147,32 @@ class SnapshotPopup(QWidget):
         green   = float(self.green_edit.text()) 
         blue    = float(self.blue_edit.text()) 
 
+
+    def set_res(self, event):
+        res = self.res_combo.currentText()
+        if res == '1k':
+            self.img_width_text.setText("1024")
+            self.img_height_text.setText("768")
+        elif res == '2k':
+            self.img_width_text.setText("2048")
+            self.img_height_text.setText("1536")
+        elif res == '4k':
+            self.img_width_text.setText("3840")
+            self.img_height_text.setText("2160")
+        elif res == '8k':
+            self.img_width_text.setText("7680")
+            self.img_height_text.setText("4320")
+        elif res == '12k':
+            self.img_width_text.setText("12288")
+            self.img_height_text.setText("6480")
+        elif res == '16k':
+            self.img_width_text.setText("15360")
+            self.img_height_text.setText("8640")
+        else:
+            print(" * Error ... unknown resultion "+res)
+
+        self.update()    
+
     def initUI(self):
 
         filename_label      = QLabel('Filename')
@@ -158,6 +184,17 @@ class SnapshotPopup(QWidget):
         self.algo_combo.addItem("hpnative")
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
+
+        self.res_combo = QComboBox()
+        self.res_combo.addItem('1k')
+        self.res_combo.addItem('2k')
+        self.res_combo.addItem('4k')
+        self.res_combo.addItem('8k')
+        self.res_combo.addItem('12k')
+        self.res_combo.addItem('16k')
+
+        # adding action to combo box
+        self.res_combo.activated.connect(self.set_res)
 
         img_width_label = QLabel('Image width')
         img_height_label = QLabel('Image height')
@@ -181,16 +218,20 @@ class SnapshotPopup(QWidget):
         btn_run = QPushButton("Go!")
         btn_run.clicked.connect(self.run)
 
-        # Left side config params
+        res_config = QGridLayout()
+        res_config.addWidget(self.img_width_text, 0, 1)
+        res_config.addWidget(self.res_combo,      0, 2)
+
         self.grid_config = QGridLayout()
         self.grid_config.addWidget(filename_label,0, 0)
         self.grid_config.addWidget(self.filename_text, 0, 1)
         self.grid_config.addWidget(algo_label ,1, 0)
         self.grid_config.addWidget(self.algo_combo ,1, 1)
-        self.grid_config.addWidget(img_width_label,3, 0)
-        self.grid_config.addWidget(self.img_width_text, 3, 1)
-        self.grid_config.addWidget(img_height_label,4, 0)
-        self.grid_config.addWidget(self.img_height_text, 4, 1)
+        self.grid_config.addLayout(res_config, 2,1)
+        self.grid_config.addWidget(self.res_combo, 2,1)
+        self.grid_config.addWidget(img_width_label,2, 0)
+        self.grid_config.addWidget(img_height_label,3, 0)
+        self.grid_config.addWidget(self.img_height_text, 3, 1)
         self.grid_config.addWidget(samples_label ,5, 0)
         self.grid_config.addWidget(self.samples_text, 5, 1)
         self.grid_config.addWidget(iter_label ,6, 0)
@@ -267,7 +308,6 @@ class FractalImgQLabel(QLabel):
 
     def mouseMoveEvent(self, event):
 
-
         # if shift is held down, then move the rectangel as is
         modifiers = QApplication.keyboardModifiers()
         if modifiers == Qt.ShiftModifier:
@@ -304,13 +344,23 @@ class FractalImgQLabel(QLabel):
         nrect = QRect(self.begin, self.end)
 
         size = nrect.size()
-        if size.height() * size.width() < 4:
-            print(" * bounding box not large enough, ignoring")
-            self.update()
-            return
 
         x = nrect.center().x()
         y = nrect.center().y()
+
+        # on click with no bounding box, check for control modifier and
+        # if pressed, use that to center the picture around the mouse
+        if size.height() * size.width() < 4:
+            modifiers = QApplication.keyboardModifiers()
+            if modifiers == Qt.ControlModifier:
+                x = event.pos().x()
+                y = event.pos().y()
+                print(" + Centering picture")
+
+            else:    
+                self.update()
+                return
+
 
         self.parent.sync_config_from_ui()
 
@@ -328,9 +378,10 @@ class FractalImgQLabel(QLabel):
         print("fxoff %f, fyoff %f"%(fxoffset,fyoffset))
         print("Real %s, Image %s"%(str(real),str(imag)))
         
-        # zoom in
-        c_width  =  hpf(float(nrect.width()) / DISPLAY_HEIGHT)  * c_width
-        c_height =  hpf(float(nrect.height()) / DISPLAY_HEIGHT) * c_height
+        # only zoom in if there is a bounding box 
+        if size.height() * size.width() >= 4:
+            c_width  =  hpf(float(nrect.width()) / DISPLAY_HEIGHT)  * c_width
+            c_height =  hpf(float(nrect.height()) / DISPLAY_HEIGHT) * c_height
 
         run(self.parent.main_image_name)
 
