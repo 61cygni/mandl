@@ -2,6 +2,13 @@
 # File : qtfractal.py
 # Date: Sun Dec 05 22:53:44 PST 2021 
 #
+# Usage:
+#
+# - Click and drag mouse to create zoom box
+# - Hold shift while creating zoom box to drag it around the screen
+# - Use Command+Mouse Click to center the picture at the current zoom
+#   level at the click location
+#
 # TODO:
 # - Fix mandeldistance
 # - add a rollback button to get to the last picture

@@ -141,7 +141,7 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
                 continue
 
             # calculate samples on a spiral moving away 
-            for i in range(0,MAX_SAMPLES,sample_step):
+            for i in range(0,MAX_SAMPLES, sample_step):
                 m.append(ccalc_pixel(Re_x + (fraction_x * x_spiral_offset[i]) , 
                                      Im_y + (fraction_y * y_spiral_offset[i]), max_iter, escape_rad))
 

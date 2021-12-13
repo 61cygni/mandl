@@ -1,4 +1,4 @@
-/*-----------------------------------------------------------------------------
+/*------e----------------------------------------------------------------------
  * file: ldnative.c 
  * date: Wed Aug 11 08:13:56 PDT 2021  
  * Author: Martin Casado 
@@ -23,6 +23,11 @@
 
 static int img_w = 0, img_h = 0;
 static int max_iter = 2000;
+
+#define MAX_SAMPLES 128
+static int samples = 65; // number of samples per pixel
+static float x_spiral_offset[MAX_SAMPLES];
+static float y_spiral_offset[MAX_SAMPLES];
 
 static long double c_real  = -1;
 static long double c_imag  = 0; 
@@ -79,6 +84,7 @@ float calc_pixel_smooth(long double re_x, long double im_y) {
 }
 
 void map_to_color(float* val, int numres, int* r, int* g, int* b);
+void calc_sample_offsets ();
 
 void print_header() {
     // printf(" # -- \n");
@@ -123,7 +129,7 @@ int main(int argc, char **argv)
 
     strncpy(filename, "longdouble.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:c:x:y:l:m:r:g:b:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:c:x:y:l:m:s:r:g:b:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -159,6 +165,9 @@ int main(int argc, char **argv)
                 break;
             case 'c': 
                 blockno = atoi(optarg); 
+                break;
+            case 's': 
+                samples = atoi(optarg); 
                 break;
             case 'r': 
                 red = strtof(optarg, 0); 
@@ -204,6 +213,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "img width %d\n", img_w);
         fprintf(stderr, "img height %d\n", img_h);
         fprintf(stderr, "max iter  %d\n",  max_iter);
+        fprintf(stderr, "samples   %d\n",  samples);
         fprintf(stderr, "re_start %.20Lf\n", re_start);
         fprintf(stderr, "re_end   %.20Lf\n", re_end);
         fprintf(stderr, "im_start %.20Lf\n", im_start);
@@ -216,17 +226,6 @@ int main(int argc, char **argv)
     long double re_x;
     long double  im_y;
 
-
-    float res[16];
-    int   numres = 9;
-
-    // for sampling for higher precision
-    long double fraction_x = (re_end - re_start) / img_w;
-    long double fraction_y = (im_end - im_start) / img_h;
-    long double fraction_3x = fraction_x / 3.;
-    long double fraction_3y = fraction_y / 3.;
-    long double fraction_5x = fraction_x / 5.;
-    long double fraction_5y = fraction_y / 5.;
 
 
     int r,g,b;
@@ -246,6 +245,19 @@ int main(int argc, char **argv)
         printf("d = {};\n");
     }
 
+    // for sampling for higher precision
+    float res[MAX_SAMPLES + 1];
+    long double fraction_x = (re_end - re_start) / img_w;
+    long double fraction_y = (im_end - im_start) / img_h;
+
+    calc_sample_offsets();
+
+    int sample_step = 0;
+    if(samples > 1){
+        sample_step = MAX_SAMPLES / (samples - 1);
+    }
+
+    int sample_count = 0;
     for(int y = 0; y < img_h; ++y){
         if(y < ystart || y > yend)
             continue;
@@ -255,19 +267,19 @@ int main(int argc, char **argv)
             im_y = im_start + (((float)y/(float)img_h) * (im_end - im_start));
 
 
-            // main calculation
-            res[0] = calc_pixel_smooth(re_x, im_y); 
-            res[1] = calc_pixel_smooth(re_x + fraction_3x, im_y); 
-            res[2] = calc_pixel_smooth(re_x - fraction_3x, im_y); 
-            res[3] = calc_pixel_smooth(re_x, im_y + fraction_3y); 
-            res[4] = calc_pixel_smooth(re_x, im_y - fraction_3y); 
-            res[5] = calc_pixel_smooth(re_x + fraction_5x, im_y + fraction_5y); 
-            res[6] = calc_pixel_smooth(re_x - fraction_5x, im_y - fraction_5y); 
-            res[7] = calc_pixel_smooth(re_x - fraction_5x, im_y + fraction_5y); 
-            res[8] = calc_pixel_smooth(re_x + fraction_5x, im_y - fraction_5y); 
+            // calculate center pixel 
+            sample_count = 0;
+            res[sample_count++] = calc_pixel_smooth(re_x, im_y); 
+
+            if(samples > 1){
+                    for(int i = 0; i < MAX_SAMPLES; i+=sample_step){
+                        res[sample_count++] = calc_pixel_smooth(re_x + (fraction_x * x_spiral_offset[i]),
+                                                                im_y + (fraction_y * y_spiral_offset[i]));
+                    }
+            }
 
             if(iflag) {
-                map_to_color(res, numres,&r, &g, &b);
+                map_to_color(res, sample_count, &r, &g, &b);
                 libattopng_set_pixel(png, x, y - ((blockno-1)*blocksize), RGBA(r,g,b)); 
             }else{
                 printf("d[(%d,%d)] = %f; ",x,y,res[0]);
@@ -291,6 +303,26 @@ int main(int argc, char **argv)
     }
 
     return 0;
+}
+
+// --
+//  calculate the offsets for a spiral around the pixel using
+//  the Archimedean spireal equation r = a + b*theta
+//  We use a = .05 and b = .0035
+//  x/y ranges end right below .5 
+// --
+void calc_sample_offsets () {
+    float a = .05;
+    float b = .0035;
+
+    for (int i = 0; i < MAX_SAMPLES ; ++i) {
+        int  theta = (float)i; // for clarity
+        float r = a + (b * theta);
+        x_spiral_offset[i] = r * cos(theta);
+        y_spiral_offset[i] = r * sin(theta);
+        //printf("%f:%f\n",x_spiral_offset[i], y_spiral_offset[i]);
+        //fflush(stdout);
+    }
 }
 
 void map_to_color(float* val, int numres, int* r, int* g, int* b) {
