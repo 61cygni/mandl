@@ -18,10 +18,13 @@
 
 
 import math
+import decimal
 
 import fractalutil as fu
 
 from algo import Algo
+
+hpf = decimal.Decimal
 
 import fractalpalette as fp
 
@@ -67,7 +70,8 @@ class Julia(Algo):
     def set_default_params(self):
         # This is close t Misiurewicz point M32,2
         # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
-        self.context.cmplx_center = self.context.ctxc(0,0)
+        self.context.c_real = hpf(0) 
+        self.context.c_imag = hpf(0) 
 
         if not self.julia_c:
             print(" * Warning no julia c value specified, defaulting to %s"%(str(default_julia_c)))
@@ -141,13 +145,13 @@ class Julia(Algo):
         # needed to uniquely identify cache frame
         self.algo_specific_cache = self.julia_c    
 
-    def calc_pixel(self, z0):
-        m = self._calc_pixel(z0)
+    def calc_pixel(self, re_x, re_y):
+        m = self._calc_pixel(complex(float(re_x), float(re_y)))
         self.palette.raw_calc_from_algo(m)
         return m 
 
     def _map_to_color(self, val):
-        magnification = 1. / self.context.cmplx_width
+        magnification = 1. / float(self.context.cmplx_width)
         if magnification <= 100:
             magnification = 100 
         denom = math.log(math.log(magnification))
@@ -168,11 +172,9 @@ class Julia(Algo):
         c3int = int(255.*((c3/4.) * 3.) / denom)
         return (c1int,c2int,c3int)
 
-    def map_value_to_color(self, loc, vals):
+    def map_value_to_color(self, val):
 
-        val = vals[loc]
-
-        magnification = 1. / self.context.cmplx_width
+        magnification = 1. / float(self.context.cmplx_width)
         if magnification <= 100:
             magnification = 100 
         denom = math.log(math.log(magnification))

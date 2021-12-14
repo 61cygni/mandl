@@ -11,6 +11,7 @@
 #
 # TODO:
 # 
+# - get julia sets working
 # - clean up status / debug printing end to end
 # - add a rollback button to get to the last picture
 # - write raw calculations from C to binary file
