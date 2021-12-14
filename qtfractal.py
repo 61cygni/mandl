@@ -42,6 +42,9 @@ getcontext().prec = 500
 BURN = False  
 DEFAULT_ALGO = "ldnative"
 
+splash_image_name = './qtfractal_splash.gif'
+main_image_name   = './pyfractal.gif'
+
 # Fixed with to display fractal image
 DISPLAY_WIDTH   = 640
 DISPLAY_HEIGHT  = 480
@@ -346,6 +349,7 @@ class FractalImgQLabel(QLabel):
         global DISPLAY_HEIGHT
         global image_w
         global image_h
+        global main_image_name
 
         nrect = QRect(self.begin, self.end)
 
@@ -389,7 +393,7 @@ class FractalImgQLabel(QLabel):
             c_width  =  hpf(float(nrect.width()) / DISPLAY_HEIGHT)  * c_width
             c_height =  hpf(float(nrect.height()) / DISPLAY_HEIGHT) * c_height
 
-        run(self.parent.main_image_name)
+        run(main_image_name)
 
         self.parent.refresh_ui()
 
@@ -407,7 +411,6 @@ class QTFractalMainWindow(QWidget):
     def __init__(self,parent):
         super(QTFractalMainWindow, self).__init__()
         self.parent = parent
-        self.main_image_name="./pyfractal.gif"
         self.mode = 5
 
         self.initUI()
@@ -445,6 +448,7 @@ class QTFractalMainWindow(QWidget):
         global red
         global green
         global blue
+        global main_image_name
 
         c_height    = c_width * (hpf(DISPLAY_HEIGHT) / hpf(DISPLAY_WIDTH))
 
@@ -462,15 +466,17 @@ class QTFractalMainWindow(QWidget):
         self.blue_edit.setText(str(blue))
 
         self.main_image = FractalImgQLabel(self)
-        pixmap = QPixmap(self.main_image_name)
+        pixmap = QPixmap(main_image_name)
         pixmap = pixmap.scaled(DISPLAY_WIDTH, DISPLAY_HEIGHT)
         self.main_image.setPixmap(pixmap)
         self.main_image.resize(DISPLAY_WIDTH, DISPLAY_HEIGHT)
         self.grid.addWidget(self.main_image, 0, 1)
 
     def run(self):
+        global main_image_name
+
         self.sync_config_from_ui()
-        run(self.main_image_name)
+        run(main_image_name)
         self.refresh_ui()
 
     def snapshot(self):
@@ -480,6 +486,7 @@ class QTFractalMainWindow(QWidget):
         
 
     def initUI(self):
+        global splash_image_name
 
         #QToolTip.setFont(QFont('SansSerif', 10))
         #QMainWindow.statusBar().showMessage('Ready')
@@ -489,12 +496,7 @@ class QTFractalMainWindow(QWidget):
         self.center()
 
         self.main_image = FractalImgQLabel(self)
-        self.main_image.setPixmap(QPixmap(self.main_image_name))
-
-        #btn = QPushButton("Make setup file")
-        #btn.setToolTip('Press <b>Detect</b> button for detecting objects by your settings')
-        #btn.resize(btn.sizeHint())
-        #btn.clicked.connect(QCoreApplication.instance().quit)
+        self.main_image.setPixmap(QPixmap(splash_image_name))
 
         btn_run = QPushButton("run")
         btn_run.clicked.connect(self.run)
@@ -502,13 +504,7 @@ class QTFractalMainWindow(QWidget):
         btn_snapshot = QPushButton("snapshot")
         btn_snapshot.clicked.connect(self.snapshot)
 
-        #fullscreen
-        #self.main_image.setScaledContents(True)
-        #just centered
         self.main_image.setAlignment(Qt.AlignCenter)
-
-        # Allow user to specify the complex width
-
 
         # Basic config
 
@@ -596,20 +592,17 @@ class QTFractalMainWindow(QWidget):
 
         self.setLayout(self.grid)
 
-
-        run(self.main_image_name)
         self.refresh_ui()
 
-        self.show()
+        # use splash screen to start
+        self.main_image = FractalImgQLabel(self)
+        pixmap = QPixmap(splash_image_name)
+        pixmap = pixmap.scaled(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        self.main_image.setPixmap(pixmap)
+        self.main_image.resize(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        self.grid.addWidget(self.main_image, 0, 1)
 
-    def browse(self):
-        w = QWidget()
-        w.resize(320, 240)
-        w.setWindowTitle("Select Picture")
-        filename = QFileDialog.getOpenFileName(w, 'Open File', '/')
-        self.main_image_name = filename
-        #self.main_image.setPixmap(QPixmap(self.main_image_name))
-        self.main_image.setPixmap(QPixmap('./pyfractal.gif'))
+        self.show()
 
     def center(self):
 
