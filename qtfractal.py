@@ -11,7 +11,8 @@
 #
 # TODO:
 # 
-# - get julia sets working
+# - get julia sets plugged into UI
+# - implement sampling with julia sets
 # - clean up status / debug printing end to end
 # - add a rollback button to get to the last picture
 # - write raw calculations from C to binary file
@@ -194,6 +195,7 @@ class SnapshotPopup(QWidget):
         self.algo_combo.addItem("hpnative")
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
+        self.algo_combo.addItem("julia")
 
         self.res_combo = QComboBox()
         self.res_combo.addItem('1k')
@@ -515,6 +517,7 @@ class QTFractalMainWindow(QWidget):
         self.algo_combo.addItem("hpnative")
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
+        self.algo_combo.addItem("julia")
 
         c_width_label   = QLabel('Complex width')
         c_height_label = QLabel('Complex height')
