@@ -10,16 +10,19 @@
 #   level at the click location
 #
 # TODO:
-# - Fix mandeldistance
+# 
+# - clean up status / debug printing end to end
 # - add a rollback button to get to the last picture
-# - center on current mouse location picture if mouse pressed some key
-#   held
+# - write raw calculations from C to binary file
 #
 # Done :
 #
+# - Fix mandeldistance
 # - Add support for max-iter
 # - Get colors working
 # - increase number of sample points per pixel from UI
+# - center on current mouse location picture if mouse pressed some key
+#   held
 #
 # --
 
@@ -36,8 +39,8 @@ from decimal import *
 hpf = Decimal
 getcontext().prec = 500 
 
+BURN = False  
 DEFAULT_ALGO = "ldnative"
-BURN = False 
 
 # Fixed with to display fractal image
 DISPLAY_WIDTH   = 640
@@ -56,20 +59,16 @@ blue  = 0.6
 
 real = hpf(-.745)
 imag = hpf(.186)
-#real = hpf(-1)
-#imag = hpf(0)
 
 c_width  = hpf(5)
 c_height = hpf(0)
 
-# number of samples per pixel
-samples  = 9
+samples  = 17  # number of samples per pixel
 max_iter = (2 << 10)  
 
 
 # --
-# Run the command line fractal program. This generates and image we then
-# pull into the UI
+# Run the command line fractal program. 
 # --
 
 def run(filename):
@@ -620,48 +619,17 @@ class QTFractalMainWindow(QWidget):
         self.move(qr.topLeft())
 
 
-class menubarex(QMainWindow):
+class ParentWindow(QMainWindow):
 
     def __init__(self, parent=None):
-        super(menubarex, self).__init__(parent)
-        self.form_widget = QTFractalMainWindow(self)
-        self.setCentralWidget(self.form_widget)
-
-        self.initUI()
-
-    def initUI(self):
-        exitAction = QAction(QIcon('exit.png'), '&Exit', self)
-        exitAction.setShortcut('Ctrl+Q')
-        exitAction.setStatusTip('Exit application')
-        exitAction.triggered.connect(qApp.quit)
-        menubar = self.menuBar()
-        fileMenu = menubar.addMenu('&File')
-        fileMenu.addAction(exitAction)
-
-        #self.toolbar = self.addToolBar('Exit')
-        #self.toolbar.addAction(exitAction)
-
-        self.statusBar().showMessage('Ready')
-        self.setWindowTitle('QTFractal')
-        self.setWindowIcon(QIcon('icon.png'))
-
-    def closeEvent(self, event):
-        event.accept()
-
-        #reply = QMessageBox.question(self, 'Message',
-        #    "Are you sure to quit?", QMessageBox.Yes |
-        #    QMessageBox.No)
-
-        #if reply == QMessageBox.Yes:
-        #    event.accept()
-        #else:
-        #    event.ignore()
+        super(ParentWindow, self).__init__(parent)
+        self.fractalmain = QTFractalMainWindow(self)
+        self.setCentralWidget(self.fractalmain)
 
 def main():
     app = QApplication(sys.argv)
-    #ex = QTFractalMainWindow()
-    menubar = menubarex()
-    menubar.show()
+    parent = ParentWindow()
+    parent.show()
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
