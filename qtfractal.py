@@ -42,7 +42,7 @@ getcontext().prec = 500
 BURN = False  
 DEFAULT_ALGO = "ldnative"
 
-splash_image_name = './qtfractal_splash.gif'
+splash_image_name = './images/qtfractal_splash.gif'
 main_image_name   = './pyfractal.gif'
 
 # Fixed with to display fractal image
