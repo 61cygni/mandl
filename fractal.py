@@ -64,6 +64,8 @@ class FractalContext:
         self.max_iter      = 0      # int max iterations before bailing
         self.escape_rad    = 0.     # float radius mod Z hits before it "escapes" 
 
+        self.samples       = 0.     # number of samples to take per pixel
+
         self.scaling_factor = .90 #  float amount to zoom each epoch
         self.num_epochs     = 0   #  int, nuber of epochs into the dive
 
@@ -297,10 +299,11 @@ class FractalContext:
     def __repr__(self):
         return """\
 [FractalContext Img W:{w:d} Img H:{h:d} Cmplx W:{cw:.20f}
-Cmplx H:{ch:.20f} c_real:{cr:s} c_imag:{ci:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d}]\
+Cmplx H:{ch:.20f} c_real:{cr:s} c_imag:{ci:s} Scaling:{s:f} Epochs:{e:d} Max iter:{mx:d} Samples:{sm:d}]\
 """.format(
         w=self.img_width,h=self.img_height,cw=self.cmplx_width,ch=self.cmplx_height,
-        cr=str(self.c_real),ci=str(self.c_imag),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter); 
+        cr=str(self.c_real),ci=str(self.c_imag),s=self.scaling_factor,e=self.num_epochs,mx=self.max_iter,
+        sm=self.samples); 
 
 class MediaView: 
     """
@@ -434,7 +437,7 @@ def set_preview_mode():
 def set_snapshot_mode():
     global fractal_ctx
 
-    print("+ Running in snapshot mode ")
+    print(" + Running in snapshot mode ")
 
     fractal_ctx.snapshot  = True
 
@@ -452,6 +455,8 @@ def set_snapshot_mode():
     if not fractal_ctx.escape_rad:    
         fractal_ctx.escape_rad = 2. 
         #fractal_ctx.escape_rad = 32768. 
+    if not fractal_ctx.samples:
+        fractal_ctx.samples =65 
 
     if not fractal_ctx.c_real :
         if fractal_ctx.algo_name == "julia":
@@ -495,6 +500,9 @@ def set_dive_mode():
     if not fractal_ctx.escape_rad:    
         fractal_ctx.escape_rad = 2. 
         #fractal_ctx.escape_rad = 32768. 
+    
+    if not fractal_ctx.samples:
+        fractal_ctx.samples = 9
 
     if fractal_ctx.c_real == None:
         print(" * Warning, no center specified, setting to -.749706+0.0314565j")
@@ -512,6 +520,7 @@ def parse_options():
                                 "algo=",
                                 "duration=",
                                 "max-iter=",
+                                "sample=",
                                 "img-w=",
                                 "img-h=",
                                 "res=",
@@ -566,6 +575,8 @@ def parse_options():
             fractal_ctx.duration = float(arg) 
         elif opt in ['-m', '--max-iter']:
             fractal_ctx.max_iter = int(arg)
+        elif opt in ['--sample']:
+            fractal_ctx.samples = int(arg)
         elif opt in ['-w', '--img-w']:
             fractal_ctx.img_width = int(arg)
         elif opt in ['-h', '--img-h']:

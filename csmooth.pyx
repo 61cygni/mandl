@@ -121,7 +121,7 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
     fraction_x = (re_end - re_start) / img_width
     fraction_y = (im_end - im_start) / img_height
 
-    sample_step = 0
+    sample_step = 1
     if c_sample > 1:
         sample_step = MAX_SAMPLES / (c_sample-1)
         
@@ -134,7 +134,7 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
             Im_y = (im_start) + (in_y / img_height) * (im_end - im_start)
 
             m = []
-            # Call primary calculation function on centern pixel 
+            # Call primary calculation function on center pixel 
             m.append(ccalc_pixel(Re_x, Im_y, max_iter, escape_rad))
             if c_sample <= 1:
                 values[(x,y)] = m 
@@ -163,8 +163,8 @@ class CSmooth(Algo):
             # take color as an RGB tuple (.1,.2,.3)
             if opt in ['--setcolor']: # take colors 
                 self.color = eval(arg) 
-            elif opt in ['--sample']: # number of samples per pixel 
-                c_sample = int(arg) 
+
+        c_sample = self.context.samples 
 
         print('+ color to %s'%(str(self.color)))
         print('+ number of samples %d'%(c_sample))

@@ -37,6 +37,7 @@ class Julia(Algo):
         #self.color = (.0,.6,1.0) 
         self.color = (.1,.2,.3) 
         self.palette = fp.FractalPalette(context)
+            
 
         self.julia_c    = None
         self.julia_list = None
@@ -54,6 +55,8 @@ class Julia(Algo):
                     print("Error: List of complex numbers for Julia walk must be at least two points")
                     sys.exit(0)
                 self.julia_c    = self.julia_list[0]
+            elif opt in ['--setcolor']: # take colors 
+                self.color = eval(arg) 
             elif opt in ['--color']:
                 if str(arg) == "gauss":
                     self.palette.create_gauss_gradient((255,255,255),(0,0,0))
@@ -68,13 +71,11 @@ class Julia(Algo):
                     sys.exit(0)
 
     def set_default_params(self):
-        # This is close t Misiurewicz point M32,2
-        # fractal_ctx.cmplx_center = fractal_ctx.ctxc(-.77568377, .13646737)
         self.context.c_real = hpf(0) 
         self.context.c_imag = hpf(0) 
 
         if not self.julia_c:
-            print(" * Warning no julia c value specified, defaulting to %s"%(str(default_julia_c)))
+            print(" *[julia] Warning no julia c value specified, defaulting to %s"%(str(default_julia_c)))
             self.julia_c = default_julia_c
 
         # needed to uniquely identify cache frame
@@ -151,25 +152,24 @@ class Julia(Algo):
         return m 
 
     def _map_to_color(self, val):
-        magnification = 1. / float(self.context.cmplx_width)
-        if magnification <= 100:
-            magnification = 100 
-        denom = math.log(math.log(magnification))
 
         c1 = 0.
         c2 = 0.
         c3 = 0.
 
-        # (yellow blue 0,.6,1.0)
-        c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
-        c1 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[0]);
-        c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
-        c2 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[1]);
-        c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
-        c3 +=  0.5 + 0.5*math.cos( 3.0 + val*0.15 + self.color[2]);
-        c1int = int(255.*((c1/4.) * 3.) / denom)
-        c2int = int(255.*((c2/4.) * 3.) / denom)
-        c3int = int(255.*((c3/4.) * 3.) / denom)
+        for m in val:
+            c1 +=  1 + math.cos( 3.0 + m*0.15 + self.color[0]);
+            c2 +=  1 + math.cos( 3.0 + m*0.15 + self.color[1]);
+            c3 +=  1 + math.cos( 3.0 + m*0.15 + self.color[2]);
+
+        c1 /= len(val)    
+        c2 /= len(val)    
+        c3 /= len(val)    
+
+        c1int = int(255.*((c1/4.) * 3.) / 1.5)
+        c2int = int(255.*((c2/4.) * 3.) / 1.5)
+        c3int = int(255.*((c3/4.) * 3.) / 1.5)
+
         return (c1int,c2int,c3int)
 
     def map_value_to_color(self, val):

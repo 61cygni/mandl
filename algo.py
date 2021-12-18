@@ -1,4 +1,5 @@
 import sys
+import math
 
 import decimal
 hpf = decimal.Decimal
@@ -8,6 +9,22 @@ class Algo(object):
     def __init__(self, context):
         self.context = context
         self.algo_specific_cache = None
+
+        self.x_spiral_offset = []
+        self.y_spiral_offset = []
+        self.MAX_SAMPLES     = 128
+
+        # calculate the offsets for a spiral around the pixel using
+        # the Archimedean spireal equation r = a + b*theta
+        # We use a = .05 and b = .0035
+        # x/y ranges end right below .5 
+        a = .05
+        b = .0035
+        for i in range(0, self.MAX_SAMPLES):
+            theta = float(i)
+            r = a + (b * theta) 
+            self.x_spiral_offset.append(r * math.cos(theta))
+            self.y_spiral_offset.append(r * math.sin(theta))
 
     def parse_options(self, opts, args):    
         pass
@@ -47,6 +64,16 @@ class Algo(object):
         print(" + Re_start %f Im_start %f"%(re_start, im_start))
         values = {}
 
+        # calculate langth of space pixel represents 
+        fraction_x = (re_end - re_start) / img_width
+        fraction_y = (im_end - im_start) / img_height
+
+        sample_step = 1
+
+        if self.context.samples > 1:
+            sample_step = int(self.MAX_SAMPLES / (self.context.samples - 1))
+        print("XXX SAMPLES %d:%d:"%(self.context.samples, sample_step))
+
         print("[",end="")
         sys.stdout.flush()
         for x in range(0, img_width):
@@ -55,8 +82,20 @@ class Algo(object):
                 Re_x = (re_start) + hpf(x / img_width)  * (re_end - re_start)
                 Im_y = (im_start) + hpf(y / img_height) * (im_end - im_start)
 
+                m = []
                 # Call primary calculation function here
-                m = self.calc_pixel(Re_x, Im_y)
+                m.append(self.calc_pixel(Re_x, Im_y))
+
+                if self.context.samples <= 1:
+                    values[(x,y)] = m 
+                    sys.stdout.flush()
+                    continue
+
+                # calculate samples on a spiral moving away 
+                for i in range(0, self.MAX_SAMPLES, sample_step):
+                    #print("%f:%f"%(self.x_spiral_offset[i], self.y_spiral_offset[i]))
+                    m.append(self.calc_pixel(Re_x + (fraction_x * hpf(self.x_spiral_offset[i])) , 
+                                             Im_y + (fraction_y * hpf(self.y_spiral_offset[i]))))
 
                 values[(x,y)] = m 
             print(".",end="")

@@ -38,8 +38,8 @@ class LDNative(Algo):
                 self.color = eval(arg) 
             elif opt in ['--numprocs']:
                 self.numprocs = int(arg) 
-            elif opt in ['--sample']: # number of samples per pixel 
-                self.samples = int(arg) 
+
+        self.samples = self.context.samples 
 
         print('+ color to %s'%(str(self.color)))
         print('+ number of samples %d'%(self.samples))
