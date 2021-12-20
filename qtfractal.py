@@ -70,6 +70,7 @@ c_height = hpf(0)
 
 samples  = 17  # number of samples per pixel
 max_iter = (2 << 10)  
+julia_c = -.8+.156j
 
 
 # --
@@ -86,13 +87,18 @@ def run(filename):
     global image_w
     global image_h
     global BURN
+    global julia_c
 
     burn_str = ""
     if BURN:
         burn_str = "--burn"
 
-    cmd = "python3 fractal.py %s --verbose=3 --algo=%s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" --gif=%s" \
-          %(burn_str, str(algo), samples, max_iter, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag),filename)
+    julia_str = ""
+    if str(algo) == 'julia':    
+        julia_str = format('--julia-c="%s"'%(str(julia_c)))
+
+    cmd = "python3 fractal.py %s --verbose=3 --algo=%s %s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" --gif=%s" \
+          %(burn_str, str(algo), julia_str, samples, max_iter, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag),filename)
     print(" + Driver running comment: "+cmd)
     proc = subprocess.Popen(cmd, shell=True)
     proc.wait()
@@ -137,6 +143,8 @@ class SnapshotPopup(QWidget):
         self.green_edit.setText(str(green))
         self.blue_edit.setText(str(blue))
 
+        self.julia_c_edit.setText(str(julia_c))
+
     def sync_config_from_ui(self):
         global samples
         global max_iter
@@ -146,6 +154,7 @@ class SnapshotPopup(QWidget):
         global red
         global blue 
         global green 
+        global julia_c 
 
 
         #set values from UI
@@ -157,6 +166,7 @@ class SnapshotPopup(QWidget):
         red     = float(self.red_edit.text())
         green   = float(self.green_edit.text()) 
         blue    = float(self.blue_edit.text()) 
+        julia_c = complex(self.julia_c_edit.text()) 
 
 
     def set_res(self, event):
@@ -227,6 +237,11 @@ class SnapshotPopup(QWidget):
         blue_label  = QLabel("Blue: ")
         self.blue_edit   = QLineEdit(self) 
 
+        julia_c_label = QLabel("Julia c: ")
+        self.julia_c_edit = QLineEdit(self)
+
+
+
         btn_run = QPushButton("Go!")
         btn_run.clicked.connect(self.run)
 
@@ -254,7 +269,10 @@ class SnapshotPopup(QWidget):
         self.grid_config.addWidget(self.green_edit, 8, 1)
         self.grid_config.addWidget(blue_label ,9, 0)
         self.grid_config.addWidget(self.blue_edit, 9, 1)
-        self.grid_config.addWidget(btn_run, 10, 1)
+        self.grid_config.addWidget(julia_c_label ,10, 0)
+        self.grid_config.addWidget(self.julia_c_edit, 10, 1)
+
+        self.grid_config.addWidget(btn_run, 11, 1)
 
         self.setLayout(self.grid_config)
         self.refresh_ui()
@@ -427,6 +445,7 @@ class QTFractalMainWindow(QWidget):
         global red
         global blue 
         global green 
+        global julia_c
 
 
         #set values from UI
@@ -438,6 +457,7 @@ class QTFractalMainWindow(QWidget):
         red     = float(self.red_edit.text())
         green   = float(self.green_edit.text()) 
         blue    = float(self.blue_edit.text()) 
+        julia_c = complex(self.julia_c_edit.text())
 
     def refresh_ui(self):
         global image_w
@@ -452,6 +472,7 @@ class QTFractalMainWindow(QWidget):
         global green
         global blue
         global main_image_name
+        global julia_c
 
         c_height    = c_width * (hpf(DISPLAY_HEIGHT) / hpf(DISPLAY_WIDTH))
 
@@ -467,6 +488,8 @@ class QTFractalMainWindow(QWidget):
         self.red_edit.setText(str(red))
         self.green_edit.setText(str(green))
         self.blue_edit.setText(str(blue))
+        self.julia_c_edit.setText(str(julia_c))
+
 
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(main_image_name)
@@ -546,6 +569,10 @@ class QTFractalMainWindow(QWidget):
         blue_label  = QLabel("Blue: ")
         self.blue_edit   = QLineEdit(self) 
 
+        julia_c_label      = QLabel("Julia c: ")
+        self.julia_c_edit  = QLineEdit(self) 
+
+
         c_real_label = QLabel("Center Real:") 
         self.c_real_edit  = QPlainTextEdit()
         c_imag_label = QLabel("Center Imaginary:") 
@@ -574,8 +601,11 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(self.green_edit, 8, 1)
         grid_config.addWidget(blue_label ,9, 0)
         grid_config.addWidget(self.blue_edit, 9, 1)
-        grid_config.addWidget(btn_run, 10, 0)
-        grid_config.addWidget(btn_snapshot, 10, 1)
+        grid_config.addWidget(julia_c_label ,10, 0)
+        grid_config.addWidget(self.julia_c_edit, 10, 1)
+
+        grid_config.addWidget(btn_run, 11, 0)
+        grid_config.addWidget(btn_snapshot, 11, 1)
 
         # Right side inputs for c_real and c_imag 
         grid_center = QGridLayout()
