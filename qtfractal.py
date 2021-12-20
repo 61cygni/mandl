@@ -206,6 +206,7 @@ class SnapshotPopup(QWidget):
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
         self.algo_combo.addItem("julia")
+        self.algo_combo.addItem("cjulia")
 
         self.res_combo = QComboBox()
         self.res_combo.addItem('1k')
@@ -541,6 +542,7 @@ class QTFractalMainWindow(QWidget):
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
         self.algo_combo.addItem("julia")
+        self.algo_combo.addItem("cjulia")
 
         c_width_label   = QLabel('Complex width')
         c_height_label = QLabel('Complex height')

@@ -12,6 +12,7 @@ import numpy
 extensions = [
     Extension('cmandelbrot',   ['cmandelbrot.pyx'], include_dirs = [numpy.get_include()]),
     Extension('csmooth',       ['csmooth.pyx'], include_dirs = [numpy.get_include()]),
+    Extension('cjulia',        ['cjulia.pyx'], include_dirs = [numpy.get_include()]),
     Extension('hpcsmooth',     ['hpcsmooth.pyx'], include_dirs = [numpy.get_include()]),
     ]
 
