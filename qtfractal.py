@@ -113,12 +113,16 @@ class SnapshotPopup(QWidget):
         QWidget.__init__(self)
 
         self.filename = './snapshot.gif'
-        self.initUI()
+        self.init_ui()
 
     def run(self):
         self.sync_config_from_ui()
         run(self.filename)
         self.refresh_ui()
+
+    # --    
+    # SnapshotPopup::refresh_ui
+    # --    
 
     def refresh_ui(self):
         global image_w
@@ -145,6 +149,10 @@ class SnapshotPopup(QWidget):
 
         self.julia_c_edit.setText(str(julia_c))
 
+    # --    
+    # SnapshotPopup::sync_config_from_ui
+    # --    
+
     def sync_config_from_ui(self):
         global samples
         global max_iter
@@ -168,6 +176,9 @@ class SnapshotPopup(QWidget):
         blue    = float(self.blue_edit.text()) 
         julia_c = complex(self.julia_c_edit.text()) 
 
+    # --    
+    # SnapshotPopup::set_res
+    # --    
 
     def set_res(self, event):
         res = self.res_combo.currentText()
@@ -194,7 +205,11 @@ class SnapshotPopup(QWidget):
 
         self.update()    
 
-    def initUI(self):
+    # --    
+    # SnapshotPopup::init_ui
+    # --    
+
+    def init_ui(self):
 
         filename_label      = QLabel('Filename')
         self.filename_text  = QLineEdit(self)
@@ -241,8 +256,6 @@ class SnapshotPopup(QWidget):
         julia_c_label = QLabel("Julia c: ")
         self.julia_c_edit = QLineEdit(self)
 
-
-
         btn_run = QPushButton("Go!")
         btn_run.clicked.connect(self.run)
 
@@ -276,7 +289,23 @@ class SnapshotPopup(QWidget):
         self.grid_config.addWidget(btn_run, 11, 1)
 
         self.setLayout(self.grid_config)
+
+        # refresh UI from defaults configs
         self.refresh_ui()
+
+        # add some snapshot specific defaults here
+
+        self.res_combo.setCurrentText("2k")
+        self.img_width_text.setText("2048")
+        self.img_height_text.setText("1536")
+        self.samples_text.setText("65")
+
+        self.sync_config_from_ui()
+
+
+
+        # increase 
+
         self.update()
 
 
@@ -435,7 +464,12 @@ class QTFractalMainWindow(QWidget):
         self.parent = parent
         self.mode = 5
 
-        self.initUI()
+        self.init_ui()
+
+
+    # --
+    # QTFractalMainWindow::sync_config_from_ui
+    # --
 
     def sync_config_from_ui(self):
         global samples
@@ -447,6 +481,8 @@ class QTFractalMainWindow(QWidget):
         global blue 
         global green 
         global julia_c
+        global real
+        global imag 
 
 
         #set values from UI
@@ -458,7 +494,16 @@ class QTFractalMainWindow(QWidget):
         red     = float(self.red_edit.text())
         green   = float(self.green_edit.text()) 
         blue    = float(self.blue_edit.text()) 
-        julia_c = complex(self.julia_c_edit.text())
+        if self.julia_c_edit:
+            julia_c = complex(self.julia_c_edit.text())
+
+        real = hpf(self.c_real_edit.toPlainText())
+        imag = hpf(self.c_imag_edit.toPlainText())
+
+
+    # --
+    # QTFractalMainWindow::refresh_ui
+    # --
 
     def refresh_ui(self):
         global image_w
@@ -489,7 +534,9 @@ class QTFractalMainWindow(QWidget):
         self.red_edit.setText(str(red))
         self.green_edit.setText(str(green))
         self.blue_edit.setText(str(blue))
-        self.julia_c_edit.setText(str(julia_c))
+
+        if self.julia_c_edit:
+            self.julia_c_edit.setText(str(julia_c))
 
 
         self.main_image = FractalImgQLabel(self)
@@ -512,7 +559,34 @@ class QTFractalMainWindow(QWidget):
         self.snap_pop.show()
         
 
-    def initUI(self):
+    def set_algo(self, event):
+        res = self.algo_combo.currentText()
+
+        if res == 'julia' or res == 'cjulia':
+            self.julia_c_label = QLabel("Julia c: ")
+            self.julia_c_edit  = QLineEdit(self) 
+            self.left_config_grid.addWidget(self.julia_c_label, 10, 0)
+            self.left_config_grid.addWidget(self.julia_c_edit,  10, 1)
+        else:
+            if self.julia_c_edit:
+                print("REMOVE!")
+                self.left_config_grid.removeWidget(self.julia_c_label)
+                self.left_config_grid.removeWidget(self.julia_c_edit)
+                self.julia_c_label.deleteLater()
+                self.julia_c_edit.deleteLater()
+                self.julia_c_edit  = None 
+                self.julia_c_label = None 
+
+        self.refresh_ui()
+        self.sync_config_from_ui()
+        self.update()    
+
+    # --
+    # QTFractalMainWindow::unit_ui
+    # --
+        
+
+    def init_ui(self):
         global splash_image_name
 
         #QToolTip.setFont(QFont('SansSerif', 10))
@@ -544,6 +618,9 @@ class QTFractalMainWindow(QWidget):
         self.algo_combo.addItem("julia")
         self.algo_combo.addItem("cjulia")
 
+        # adding action to combo box
+        self.algo_combo.activated.connect(self.set_algo)
+
         c_width_label   = QLabel('Complex width')
         c_height_label = QLabel('Complex height')
 
@@ -554,14 +631,15 @@ class QTFractalMainWindow(QWidget):
         img_height_label = QLabel('Image height')
 
         self.img_width_text  = QLineEdit(self)
+        self.img_width_text.setReadOnly(True)
         self.img_height_text  = QLineEdit(self)
+        self.img_height_text.setReadOnly(True)
 
         samples_label     = QLabel("Samples: ")
         self.samples_text = QLineEdit(self) 
 
         iter_label     = QLabel("Max iter: ")
         self.iter_text = QLineEdit(self) 
-
 
 
         red_label   = QLabel("Red: ")
@@ -571,8 +649,10 @@ class QTFractalMainWindow(QWidget):
         blue_label  = QLabel("Blue: ")
         self.blue_edit   = QLineEdit(self) 
 
-        julia_c_label      = QLabel("Julia c: ")
-        self.julia_c_edit  = QLineEdit(self) 
+        # Only show julia c if julia selected as lago
+        # julia_c_label      = QLabel("Julia c: ")
+        self.julia_c_edit = None
+        # self.julia_c_edit  = QLineEdit(self) 
 
 
         c_real_label = QLabel("Center Real:") 
@@ -583,6 +663,7 @@ class QTFractalMainWindow(QWidget):
         
         # Left side config params
         grid_config = QGridLayout()
+        self.left_config_grid = grid_config
         grid_config.addWidget(algo_label ,0, 0)
         grid_config.addWidget(self.algo_combo ,0, 1)
         grid_config.addWidget(c_width_label,1, 0)
@@ -603,8 +684,9 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(self.green_edit, 8, 1)
         grid_config.addWidget(blue_label ,9, 0)
         grid_config.addWidget(self.blue_edit, 9, 1)
-        grid_config.addWidget(julia_c_label ,10, 0)
-        grid_config.addWidget(self.julia_c_edit, 10, 1)
+
+        #grid_config.addWidget(julia_c_label ,10, 0)
+        #grid_config.addWidget(self.julia_c_edit, 10, 1)
 
         grid_config.addWidget(btn_run, 11, 0)
         grid_config.addWidget(btn_snapshot, 11, 1)
