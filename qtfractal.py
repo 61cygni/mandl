@@ -94,7 +94,7 @@ def run(filename):
         burn_str = "--burn"
 
     julia_str = ""
-    if str(algo) == 'julia':    
+    if str(algo) == 'julia' or str(algo) == 'cjulia':    
         julia_str = format('--julia-c="%s"'%(str(julia_c)))
 
     cmd = "python3 fractal.py %s --verbose=3 --algo=%s %s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" --gif=%s" \

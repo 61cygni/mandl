@@ -18,6 +18,10 @@ from libc.math cimport log2
 from libc.math cimport log
 from libc.math cimport cos
 
+from libc.stdio cimport printf
+from libc.stdio cimport fflush 
+from libc.stdio cimport stdout 
+
 import fractalutil as fu
 
 from algo import Algo
@@ -110,6 +114,7 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
     if c_sample > 1:
         sample_step = MAX_SAMPLES / (c_sample-1)
         
+    printf("[")
     for x in range(0, img_width):
         for y in range(0, img_height):
             in_x = x
@@ -131,7 +136,10 @@ def ccalc_cur_frame(int img_width, int img_height, long double re_start, long do
                                      Im_y + (fraction_y * y_spiral_offset[i]), max_iter, escape_rad))
 
             values[(x,y)] = m 
+        printf(".")
+        fflush(stdout)
 
+    printf("]\n");
     return values
 
 class CJulia(Algo):
@@ -143,13 +151,20 @@ class CJulia(Algo):
 
     def parse_options(self, opts, args):    
         global c_sample
+        global julia_c_real
+        global julia_c_imag
 
         for opt,arg in opts:
             # take color as an RGB tuple (.1,.2,.3)
             if opt in ['--setcolor']: # take colors 
                 self.color = eval(arg) 
+            elif opt in ['--julia-c']:
+                self.julia_c = complex(arg) 
 
-        c_sample = self.context.samples 
+                
+        c_sample    = self.context.samples 
+        julia_c_real = self.julia_c.real
+        julia_c_imag = self.julia_c.imag
 
         print('+ color to %s'%(str(self.color)))
         print('+ number of samples %d'%(c_sample))

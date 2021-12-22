@@ -163,6 +163,8 @@ class FractalContext:
 
                     # Plot the point
                     draw.point([x, y], color) 
+                print(".", end="")
+                sys.stdout.flush()
 
             if self.keyframe or snapshot_filename:
                 print("%f]"%(time.perf_counter() - self.pre_time))
