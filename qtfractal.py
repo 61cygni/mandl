@@ -11,14 +11,15 @@
 #
 # TODO:
 # 
-# - get julia sets plugged into UI
-# - implement sampling with julia sets
+# - add a "reset" button to get to the initial config
 # - clean up status / debug printing end to end
 # - add a rollback button to get to the last picture
 # - write raw calculations from C to binary file
 #
 # Done :
 #
+# - get julia sets plugged into UI
+# - implement sampling with julia sets
 # - Fix mandeldistance
 # - Add support for max-iter
 # - Get colors working
@@ -28,13 +29,15 @@
 #
 # --
 
+import sys, os
+import subprocess
+from dataclasses import dataclass
+
 
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-import sys, os
-import subprocess
 
 from decimal import *
 
@@ -48,57 +51,79 @@ splash_image_name = './images/qtfractal_splash.gif'
 main_image_name   = './pyfractal.gif'
 
 # Fixed with to display fractal image
-DISPLAY_WIDTH   = 640
-DISPLAY_HEIGHT  = 480
+DEFAULT_DISPLAY_WIDTH   = 640
+DEFAULT_DISPLAY_HEIGHT  = 480
 
 # runtime configurable paremeters
 
-algo = DEFAULT_ALGO
+DEFAULT_RED   = 0.1
+DEFAULT_GREEN = 0.2
+DEFAULT_BLUE  = 0.6
 
-image_w = DISPLAY_WIDTH
-image_h = DISPLAY_HEIGHT 
+DEFAULT_REAL = hpf(-.745)
+DEFAULT_IMAG = hpf(.186)
 
-red   = 0.1
-green = 0.2
-blue  = 0.6
+DEFAULT_C_WIDTH  = hpf(5)
+DEFAULT_C_HEIGHT = hpf(3.75)
 
-real = hpf(-.745)
-imag = hpf(.186)
-
-c_width  = hpf(5)
-c_height = hpf(0)
-
-samples  = 17  # number of samples per pixel
-max_iter = (2 << 10)  
-julia_c = -.8+.156j
+DEFAULT_SAMPLES  = 17  # number of samples per pixel
+DEFAULT_MAX_ITER = (2 << 10)  
+DEFAULT_JULIA_C = -.8+.156j
 
 
 # --
+# global::RunContext
+# --
+
+class RunContext:
+
+    def __init__(self):
+        self.algo     = "" 
+        self.image_w  = DEFAULT_DISPLAY_WIDTH 
+        self.image_h  = DEFAULT_DISPLAY_HEIGHT
+        self.red      = 0. 
+        self.green    = 0. 
+        self.blue     = 0.
+        self.samples  = 0
+        self.max_iter = 0
+        self.julia_c  = complex(0)
+        self.c_width  = hpf(0)
+        self.c_height = hpf(0)
+        self.c_real   = hpf(0)
+        self.c_imag   = hpf(0)
+
+
+# --
+# global::run
 # Run the command line fractal program. 
 # --
 
-def run(filename):
-    global real
-    global imag
-    global samples
-    global max_iter
-    global c_width
-    global c_height
-    global image_w
-    global image_h
-    global BURN
-    global julia_c
+def run(fn, context):
 
-    burn_str = ""
+    al = context.algo
+    jc = context.julia_c
+    sm = context.samples
+    r  = context.red
+    g  = context.green
+    b  = context.blue
+    cw = str(context.c_width)
+    ch = str(context.c_height)
+    iw = context.image_w
+    ih = context.image_h
+    mi = context.max_iter
+    cr = str(context.c_real)
+    ci = str(context.c_imag)
+
+    bstr = ""
     if BURN:
-        burn_str = "--burn"
+        bstr = "--burn"
 
-    julia_str = ""
-    if str(algo) == 'julia' or str(algo) == 'cjulia':    
-        julia_str = format('--julia-c="%s"'%(str(julia_c)))
+    jstr = ""
+    if str(al) == 'julia' or str(al) == 'cjulia':    
+        jstr = format('--julia-c="%s"'%(str(jc)))
 
     cmd = "python3 fractal.py %s --verbose=3 --algo=%s %s --sample=%d --max-iter=%d --setcolor='(%f,%f,%f)' --cmplx-w=%s --cmplx-h=%s --img-w=%d --img-h=%d --real=\"%s\" --imag=\"%s\" --gif=%s" \
-          %(burn_str, str(algo), julia_str, samples, max_iter, red, green, blue, str(c_width), str(c_height),image_w,image_h,str(real),str(imag),filename)
+          %(bstr, al, jstr, sm, mi, r, g, b, cw, ch,iw,ih,cr,ci,fn)
     print(" + Driver running comment: "+cmd)
     proc = subprocess.Popen(cmd, shell=True)
     proc.wait()
@@ -109,72 +134,74 @@ def run(filename):
 
 class SnapshotPopup(QWidget):
 
-    def __init__(self):
+    def __init__(self, parent, context):
         QWidget.__init__(self)
 
+        self.parent  = parent
         self.filename = './snapshot.gif'
-        self.init_ui()
+        self.init_ui(context)
+
+    # --    
+    # SnapshotPopup::run
+    # --    
 
     def run(self):
-        self.sync_config_from_ui()
-        run(self.filename)
-        self.refresh_ui()
+        context = self.sync_config_from_ui()
+        run(self.filename, context)
 
     # --    
     # SnapshotPopup::refresh_ui
     # --    
 
-    def refresh_ui(self):
-        global image_w
-        global image_h
-        global real
-        global imag
-        global samples
-        global max_iter
-        global c_height
-        global c_width
-        global red
-        global green
-        global blue
+    def set_ui_defaults(self, context):
 
         self.filename_text.setText(self.filename)
-        self.img_width_text.setText(str(image_w))
-        self.img_height_text.setText(str(image_h))
-        self.samples_text.setText(str(samples))
-        self.iter_text.setText(str(max_iter))
+        self.img_width_text.setText(str(context.image_w))
+        self.img_height_text.setText(str(context.image_h))
+        self.samples_text.setText(str(context.samples))
+        self.iter_text.setText(str(context.max_iter))
 
-        self.red_edit.setText(str(red))
-        self.green_edit.setText(str(green))
-        self.blue_edit.setText(str(blue))
+        self.red_edit.setText(str(context.red))
+        self.green_edit.setText(str(context.green))
+        self.blue_edit.setText(str(context.blue))
 
-        self.julia_c_edit.setText(str(julia_c))
+        self.res_combo.setCurrentText("2k")
+        self.img_width_text.setText("2048")
+        self.img_height_text.setText("1536")
+        self.samples_text.setText("65")
+        self.algo_combo.setCurrentText(self.parent.algo_combo.currentText())
+
+        self.set_algo(None) # force setting julia-c
 
     # --    
     # SnapshotPopup::sync_config_from_ui
     # --    
 
     def sync_config_from_ui(self):
-        global samples
-        global max_iter
-        global image_w
-        global image_h
-        global algo
-        global red
-        global blue 
-        global green 
-        global julia_c 
+
+        ctx = RunContext()
 
 
         #set values from UI
-        algo    = self.algo_combo.currentText()
-        samples  = int(self.samples_text.text())
-        max_iter = int(self.iter_text.text())
-        image_w = int(float(self.img_width_text.text()))
-        image_h = int(float(self.img_height_text.text())) 
-        red     = float(self.red_edit.text())
-        green   = float(self.green_edit.text()) 
-        blue    = float(self.blue_edit.text()) 
-        julia_c = complex(self.julia_c_edit.text()) 
+        ctx.algo    = self.algo_combo.currentText()
+        ctx.samples  = int(self.samples_text.text())
+        ctx.max_iter = int(self.iter_text.text())
+        ctx.image_w = int(float(self.img_width_text.text()))
+        ctx.image_h = int(float(self.img_height_text.text())) 
+        ctx.red     = float(self.red_edit.text())
+        ctx.green   = float(self.green_edit.text()) 
+        ctx.blue    = float(self.blue_edit.text()) 
+        if self.julia_c_edit:
+            ctx.julia_c = complex(self.julia_c_edit.text()) 
+        else:
+            ctx.julia_c = None
+
+        ctx.c_width  = hpf(self.parent.c_width_text.toPlainText())
+        ctx.c_height = hpf(self.parent.c_height_text.toPlainText())
+        ctx.c_real = hpf(self.parent.c_real_edit.toPlainText())
+        ctx.c_imag = hpf(self.parent.c_imag_edit.toPlainText())
+
+        return ctx 
 
     # --    
     # SnapshotPopup::set_res
@@ -206,10 +233,40 @@ class SnapshotPopup(QWidget):
         self.update()    
 
     # --    
+    # SnapshotPopup::set_algo
+    # --    
+
+    def set_algo(self, event):
+        res = self.algo_combo.currentText()
+
+        if res == 'julia' or res == 'cjulia':
+            if not self.julia_c_edit:
+                self.julia_c_label = QLabel("Julia c: ")
+                self.julia_c_edit  = QLineEdit(self) 
+                self.grid_config.addWidget(self.julia_c_label, 10, 0)
+                self.grid_config.addWidget(self.julia_c_edit,  10, 1)
+                if self.parent.julia_c_edit:
+                    self.julia_c_edit.setText(self.parent.julia_c_edit.text())
+                else:    
+                    self.julia_c_edit.setText(str(DEFAULT_JULIA_C))
+        else:
+            if self.julia_c_edit:
+                self.grid_config.removeWidget(self.julia_c_label)
+                self.grid_config.removeWidget(self.julia_c_edit)
+                self.julia_c_label.deleteLater()
+                self.julia_c_edit.deleteLater()
+                self.julia_c_edit  = None 
+                self.julia_c_label = None 
+
+        #self.refresh_ui()
+        #self.sync_config_from_ui()
+        self.update()    
+
+    # --    
     # SnapshotPopup::init_ui
     # --    
 
-    def init_ui(self):
+    def init_ui(self, context):
 
         filename_label      = QLabel('Filename')
         self.filename_text  = QLineEdit(self)
@@ -222,6 +279,8 @@ class SnapshotPopup(QWidget):
         self.algo_combo.addItem("csmooth")
         self.algo_combo.addItem("julia")
         self.algo_combo.addItem("cjulia")
+
+        self.algo_combo.activated.connect(self.set_algo)
 
         self.res_combo = QComboBox()
         self.res_combo.addItem('1k')
@@ -253,8 +312,9 @@ class SnapshotPopup(QWidget):
         blue_label  = QLabel("Blue: ")
         self.blue_edit   = QLineEdit(self) 
 
-        julia_c_label = QLabel("Julia c: ")
-        self.julia_c_edit = QLineEdit(self)
+        self.julia_c_label = None
+        self.julia_c_edit = None
+
 
         btn_run = QPushButton("Go!")
         btn_run.clicked.connect(self.run)
@@ -283,28 +343,16 @@ class SnapshotPopup(QWidget):
         self.grid_config.addWidget(self.green_edit, 8, 1)
         self.grid_config.addWidget(blue_label ,9, 0)
         self.grid_config.addWidget(self.blue_edit, 9, 1)
-        self.grid_config.addWidget(julia_c_label ,10, 0)
-        self.grid_config.addWidget(self.julia_c_edit, 10, 1)
 
         self.grid_config.addWidget(btn_run, 11, 1)
 
         self.setLayout(self.grid_config)
 
-        # refresh UI from defaults configs
-        self.refresh_ui()
+        context = self.parent.sync_config_from_ui()
+        self.set_ui_defaults(context)
 
         # add some snapshot specific defaults here
 
-        self.res_combo.setCurrentText("2k")
-        self.img_width_text.setText("2048")
-        self.img_height_text.setText("1536")
-        self.samples_text.setText("65")
-
-        self.sync_config_from_ui()
-
-
-
-        # increase 
 
         self.update()
 
@@ -315,6 +363,7 @@ class SnapshotPopup(QWidget):
 # --
 
 class FractalImgQLabel(QLabel):
+
     def __init__(self, parent=None):
         super(FractalImgQLabel, self).__init__(parent)
         self.setAttribute(Qt.WA_Hover)
@@ -324,6 +373,12 @@ class FractalImgQLabel(QLabel):
         self.begin = QPoint()
         self.end   = QPoint()
         self.pos   = QPoint()
+
+    # --
+    # FractalImgQLabel::event
+    #
+    # On mouse hover over main image, update status bar
+    # --
         
     def event(self, event):
 
@@ -352,8 +407,8 @@ class FractalImgQLabel(QLabel):
 
         # draw crosshairs
         qp.setPen(QColor(128, 0, 64, 127))
-        qp.drawLine(0,self.pos.y(),DISPLAY_WIDTH,self.pos.y())
-        qp.drawLine(self.pos.x(),0,self.pos.x(), DISPLAY_HEIGHT)
+        qp.drawLine(0,self.pos.y(),DEFAULT_DISPLAY_WIDTH,self.pos.y())
+        qp.drawLine(self.pos.x(),0,self.pos.x(), DEFAULT_DISPLAY_HEIGHT)
 
 
     def keyPressEvent(self, event):
@@ -380,7 +435,7 @@ class FractalImgQLabel(QLabel):
             # make sure rectangle keeps aspect ration of display
             nrect = QRect(self.begin, self.end)
             rw = nrect.width()
-            rh = int(float(rw) * (DISPLAY_HEIGHT / DISPLAY_WIDTH)) 
+            rh = int(float(rw) * (DEFAULT_DISPLAY_HEIGHT / DEFAULT_DISPLAY_WIDTH)) 
             nrect.setWidth(rw)
             nrect.setHeight(rh)
             self.end = nrect.bottomRight()
@@ -388,19 +443,6 @@ class FractalImgQLabel(QLabel):
         self.update()
 
     def mouseReleaseEvent(self, event):
-        global real
-        global imag
-        global c_width
-        global c_height
-        global ALGO
-        global BURN
-        global samples
-        global max_iter
-        global DISPLAY_WIDTH
-        global DISPLAY_HEIGHT
-        global image_w
-        global image_h
-        global main_image_name
 
         nrect = QRect(self.begin, self.end)
 
@@ -423,30 +465,30 @@ class FractalImgQLabel(QLabel):
                 return
 
 
-        self.parent.sync_config_from_ui()
+        ctx = self.parent.sync_config_from_ui()
 
         # Use the center the calculate the edges
-        re_start = real - (c_width  / hpf(2.))
-        im_start = imag - (c_height / hpf(2.))
+        re_start = ctx.c_real - (ctx.c_width  / hpf(2.))
+        im_start = ctx.c_imag - (ctx.c_height / hpf(2.))
 
-        fxoffset = float(x)/DISPLAY_WIDTH
-        fyoffset = float(y)/DISPLAY_HEIGHT
+        fxoffset = float(x)/DEFAULT_DISPLAY_WIDTH
+        fyoffset = float(y)/DEFAULT_DISPLAY_HEIGHT
 
-        real = re_start + (hpf(fxoffset) * c_width)
-        imag = im_start + (hpf(fyoffset) * c_height)
+        ctx.c_real = re_start + (hpf(fxoffset) * ctx.c_width)
+        ctx.c_imag = im_start + (hpf(fyoffset) * ctx.c_height)
 
         print("x %d, y %d"%(x,y))
         print("fxoff %f, fyoff %f"%(fxoffset,fyoffset))
-        print("Real %s, Image %s"%(str(real),str(imag)))
+        print("Real %s, Image %s"%(str(ctx.c_real),str(ctx.c_imag)))
         
         # only zoom in if there is a bounding box 
         if size.height() * size.width() >= 4:
-            c_width  =  hpf(float(nrect.width()) / DISPLAY_HEIGHT)  * c_width
-            c_height =  hpf(float(nrect.height()) / DISPLAY_HEIGHT) * c_height
+            ctx.c_width  =  hpf(float(nrect.width()) / DEFAULT_DISPLAY_WIDTH) * ctx.c_width
+            ctx.c_height =  hpf(float(nrect.height()) /DEFAULT_DISPLAY_HEIGHT) * ctx.c_height
 
-        run(main_image_name)
+        run(main_image_name, ctx)
 
-        self.parent.refresh_ui()
+        self.parent.refresh_ui(ctx)
 
         self.begin = event.pos()
         self.end = event.pos()
@@ -472,92 +514,92 @@ class QTFractalMainWindow(QWidget):
     # --
 
     def sync_config_from_ui(self):
-        global samples
-        global max_iter
-        global image_w
-        global image_h
-        global algo
-        global red
-        global blue 
-        global green 
-        global julia_c
-        global real
-        global imag 
 
+        ctx = RunContext()
 
         #set values from UI
-        samples  = int(self.samples_text.text())
-        max_iter = int(self.iter_text.text())
-        image_w = int(float(self.img_width_text.text()))
-        image_h = int(float(self.img_height_text.text())) 
-        algo    = self.algo_combo.currentText()
-        red     = float(self.red_edit.text())
-        green   = float(self.green_edit.text()) 
-        blue    = float(self.blue_edit.text()) 
+        ctx.samples  = int(self.samples_text.text())
+        ctx.max_iter = int(self.iter_text.text())
+        ctx.image_w = int(float(self.img_width_text.text()))
+        ctx.image_h = int(float(self.img_height_text.text())) 
+        ctx.algo    = self.algo_combo.currentText()
+        ctx.red     = float(self.red_edit.text())
+        ctx.green   = float(self.green_edit.text()) 
+        ctx.blue    = float(self.blue_edit.text()) 
         if self.julia_c_edit:
-            julia_c = complex(self.julia_c_edit.text())
+            ctx.julia_c = complex(self.julia_c_edit.text())
 
-        real = hpf(self.c_real_edit.toPlainText())
-        imag = hpf(self.c_imag_edit.toPlainText())
+        ctx.c_width  = hpf(self.c_width_text.toPlainText())
+        ctx.c_height = hpf(self.c_height_text.toPlainText())
+        ctx.c_real = hpf(self.c_real_edit.toPlainText())
+        ctx.c_imag = hpf(self.c_imag_edit.toPlainText())
+
+        return ctx
 
 
     # --
-    # QTFractalMainWindow::refresh_ui
+    # QTFractalMainWindow::set_ui_defaults
     # --
 
-    def refresh_ui(self):
-        global image_w
-        global image_h
-        global real
-        global imag
-        global samples
-        global max_iter
-        global c_height
-        global c_width
-        global red
-        global green
-        global blue
-        global main_image_name
-        global julia_c
+    def set_ui_defaults(self):
 
-        c_height    = c_width * (hpf(DISPLAY_HEIGHT) / hpf(DISPLAY_WIDTH))
 
-        self.c_width_text.setPlainText(str(c_width))
-        self.c_height_text.setPlainText(str(c_height))
-        self.img_width_text.setText(str(image_w))
-        self.img_height_text.setText(str(image_h))
-        self.c_real_edit.setPlainText(str(real))
-        self.c_imag_edit.setPlainText(str(imag))
-        self.samples_text.setText(str(samples))
-        self.iter_text.setText(str(max_iter))
+        self.c_width_text.setPlainText(str(DEFAULT_C_WIDTH))
+        self.c_height_text.setPlainText(str(DEFAULT_C_HEIGHT))
+        self.img_width_text.setText(str(DEFAULT_DISPLAY_WIDTH))
+        self.img_height_text.setText(str(DEFAULT_DISPLAY_HEIGHT))
+        self.c_real_edit.setPlainText(str(DEFAULT_REAL))
+        self.c_imag_edit.setPlainText(str(DEFAULT_IMAG))
+        self.samples_text.setText(str(DEFAULT_SAMPLES))
+        self.iter_text.setText(str(DEFAULT_MAX_ITER))
 
-        self.red_edit.setText(str(red))
-        self.green_edit.setText(str(green))
-        self.blue_edit.setText(str(blue))
+        self.red_edit.setText(str(DEFAULT_RED))
+        self.green_edit.setText(str(DEFAULT_GREEN))
+        self.blue_edit.setText(str(DEFAULT_BLUE))
 
         if self.julia_c_edit:
-            self.julia_c_edit.setText(str(julia_c))
+            self.julia_c_edit.setText(str(DEFAULT_JULIA_C))
 
 
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(main_image_name)
-        pixmap = pixmap.scaled(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.main_image.setPixmap(pixmap)
-        self.main_image.resize(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.grid.addWidget(self.main_image, 0, 1)
+
+    def refresh_ui(self, context = None):
+
+        if context:
+            self.c_width_text.setPlainText(str(context.c_width))
+            self.c_height_text.setPlainText(str(context.c_height))
+            self.c_real_edit.setPlainText(str(context.c_real))
+            self.c_imag_edit.setPlainText(str(context.c_imag))
+
+        self.main_image = FractalImgQLabel(self)
+        pixmap = QPixmap(main_image_name)
+        pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.main_image.setPixmap(pixmap)
+        self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.grid.addWidget(self.main_image, 0, 1)
 
     def run(self):
         global main_image_name
 
-        self.sync_config_from_ui()
-        run(main_image_name)
+        ctx = self.sync_config_from_ui()
+        run(main_image_name, ctx)
         self.refresh_ui()
 
     def snapshot(self):
-        self.snap_pop = SnapshotPopup()
+        ctx = self.sync_config_from_ui()
+        self.snap_pop = SnapshotPopup(self, ctx)
         self.snap_pop.setGeometry(QRect(100, 100, 400, 200))
         self.snap_pop.show()
         
+
+    # --    
+    # QTFractalMainWindow::set_algo
+    # --    
 
     def set_algo(self, event):
         res = self.algo_combo.currentText()
@@ -567,6 +609,7 @@ class QTFractalMainWindow(QWidget):
             self.julia_c_edit  = QLineEdit(self) 
             self.left_config_grid.addWidget(self.julia_c_label, 10, 0)
             self.left_config_grid.addWidget(self.julia_c_edit,  10, 1)
+            self.julia_c_edit.setText(str(DEFAULT_JULIA_C))
         else:
             if self.julia_c_edit:
                 print("REMOVE!")
@@ -577,8 +620,8 @@ class QTFractalMainWindow(QWidget):
                 self.julia_c_edit  = None 
                 self.julia_c_label = None 
 
-        self.refresh_ui()
-        self.sync_config_from_ui()
+        #self.refresh_ui()
+        #self.sync_config_from_ui()
         self.update()    
 
     # --
@@ -710,14 +753,15 @@ class QTFractalMainWindow(QWidget):
 
         self.setLayout(self.grid)
 
+        self.set_ui_defaults()
         self.refresh_ui()
 
         # use splash screen to start
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(splash_image_name)
-        pixmap = pixmap.scaled(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.main_image.setPixmap(pixmap)
-        self.main_image.resize(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.grid.addWidget(self.main_image, 0, 1)
 
         self.show()
