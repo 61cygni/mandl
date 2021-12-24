@@ -11,13 +11,16 @@
 #
 # TODO:
 # 
-# - add a "reset" button to get to the initial config
+# - preview radio button for snapshot window 
+# - ability to save current config (should be easy now that we have
+#   context)
 # - clean up status / debug printing end to end
 # - add a rollback button to get to the last picture
 # - write raw calculations from C to binary file
 #
 # Done :
 #
+# - add a "reset" button to get to the initial config
 # - get julia sets plugged into UI
 # - implement sampling with julia sets
 # - Fix mandeldistance
@@ -568,6 +571,10 @@ class QTFractalMainWindow(QWidget):
         self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.grid.addWidget(self.main_image, 0, 1)
 
+    # --
+    # QTFractalMainWindow::refresh_ui
+    # --
+
     def refresh_ui(self, context = None):
 
         if context:
@@ -583,6 +590,10 @@ class QTFractalMainWindow(QWidget):
         self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.grid.addWidget(self.main_image, 0, 1)
 
+    # --
+    # QTFractalMainWindow::run
+    # --
+
     def run(self):
         global main_image_name
 
@@ -590,12 +601,26 @@ class QTFractalMainWindow(QWidget):
         run(main_image_name, ctx)
         self.refresh_ui()
 
+    # --
+    # QTFractalMainWindow::snapshot
+    # --
+
     def snapshot(self):
         ctx = self.sync_config_from_ui()
         self.snap_pop = SnapshotPopup(self, ctx)
         self.snap_pop.setGeometry(QRect(100, 100, 400, 200))
         self.snap_pop.show()
-        
+
+    # --
+    # QTFractalMainWindow::reset
+    # --
+
+    def reset(self):
+        self.set_ui_defaults()
+        ctx = self.sync_config_from_ui()
+        run(main_image_name, ctx)
+        self.refresh_ui()
+
 
     # --    
     # QTFractalMainWindow::set_algo
@@ -627,7 +652,6 @@ class QTFractalMainWindow(QWidget):
     # --
     # QTFractalMainWindow::unit_ui
     # --
-        
 
     def init_ui(self):
         global splash_image_name
@@ -647,6 +671,9 @@ class QTFractalMainWindow(QWidget):
 
         btn_snapshot = QPushButton("snapshot")
         btn_snapshot.clicked.connect(self.snapshot)
+
+        btn_reset = QPushButton("reset")
+        btn_reset.clicked.connect(self.reset)
 
         self.main_image.setAlignment(Qt.AlignCenter)
 
@@ -732,7 +759,11 @@ class QTFractalMainWindow(QWidget):
         #grid_config.addWidget(self.julia_c_edit, 10, 1)
 
         grid_config.addWidget(btn_run, 11, 0)
-        grid_config.addWidget(btn_snapshot, 11, 1)
+
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(btn_snapshot)
+        buttonLayout.addWidget(btn_reset)
+        grid_config.addLayout(buttonLayout, 11, 1)
 
         # Right side inputs for c_real and c_imag 
         grid_center = QGridLayout()
