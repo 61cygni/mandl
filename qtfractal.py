@@ -11,7 +11,6 @@
 #
 # TODO:
 # 
-# - preview radio button for snapshot window 
 # - ability to save current config (should be easy now that we have
 #   context)
 # - clean up status / debug printing end to end
@@ -20,6 +19,7 @@
 #
 # Done :
 #
+# - preview radio button for snapshot window 
 # - add a "reset" button to get to the initial config
 # - get julia sets plugged into UI
 # - implement sampling with julia sets
@@ -30,10 +30,13 @@
 # - center on current mouse location picture if mouse pressed some key
 #   held
 #
+# Really nice colors : 0, .19, 1.0
+#
 # --
 
 import sys, os
 import subprocess
+import pickle
 from dataclasses import dataclass
 
 
@@ -72,6 +75,43 @@ DEFAULT_C_HEIGHT = hpf(3.75)
 DEFAULT_SAMPLES  = 17  # number of samples per pixel
 DEFAULT_MAX_ITER = (2 << 10)  
 DEFAULT_JULIA_C = -.8+.156j
+
+DEFAULT_SAVEDIR = "./savedfiles/"
+
+def FileDialog(directory='', forOpen=True, fmt='', isFolder=False):
+    options = QFileDialog.Options()
+    options |= QFileDialog.DontUseNativeDialog
+    options |= QFileDialog.DontUseCustomDirectoryIcons
+    dialog = QFileDialog()
+    dialog.setOptions(options)
+
+    dialog.setFilter(dialog.filter() | QDir.Hidden)
+
+    # ARE WE TALKING ABOUT FILES OR FOLDERS
+    if isFolder:
+        dialog.setFileMode(QFileDialog.DirectoryOnly)
+    else:
+        dialog.setFileMode(QFileDialog.AnyFile)
+    # OPENING OR SAVING
+    dialog.setAcceptMode(QFileDialog.AcceptOpen) if forOpen else dialog.setAcceptMode(QFileDialog.AcceptSave)
+
+    # SET FORMAT, IF SPECIFIED
+    if fmt != '' and isFolder is False:
+        dialog.setDefaultSuffix(fmt)
+        dialog.setNameFilters([f'{fmt} (*.{fmt})'])
+
+    # SET THE STARTING DIRECTORY
+    if directory != '':
+        dialog.setDirectory(str(directory))
+    else:
+        dialog.setDirectory(DEFAULT_SAVEDIR)
+
+
+    if dialog.exec_() == QDialog.Accepted:
+        path = dialog.selectedFiles()[0]  # returns a list
+        return path
+    else:
+        return ''
 
 
 # --
@@ -453,11 +493,6 @@ class FractalImgQLabel(QLabel):
         qp.drawLine(self.pos.x(),0,self.pos.x(), DEFAULT_DISPLAY_HEIGHT)
 
 
-    def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key_Escape:
-            print("escape")
-
-
     def mousePressEvent(self, event):
         self.begin = event.pos()
         self.end = event.pos()
@@ -621,6 +656,14 @@ class QTFractalMainWindow(QWidget):
             self.c_height_text.setPlainText(str(context.c_height))
             self.c_real_edit.setPlainText(str(context.c_real))
             self.c_imag_edit.setPlainText(str(context.c_imag))
+            self.iter_text.setText(str(context.max_iter))
+            self.samples_text.setText(str(context.samples))
+            self.red_edit.setText(str(context.red))
+            self.green_edit.setText(str(context.green))
+            self.blue_edit.setText(str(context.blue))
+            self.algo_combo.setCurrentText(context.algo)
+            self.set_algo(None)
+            self.julia_c_edit.setText(str(context.julia_c))
 
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(main_image_name)
@@ -639,6 +682,39 @@ class QTFractalMainWindow(QWidget):
         ctx = self.sync_config_from_ui()
         run(main_image_name, ctx)
         self.refresh_ui()
+
+    # --
+    # QTFractalMainWindow::save
+    # --
+
+    def save(self):
+        fname = QFileDialog.getSaveFileName(self, 'Save File', DEFAULT_SAVEDIR)
+        fname = fname[0]
+        if fname == '':
+            return
+        fd = open(fname, "wb")
+        context = self.sync_config_from_ui()
+        pickle.dump(context, fd)
+        fd.close()
+
+    # --
+    # QTFractalMainWindow::load
+    # --
+
+    def load(self):
+        fname = QFileDialog.getOpenFileNames(self, "Open File", DEFAULT_SAVEDIR)
+        fname = fname[0]
+        if len(fname) == 0:
+            return
+        fname = fname[0]    
+        if fname == '':
+            return
+        fd = open(fname, "rb")
+        context = pickle.load(fd)
+        fd.close()
+        self.refresh_ui(context)
+        self.update()
+
 
     # --
     # QTFractalMainWindow::snapshot
@@ -667,13 +743,13 @@ class QTFractalMainWindow(QWidget):
 
     def set_algo(self, event):
         res = self.algo_combo.currentText()
-
         if res == 'julia' or res == 'cjulia':
-            self.julia_c_label = QLabel("Julia c: ")
-            self.julia_c_edit  = QLineEdit(self) 
-            self.left_config_grid.addWidget(self.julia_c_label, 10, 0)
-            self.left_config_grid.addWidget(self.julia_c_edit,  10, 1)
-            self.julia_c_edit.setText(str(DEFAULT_JULIA_C))
+            if not self.julia_c_edit:
+                self.julia_c_label = QLabel("Julia c: ")
+                self.julia_c_edit  = QLineEdit(self) 
+                self.left_config_grid.addWidget(self.julia_c_label, 10, 0)
+                self.left_config_grid.addWidget(self.julia_c_edit,  10, 1)
+                self.julia_c_edit.setText(str(DEFAULT_JULIA_C))
         else:
             if self.julia_c_edit:
                 print("REMOVE!")
@@ -708,6 +784,12 @@ class QTFractalMainWindow(QWidget):
         btn_run = QPushButton("run")
         btn_run.clicked.connect(self.run)
 
+        btn_save = QPushButton("save")
+        btn_save.clicked.connect(self.save)
+
+        btn_load = QPushButton("load")
+        btn_load.clicked.connect(self.load)
+
         btn_snapshot = QPushButton("snapshot")
         btn_snapshot.clicked.connect(self.snapshot)
 
@@ -718,7 +800,7 @@ class QTFractalMainWindow(QWidget):
 
         # Basic config
 
-        algo_label = QLabel('Fractal Algo')
+        algo_label = QLabel('Algorithm')
         self.algo_combo = QComboBox()
         self.algo_combo.addItem("ldnative")
         self.algo_combo.addItem("hpnative")
@@ -730,14 +812,14 @@ class QTFractalMainWindow(QWidget):
         # adding action to combo box
         self.algo_combo.activated.connect(self.set_algo)
 
-        c_width_label   = QLabel('Complex width')
-        c_height_label = QLabel('Complex height')
+        c_width_label   = QLabel('Cmplx w')
+        c_height_label = QLabel('Cmplx h')
 
         self.c_width_text   = QPlainTextEdit(self)
         self.c_height_text  = QPlainTextEdit(self)
 
-        img_width_label = QLabel('Image width')
-        img_height_label = QLabel('Image height')
+        img_width_label = QLabel('Image w')
+        img_height_label = QLabel('Image h')
 
         self.img_width_text  = QLineEdit(self)
         self.img_width_text.setReadOnly(True)
@@ -805,11 +887,16 @@ class QTFractalMainWindow(QWidget):
         grid_config.addLayout(buttonLayout, 11, 1)
 
         # Right side inputs for c_real and c_imag 
-        grid_center = QGridLayout()
-        grid_center.addWidget(c_real_label ,0, 0)
-        grid_center.addWidget(self.c_real_edit  ,1, 0)
-        grid_center.addWidget(c_imag_label ,2, 0)
-        grid_center.addWidget(self.c_imag_edit  ,3, 0)
+        grid_right = QGridLayout()
+        grid_right.addWidget(c_real_label ,0, 0)
+        grid_right.addWidget(self.c_real_edit  ,1, 0)
+        grid_right.addWidget(c_imag_label ,2, 0)
+        grid_right.addWidget(self.c_imag_edit  ,3, 0)
+
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(btn_save)
+        buttonLayout.addWidget(btn_load)
+        grid_right.addLayout(buttonLayout, 4,0)
 
 
         # MAIN GRID
@@ -819,7 +906,7 @@ class QTFractalMainWindow(QWidget):
 
         self.grid.addLayout(grid_config,     0, 0)
         self.grid.addWidget(self.main_image, 0, 1)
-        self.grid.addLayout(grid_center,     0, 2)
+        self.grid.addLayout(grid_right,      0, 2)
 
         self.setLayout(self.grid)
 
