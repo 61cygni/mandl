@@ -131,6 +131,32 @@ def run(fn, context):
     proc = subprocess.Popen(cmd, shell=True)
     proc.wait()
 
+
+class DisplaySnap(QWidget):
+
+    def __init__(self, filename):
+        super().__init__()
+        self.title = 'QTFractal Snapshot'
+        self.filename = filename
+        self.left = 10
+        self.top = 10
+        self.width = 640
+        self.height = 480
+        self.init_ui()
+    
+    def init_ui(self):
+        self.setWindowTitle(self.title)
+        self.setGeometry(self.left, self.top, self.width, self.height)
+    
+        # Create widget
+        label = QLabel(self)
+        pixmap = QPixmap(self.filename)
+        label.setPixmap(pixmap)
+        self.resize(pixmap.width(),pixmap.height())
+        
+        self.show()
+
+
 # --
 # Popup that we use to generate a large snapshot
 # --
@@ -151,6 +177,9 @@ class SnapshotPopup(QWidget):
     def run(self):
         context = self.sync_config_from_ui()
         run(self.filename, context)
+        if self.display_check.isChecked():
+            self.ds = DisplaySnap(self.filename)
+
 
     # --    
     # SnapshotPopup::refresh_ui
@@ -322,6 +351,9 @@ class SnapshotPopup(QWidget):
         btn_run = QPushButton("Go!")
         btn_run.clicked.connect(self.run)
 
+        display_label      = QLabel("display")
+        self.display_check = QCheckBox()
+
         res_config = QGridLayout()
         res_config.addWidget(self.img_width_text, 0, 1)
         res_config.addWidget(self.res_combo,      0, 2)
@@ -347,7 +379,14 @@ class SnapshotPopup(QWidget):
         self.grid_config.addWidget(blue_label ,9, 0)
         self.grid_config.addWidget(self.blue_edit, 9, 1)
 
+
+        dlayout = QHBoxLayout()
+        dlayout.addWidget(display_label)
+        dlayout.addWidget(self.display_check)
+        self.grid_config.addLayout(dlayout, 11, 0)
+
         self.grid_config.addWidget(btn_run, 11, 1)
+
 
         self.setLayout(self.grid_config)
 
