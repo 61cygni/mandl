@@ -663,7 +663,8 @@ class QTFractalMainWindow(QWidget):
             self.blue_edit.setText(str(context.blue))
             self.algo_combo.setCurrentText(context.algo)
             self.set_algo(None)
-            self.julia_c_edit.setText(str(context.julia_c))
+            if self.julia_c_edit:
+                self.julia_c_edit.setText(str(context.julia_c))
 
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(main_image_name)
