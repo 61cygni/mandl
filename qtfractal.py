@@ -8,6 +8,7 @@
 # - Hold shift while creating zoom box to drag it around the screen
 # - Use Command+Mouse Click to center the picture at the current zoom
 #   level at the click location
+# - Use ctrl-Mouse click to zoom out
 #
 # TODO:
 # 
@@ -525,24 +526,29 @@ class FractalImgQLabel(QLabel):
 
         size = nrect.size()
 
-        x = nrect.center().x()
-        y = nrect.center().y()
+        ctx = self.parent.sync_config_from_ui()
+        x   = nrect.center().x()
+        y   = nrect.center().y()
 
         # on click with no bounding box, check for control modifier and
         # if pressed, use that to center the picture around the mouse
         if size.height() * size.width() < 4:
             modifiers = QApplication.keyboardModifiers()
-            if modifiers == Qt.ControlModifier:
+            if modifiers == Qt.ControlModifier: # command key on Mac
                 x = event.pos().x()
                 y = event.pos().y()
                 print(" + Centering picture")
-
+            elif modifiers == Qt.MetaModifier:  # Control key on Max
+                # zoom out by 2x 
+                x = event.pos().x()
+                y = event.pos().y()
+                ctx.c_width  = ctx.c_width * hpf(2)
+                ctx.c_height = ctx.c_height* hpf(2)
             else:    
                 self.update()
                 return
 
 
-        ctx = self.parent.sync_config_from_ui()
 
         # Use the center the calculate the edges
         re_start = ctx.c_real - (ctx.c_width  / hpf(2.))
