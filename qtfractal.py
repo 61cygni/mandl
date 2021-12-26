@@ -11,15 +11,17 @@
 # - Use ctrl-Mouse click to zoom out
 #
 # TODO:
-# 
-# - ability to save current config (should be easy now that we have
-#   context)
+#
+# - delete / reset on list
+# - waypoint preview
 # - clean up status / debug printing end to end
 # - add a rollback button to get to the last picture
 # - write raw calculations from C to binary file
 #
 # Done :
 #
+# - ability to save current config (should be easy now that we have
+#   context)
 # - preview radio button for snapshot window 
 # - add a "reset" button to get to the initial config
 # - get julia sets plugged into UI
@@ -78,64 +80,6 @@ DEFAULT_MAX_ITER = (2 << 10)
 DEFAULT_JULIA_C = -.8+.156j
 
 DEFAULT_SAVEDIR = "./savedfiles/"
-
-def FileDialog(directory='', forOpen=True, fmt='', isFolder=False):
-    options = QFileDialog.Options()
-    options |= QFileDialog.DontUseNativeDialog
-    options |= QFileDialog.DontUseCustomDirectoryIcons
-    dialog = QFileDialog()
-    dialog.setOptions(options)
-
-    dialog.setFilter(dialog.filter() | QDir.Hidden)
-
-    # ARE WE TALKING ABOUT FILES OR FOLDERS
-    if isFolder:
-        dialog.setFileMode(QFileDialog.DirectoryOnly)
-    else:
-        dialog.setFileMode(QFileDialog.AnyFile)
-    # OPENING OR SAVING
-    dialog.setAcceptMode(QFileDialog.AcceptOpen) if forOpen else dialog.setAcceptMode(QFileDialog.AcceptSave)
-
-    # SET FORMAT, IF SPECIFIED
-    if fmt != '' and isFolder is False:
-        dialog.setDefaultSuffix(fmt)
-        dialog.setNameFilters([f'{fmt} (*.{fmt})'])
-
-    # SET THE STARTING DIRECTORY
-    if directory != '':
-        dialog.setDirectory(str(directory))
-    else:
-        dialog.setDirectory(DEFAULT_SAVEDIR)
-
-
-    if dialog.exec_() == QDialog.Accepted:
-        path = dialog.selectedFiles()[0]  # returns a list
-        return path
-    else:
-        return ''
-
-
-# --
-# global::RunContext
-# --
-
-class RunContext:
-
-    def __init__(self):
-        self.algo     = "" 
-        self.image_w  = DEFAULT_DISPLAY_WIDTH 
-        self.image_h  = DEFAULT_DISPLAY_HEIGHT
-        self.red      = 0. 
-        self.green    = 0. 
-        self.blue     = 0.
-        self.samples  = 0
-        self.max_iter = 0
-        self.julia_c  = complex(0)
-        self.c_width  = hpf(0)
-        self.c_height = hpf(0)
-        self.c_real   = hpf(0)
-        self.c_imag   = hpf(0)
-
 
 # --
 # global::run
@@ -198,6 +142,7 @@ class DisplaySnap(QWidget):
         self.show()
 
 
+
 # --
 # Popup that we use to generate a large snapshot
 # --
@@ -253,6 +198,8 @@ class SnapshotPopup(QWidget):
     def sync_config_from_ui(self):
 
         ctx = RunContext()
+        ctx.image_w  = DEFAULT_DISPLAY_WIDTH 
+        ctx.image_h  = DEFAULT_DISPLAY_HEIGHT
 
 
         #set values from UI
@@ -439,7 +386,6 @@ class SnapshotPopup(QWidget):
 
         self.update()
 
-
 # --
 # Main image widget. This loads in the fractal snapshot after it was
 # generated and responds to mouse events
@@ -527,6 +473,7 @@ class FractalImgQLabel(QLabel):
         size = nrect.size()
 
         ctx = self.parent.sync_config_from_ui()
+
         x   = nrect.center().x()
         y   = nrect.center().y()
 
@@ -547,7 +494,6 @@ class FractalImgQLabel(QLabel):
             else:    
                 self.update()
                 return
-
 
 
         # Use the center the calculate the edges
@@ -585,9 +531,10 @@ class FractalImgQLabel(QLabel):
 class QTFractalMainWindow(QWidget):
 
     def __init__(self,parent):
+
         super(QTFractalMainWindow, self).__init__()
         self.parent = parent
-        self.mode = 5
+        self.waypoints = {}
 
         self.init_ui()
 
@@ -599,6 +546,8 @@ class QTFractalMainWindow(QWidget):
     def sync_config_from_ui(self):
 
         ctx = RunContext()
+        ctx.image_w  = DEFAULT_DISPLAY_WIDTH 
+        ctx.image_h  = DEFAULT_DISPLAY_HEIGHT
 
         #set values from UI
         ctx.samples  = int(self.samples_text.text())
@@ -646,10 +595,10 @@ class QTFractalMainWindow(QWidget):
 
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(main_image_name)
-        pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
-        self.main_image.setPixmap(pixmap)
+        self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.main_image.setPixmap(self.pixmap)
         self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
-        self.grid.addWidget(self.main_image, 0, 1)
+        self.grid_center.addWidget(self.main_image, 1, 0)
 
     # --
     # QTFractalMainWindow::refresh_ui
@@ -674,10 +623,10 @@ class QTFractalMainWindow(QWidget):
 
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(main_image_name)
-        pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.main_image.setPixmap(pixmap)
         self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
-        self.grid.addWidget(self.main_image, 0, 1)
+        self.grid_center.addWidget(self.main_image, 1, 0)
 
     # --
     # QTFractalMainWindow::run
@@ -743,6 +692,47 @@ class QTFractalMainWindow(QWidget):
         run(main_image_name, ctx)
         self.refresh_ui()
 
+    # --
+    # QTFractalMainWindow::waypoint
+    # --
+
+    def waypoint(self):
+        dur = self.dur_edit.text()
+        if dur == '':
+            dur = 0
+
+        context = self.sync_config_from_ui()
+
+        way = Waypoint(context, dur, self.pixmap.scaledToWidth(128)) 
+        self.waypoints[str(way)] = way
+        self.waypoint_list.addItem(str(way))
+
+
+    # --
+    # QTFractalMainWindow::generate_preview
+    # --
+
+    def generate_preview(self):
+        items = []
+        count = self.waypoint_list.count()
+        for i in range(0, count):
+            item = self.waypoint_list.item(i)
+            items.append(self.waypoints[item.text()])
+            print("PREVIEW %s"%(str(items[i])))
+
+    # --
+    # QTFractalMainWindow::waypoint_clicked
+    # --
+
+    def waypoint_clicked(self, item):
+        print("CLICK!!!")
+        thumb_label = QLabel(self)
+        thumb_label.setFixedSize(128, 128)
+        waypt = self.waypoints[item.text()]
+        thumb_label.setPixmap(waypt.image)
+        self.previewLayout.addWidget(thumb_label,  0, 0)
+        #self.update()
+
 
     # --    
     # QTFractalMainWindow::set_algo
@@ -786,7 +776,8 @@ class QTFractalMainWindow(QWidget):
         self.center()
 
         self.main_image = FractalImgQLabel(self)
-        self.main_image.setPixmap(QPixmap(splash_image_name))
+        self.pixmap = QPixmap(splash_image_name)
+        self.main_image.setPixmap(self.pixmap)
 
         btn_run = QPushButton("run")
         btn_run.clicked.connect(self.run)
@@ -883,8 +874,6 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(blue_label ,9, 0)
         grid_config.addWidget(self.blue_edit, 9, 1)
 
-        #grid_config.addWidget(julia_c_label ,10, 0)
-        #grid_config.addWidget(self.julia_c_edit, 10, 1)
 
         grid_config.addWidget(btn_run, 11, 0)
 
@@ -905,6 +894,56 @@ class QTFractalMainWindow(QWidget):
         buttonLayout.addWidget(btn_load)
         grid_right.addLayout(buttonLayout, 4,0)
 
+        #center panel
+        self.grid_center = QGridLayout()
+
+
+        # Top for setting up waypoints 
+        way_label    = QLabel("Waypoints")
+        btn_add = QPushButton("add")
+        btn_del = QPushButton("delete")
+        btn_res = QPushButton("reset")
+        btn_add.clicked.connect(self.waypoint)
+        dur_label     = QLabel("duration")
+        self.dur_edit = QLineEdit(self) 
+        self.dur_edit.setText("10")
+        self.waypoint_list = QListWidget()
+        self.waypoint_list.itemClicked.connect(self.waypoint_clicked)
+        self.thumb_label = QLabel()
+
+        durLayout = QHBoxLayout()
+        durLayout.addWidget(dur_label)
+        durLayout.addWidget(self.dur_edit)
+
+        wayLayout = QGridLayout()
+        wayLayout.addWidget(way_label, 0, 0)
+        wayLayout.addWidget(btn_add,   1, 0)
+        wayLayout.addWidget(btn_del,   2, 0)
+        wayLayout.addWidget(btn_res,   3, 0)
+        wayLayout.addLayout(durLayout, 4, 0)
+        #wayLayout.addWidget(dur_label, 4, 0)
+        #wayLayout.addWidget(self.dur_edit, 5, 0)
+
+        self.grid_top = QGridLayout()
+        self.grid_top.addLayout(wayLayout,          0, 0)
+        self.grid_top.addWidget(self.waypoint_list, 0, 1)
+
+        btn_preview = QPushButton("preview")
+        btn_preview.clicked.connect(self.generate_preview)
+        placeholder = QLabel(self)
+        placeholder.setFixedSize(128,128)
+        pixmap = QPixmap(splash_image_name)
+        pixmap = pixmap.scaled(128,128)
+        placeholder.setPixmap(pixmap)
+        self.previewLayout = QGridLayout()
+        self.previewLayout.addWidget(placeholder, 0, 0)
+        self.previewLayout.addWidget(btn_preview, 1, 0)
+
+        self.grid_top.addLayout(self.previewLayout, 0, 2)
+
+        self.grid_center.addLayout(self.grid_top, 0, 0)
+        self.grid_center.addWidget(self.main_image, 1, 0)
+
 
         # MAIN GRID
 
@@ -912,9 +951,8 @@ class QTFractalMainWindow(QWidget):
         self.grid.setSpacing(10)
 
         self.grid.addLayout(grid_config,     0, 0)
-        self.grid.addWidget(self.main_image, 0, 1)
+        self.grid.addLayout(self.grid_center,     0, 1)
         self.grid.addLayout(grid_right,      0, 2)
-
         self.setLayout(self.grid)
 
         self.set_ui_defaults()
@@ -923,10 +961,10 @@ class QTFractalMainWindow(QWidget):
         # use splash screen to start
         self.main_image = FractalImgQLabel(self)
         pixmap = QPixmap(splash_image_name)
-        pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
-        self.main_image.setPixmap(pixmap)
+        self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.main_image.setPixmap(self.pixmap)
         self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
-        self.grid.addWidget(self.main_image, 0, 1)
+        self.grid_center.addWidget(self.main_image, 1, 0)
 
         self.show()
 
