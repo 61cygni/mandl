@@ -6,6 +6,8 @@
 #
 # --
 
+from globalconfig  import *
+
 # --
 # global::RunContext
 # --

@@ -40,18 +40,16 @@
 import sys, os
 import subprocess
 import pickle
-from dataclasses import dataclass
 
+from dataclasses import dataclass
 
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
+from globalconfig  import *
+from sharedcontext import *
 
-from decimal import *
-
-hpf = Decimal
-getcontext().prec = 500 
 
 BURN = False  
 DEFAULT_ALGO = "ldnative"
