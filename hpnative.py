@@ -10,7 +10,6 @@ import sys
 import os
 import os.path
 
-import decimal
 import subprocess
 import multiprocessing
 
@@ -18,12 +17,11 @@ from algo import Algo
 
 from PIL import Image
 
+from globalconfig import *
+
 PRECISION      = 300
 NativeLong_EXE = "./hpnative"
 Gen_DIR        = "hpfiles"
-
-hpf = decimal.Decimal
-decimal.getcontext().prec = PRECISION 
 
 
 c_width  = hpf(0.)
@@ -60,15 +58,20 @@ class HPNative(Algo):
                 #self.color = (.0,.6,1.0) # blue / yellow
 
         if self.precision == 0:
-            self.precision = PRECISION
-            decimal.getcontext().prec = self.precision 
+            self.precision = GLOBAL_PRECISION
 
+        # from decimal
+        getcontext().prec = self.precision 
+
+        print('+ color to %s'%(str(self.color)))
+        print('+ precision %d'%(self.precision))
 
     def set_default_params(self):
 
         # set a more interesting point if we're going to be doing a dive    
-        if self.context.dive and not self.context.cmplx_center: 
-            self.context.cmplx_center = self.context.ctxc(-0.235125,0.827215)
+        if self.context.dive and not self.context.c_real: 
+            self.context.c_real = hpf(-0.235125)
+            self.context.c_imag = hpf(0.827215)
         if not self.context.escape_rad:        
             self.context.escape_rad   = 256.
         if not self.context.max_iter:        
@@ -78,10 +81,6 @@ class HPNative(Algo):
         assert 0
 
     def calc_cur_frame(self, img_width, img_height, x, xx, xxx, xxxx):
-        global c_width
-        global c_height
-        global c_real
-        global c_imag
         global scaling_factor
         global magnification
         global num_epochs
@@ -90,12 +89,18 @@ class HPNative(Algo):
         cmds      = []
         procs     = []
 
+
+        c_real = self.context.c_real
+        c_imag = self.context.c_imag
+        c_w    = self.context.cmplx_width
+
+
         for i in range(0,self.numprocs):
             fn = self.dir+"hpm%d.png"%(i)
             filenames.append(fn)
             cmd_args =  self.exe+" -v -w %d -h %d -n %d -b %d -i %s -p %d -m %d -x \"%s\" -y \"%s\" -l \"%s\""%\
                                  (img_width, img_height, self.numprocs, i+1, fn, self.precision, self.context.max_iter, \
-                                 str(c_real), str(c_imag), str(c_width) )
+                                 str(c_real), str(c_imag), str(c_w) )
             cmds.append(cmd_args)
 
         

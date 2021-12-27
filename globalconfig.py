@@ -9,5 +9,9 @@
 
 from decimal import *
 
+# defaults if not specificed by user
+GLOBAL_PRECISION = 500
+GLOBAL_MAXITER   = (2 << 10) 
+
 hpf = Decimal
-getcontext().prec = 500 
+getcontext().prec = GLOBAL_PRECISION

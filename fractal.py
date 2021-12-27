@@ -28,16 +28,14 @@ from PIL import Image, ImageDraw, ImageFont
 
 # -- our files
 
+from globalconfig  import *
+from sharedcontext import *
+
 import fractalcache   as fc
 import fractalpalette as fp
 
 
 FRACTAL_VER = "0.1"
-
-hpf = decimal.Decimal
-
-decimal.getcontext().prec = 500 
-
 
 class FractalContext:
     """

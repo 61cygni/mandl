@@ -74,7 +74,6 @@ DEFAULT_C_WIDTH  = hpf(5)
 DEFAULT_C_HEIGHT = hpf(3.75)
 
 DEFAULT_SAMPLES  = 17  # number of samples per pixel
-DEFAULT_MAX_ITER = (2 << 10)  
 DEFAULT_JULIA_C = -.8+.156j
 
 DEFAULT_SAVEDIR = "./savedfiles/"
@@ -138,8 +137,6 @@ class DisplaySnap(QWidget):
         self.resize(pixmap.width(),pixmap.height())
         
         self.show()
-
-
 
 # --
 # Popup that we use to generate a large snapshot
@@ -581,7 +578,7 @@ class QTFractalMainWindow(QWidget):
         self.c_real_edit.setPlainText(str(DEFAULT_REAL))
         self.c_imag_edit.setPlainText(str(DEFAULT_IMAG))
         self.samples_text.setText(str(DEFAULT_SAMPLES))
-        self.iter_text.setText(str(DEFAULT_MAX_ITER))
+        self.iter_text.setText(str(GLOBAL_MAXITER))
 
         self.red_edit.setText(str(DEFAULT_RED))
         self.green_edit.setText(str(DEFAULT_GREEN))
@@ -595,7 +592,7 @@ class QTFractalMainWindow(QWidget):
         pixmap = QPixmap(main_image_name)
         self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.main_image.setPixmap(self.pixmap)
-        self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.main_image.setFixedSize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
         self.grid_center.addWidget(self.main_image, 1, 0)
 
     # --
@@ -620,10 +617,9 @@ class QTFractalMainWindow(QWidget):
                 self.julia_c_edit.setText(str(context.julia_c))
 
         self.main_image = FractalImgQLabel(self)
-        pixmap = QPixmap(main_image_name)
-        self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
-        self.main_image.setPixmap(pixmap)
-        self.main_image.resize(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT)
+        self.pixmap = QPixmap(main_image_name)
+        self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, Qt.KeepAspectRatio, Qt.FastTransformation)
+        self.main_image.setPixmap(self.pixmap)
         self.grid_center.addWidget(self.main_image, 1, 0)
 
     # --
@@ -723,7 +719,6 @@ class QTFractalMainWindow(QWidget):
     # --
 
     def waypoint_clicked(self, item):
-        print("CLICK!!!")
         thumb_label = QLabel(self)
         thumb_label.setFixedSize(128, 128)
         waypt = self.waypoints[item.text()]
@@ -758,6 +753,16 @@ class QTFractalMainWindow(QWidget):
         #self.refresh_ui()
         #self.sync_config_from_ui()
         self.update()    
+
+    # --    
+    # QTFractalMainWindow::set_imageres
+    # --    
+
+    def set_imageres(self, event):
+        res = self.imageres_combo.currentText().split('x')
+        self.img_width_text.setText(res[0])
+        self.img_height_text.setText(res[1])
+
 
     # --
     # QTFractalMainWindow::unit_ui
@@ -822,6 +827,13 @@ class QTFractalMainWindow(QWidget):
         self.img_height_text  = QLineEdit(self)
         self.img_height_text.setReadOnly(True)
 
+        self.imageres_combo = QComboBox()
+        self.imageres_combo.addItem("640x480")
+        self.imageres_combo.addItem("320x240")
+        self.imageres_combo.addItem("160x120")
+
+        self.imageres_combo.activated.connect(self.set_imageres)
+
         samples_label     = QLabel("Samples: ")
         self.samples_text = QLineEdit(self) 
 
@@ -857,10 +869,18 @@ class QTFractalMainWindow(QWidget):
         grid_config.addWidget(self.c_width_text, 1, 1)
         grid_config.addWidget(c_height_label,2, 0)
         grid_config.addWidget(self.c_height_text, 2, 1)
+
+
         grid_config.addWidget(img_width_label,3, 0)
-        grid_config.addWidget(self.img_width_text, 3, 1)
         grid_config.addWidget(img_height_label,4, 0)
+
+
+        imageres_layout = QHBoxLayout()
+        imageres_layout.addWidget(self.img_width_text)
+        imageres_layout.addWidget(self.imageres_combo)
+        grid_config.addLayout(imageres_layout, 3, 1)
         grid_config.addWidget(self.img_height_text, 4, 1)
+
         grid_config.addWidget(samples_label ,5, 0)
         grid_config.addWidget(self.samples_text, 5, 1)
         grid_config.addWidget(iter_label ,6, 0)
@@ -919,8 +939,6 @@ class QTFractalMainWindow(QWidget):
         wayLayout.addWidget(btn_del,   2, 0)
         wayLayout.addWidget(btn_res,   3, 0)
         wayLayout.addLayout(durLayout, 4, 0)
-        #wayLayout.addWidget(dur_label, 4, 0)
-        #wayLayout.addWidget(self.dur_edit, 5, 0)
 
         self.grid_top = QGridLayout()
         self.grid_top.addLayout(wayLayout,          0, 0)
