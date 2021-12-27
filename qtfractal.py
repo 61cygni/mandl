@@ -618,7 +618,7 @@ class QTFractalMainWindow(QWidget):
 
         self.main_image = FractalImgQLabel(self)
         self.pixmap = QPixmap(main_image_name)
-        self.pixmap = pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, Qt.KeepAspectRatio, Qt.FastTransformation)
+        self.pixmap = self.pixmap.scaled(DEFAULT_DISPLAY_WIDTH, DEFAULT_DISPLAY_HEIGHT, Qt.KeepAspectRatio, Qt.FastTransformation)
         self.main_image.setPixmap(self.pixmap)
         self.grid_center.addWidget(self.main_image, 1, 0)
 
