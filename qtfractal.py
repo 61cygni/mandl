@@ -10,17 +10,23 @@
 #   level at the click location
 # - Use ctrl-Mouse click to zoom out
 #
+# Note : mpfrnative is a much faster high precision implementation than
+#        hpnative
+#
 # TODO:
 #
+# - passing precision in mpfrnative
 # - delete / reset on list
-# - waypoint preview
 # - clean up status / debug printing end to end
-# - add a rollback button to get to the last picture
 # - write raw calculations from C to binary file
 #
 # Done :
 #
+# - add a back button to get to the last n pictures
+# - get mpfrnative working fully (tested to -100, colors, samples, etc) 
+# - support passing max iter in ldnative and mpfrnative
 # - ability to save current config (should be easy now that we have
+# - waypoint preview
 #   context)
 # - preview radio button for snapshot window 
 # - add a "reset" button to get to the initial config
@@ -286,10 +292,11 @@ class SnapshotPopup(QWidget):
         filename_label      = QLabel('Filename')
         self.filename_text  = QLineEdit(self)
 
-        algo_label = QLabel('Fractal Algo')
+        algo_label = QLabel('Algo')
         self.algo_combo = QComboBox()
         self.algo_combo.addItem("ldnative")
-        self.algo_combo.addItem("hpnative")
+        self.algo_combo.addItem("mpfrnative")
+        self.algo_combo.addItem("hpnative(slow)")
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
         self.algo_combo.addItem("julia")
@@ -512,6 +519,10 @@ class FractalImgQLabel(QLabel):
 
         run(main_image_name, ctx)
 
+        if self.parent.cur_ctx:
+            self.parent.back_stack.append(self.parent.cur_ctx)
+        self.parent.cur_ctx = ctx    
+
         self.parent.refresh_ui(ctx)
 
         self.begin = event.pos()
@@ -529,7 +540,10 @@ class QTFractalMainWindow(QWidget):
 
         super(QTFractalMainWindow, self).__init__()
         self.parent = parent
-        self.waypoints = {}
+
+        self.waypoints  = {} # saved locations for animation
+        self.cur_ctx    = None
+        self.back_stack = [] # 
 
         self.init_ui()
 
@@ -631,6 +645,9 @@ class QTFractalMainWindow(QWidget):
 
         ctx = self.sync_config_from_ui()
         run(main_image_name, ctx)
+        if self.cur_ctx:
+            self.back_stack.append(self.cur_ctx)
+        self.cur_ctx = ctx    
         self.refresh_ui()
 
     # --
@@ -675,6 +692,19 @@ class QTFractalMainWindow(QWidget):
         self.snap_pop = SnapshotPopup(self, ctx)
         self.snap_pop.setGeometry(QRect(100, 100, 400, 200))
         self.snap_pop.show()
+
+    # --
+    # QTFractalMainWindow::back
+    # --
+
+    def back(self):
+        if len(self.back_stack) <= 0:
+            print("* Can't go back further")
+            return
+        ctx = self.back_stack.pop()
+        self.cur_ctx = None 
+        self.refresh_ui(ctx)
+        self.update()
 
     # --
     # QTFractalMainWindow::reset
@@ -797,14 +827,18 @@ class QTFractalMainWindow(QWidget):
         btn_reset = QPushButton("reset")
         btn_reset.clicked.connect(self.reset)
 
+        btn_back = QPushButton("back")
+        btn_back.clicked.connect(self.back)
+
         self.main_image.setAlignment(Qt.AlignCenter)
 
         # Basic config
 
-        algo_label = QLabel('Algorithm')
+        algo_label = QLabel('Algo')
         self.algo_combo = QComboBox()
         self.algo_combo.addItem("ldnative")
-        self.algo_combo.addItem("hpnative")
+        self.algo_combo.addItem("mpfrnative")
+        self.algo_combo.addItem("hpnative(slow)")
         self.algo_combo.addItem("mandeldistance")
         self.algo_combo.addItem("csmooth")
         self.algo_combo.addItem("julia")
@@ -897,6 +931,7 @@ class QTFractalMainWindow(QWidget):
 
         buttonLayout = QHBoxLayout()
         buttonLayout.addWidget(btn_snapshot)
+        buttonLayout.addWidget(btn_back)
         buttonLayout.addWidget(btn_reset)
         grid_config.addLayout(buttonLayout, 11, 1)
 
@@ -972,6 +1007,8 @@ class QTFractalMainWindow(QWidget):
         self.setLayout(self.grid)
 
         self.set_ui_defaults()
+        ctx = self.sync_config_from_ui()
+        self.back_stack.append(ctx)
         self.refresh_ui()
 
         # use splash screen to start

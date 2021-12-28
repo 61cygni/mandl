@@ -19,7 +19,6 @@ from PIL import Image
 
 from globalconfig import *
 
-PRECISION      = 300
 NativeLong_EXE = "./hpnative"
 Gen_DIR        = "hpfiles"
 

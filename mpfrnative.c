@@ -27,6 +27,9 @@
 
 static int img_w = 0, img_h = 0;
 
+#define MAX_SAMPLES 128
+static int samples = 65; // number of samples per pixel
+
 static float red   = 0.1; 
 static float green = 0.2;
 static float blue  = 0.3;
@@ -179,7 +182,7 @@ int main(int argc, char **argv)
 
     strncpy(filename, "hpcnative.png",FILESTR_LEN - 1);
 
-    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:c:l:m:")) != -1) {
+    while ((ch = getopt(argc, argv, "i:vw:h:n:b:x:y:p:c:l:m:s:r:g:b:")) != -1) {
         switch (ch) {
             case 'i':
                 iflag = 1;
@@ -218,6 +221,9 @@ int main(int argc, char **argv)
                 break;
             case 'c': 
                 blockno = atoi(optarg); 
+                break;
+            case 's': 
+                samples = atoi(optarg); 
                 break;
             case 'r': 
                 red = strtof(optarg, 0); 

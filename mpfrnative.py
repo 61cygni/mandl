@@ -18,13 +18,10 @@ from algo import Algo
 
 from PIL import Image
 
-PRECISION      = 300
+from globalconfig import *
+
 NativeLong_EXE = "./mpfrnative"
 Gen_DIR        = "mpfrfiles"
-
-hpf = decimal.Decimal
-decimal.getcontext().prec = PRECISION 
-
 
 c_width  = hpf(0.)
 c_height = hpf(0.)
@@ -44,24 +41,29 @@ class MPFRNative(Algo):
         self.color = (.1,.2,.3) 
         self.numprocs  = 0
         self.precision = 0
+        self.samples  = 17
         #self.color = (.0,.6,1.0) 
 
     def parse_options(self, opts, args):    
         for opt,arg in opts:
-            if opt in ['--nocolor']:
-                self.color = None 
-            elif opt in ['--numprocs']:
+            if opt in ['--numprocs']:
                 self.numprocs = int(arg) 
             elif opt in ['--precision']:
                 self.precision = int(arg) 
             elif opt in ['--setcolor']: # XXX TODO
-                pass
+                self.color = eval(arg) 
                 #self.color = (.1,.2,.3)   # dark
                 #self.color = (.0,.6,1.0) # blue / yellow
 
+        self.samples = self.context.samples 
+
         if self.precision == 0:
-            self.precision = PRECISION
+            self.precision = GLOBAL_PRECISION
             decimal.getcontext().prec = self.precision 
+
+        print('+ color to %s'%(str(self.color)))
+        print('+ number of samples %d'%(self.samples))
+        print('+ precision %d'%(self.precision))
 
 
     def set_default_params(self):
@@ -91,15 +93,17 @@ class MPFRNative(Algo):
         cmds      = []
         procs     = []
 
+        m_i    = self.context.max_iter
         c_real = self.context.c_real
         c_imag = self.context.c_imag
         c_w    = self.context.cmplx_width
+        p      = self.precision
 
         for i in range(0,self.numprocs):
             fn = self.dir+"mpfr%d.png"%(i)
             filenames.append(fn)
-            cmd_args =  self.exe+" -v -w %d -h %d -n %d -c %d -i %s  -x %s -y %s -l %s"%\
-                                 (img_width, img_height, self.numprocs, i+1, fn, str(c_real), str(c_imag), str(c_w) )
+            cmd_args =  self.exe+" -m %d -p %d -v -w %d -h %d -n %d -c %d -i %s  -x %s -y %s -l %s -s %d -r %f -g %f -b %f"%\
+                                 (m_i, p, img_width, img_height, self.numprocs, i+1, fn, str(c_real), str(c_imag), str(c_w), self.samples, self.color[0], self.color[1], self.color[2])
             cmds.append(cmd_args)
 
         
